@@ -3,7 +3,7 @@ CROSS_COMPILE=aarch64-linux-gnu-
 LLVM=1
 LLVM_IAS=1
 LD_LIBRARY_PATH=prebuilts/clang/host/linux-x86/clang-r383902/lib64:$$LD_LIBRARY_PATH
-# DEFCONFIG=defconfig
+DEFCONFIG=ls12_mt8797_wifi_64_defconfig
 KERNEL_DIR=kernel-4.19
 CLANG_PREBUILT_BIN=prebuilts/clang/host/linux-x86/clang-r383902/bin
 # for check scripts

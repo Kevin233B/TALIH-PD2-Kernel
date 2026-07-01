@@ -31,3 +31,9 @@ TALPAD的/proc/version记录的编译环境是llvm-r383902
 因此我特地准备了编译用的clang和lld
 
 [Download llvm-tools](https://github.com/Kevin233B/TALIH-PD2-Kernel/releases/download/llvm-r383902b/llvm-tools.zip)
+
+噢当然 如果要是你还费心费力的去下载 移到对应目录 那你就错了哈哈
+
+我已经把需要的东西放在prebuilts里面了 amd64开箱即用
+
+什么？为什么不支持arm64？不知道不知道 自己去编译llvm啊
