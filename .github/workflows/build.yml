@@ -20,8 +20,14 @@ jobs:
       - name: Build kernel
         run: |
           chmod +x build-mt8797.sh
+          chmod +x Integrate_sukisu.sh
+          chmod +x Integrate_SUSFS.sh
+          chmod +x download_clang.sh
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
+          ./Integrate_sukisu.sh
+          ./Integrate_SUSFS.sh
+          ./download_clang.sh
           ./build-mt8797.sh
 
       - name: Package artifacts
