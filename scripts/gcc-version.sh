@@ -15,6 +15,11 @@ if [ "$1" = "-p" ] ; then
 	shift;
 fi
 
+if [ "$1" = "-s" ] ; then
+	strip_zero=1;
+	shift;
+fi
+
 compiler="$*"
 
 if [ ${#compiler} -eq 0 ]; then
@@ -27,7 +32,13 @@ MAJOR=$(echo __GNUC__ | $compiler -E -x c - | tail -n 1)
 MINOR=$(echo __GNUC_MINOR__ | $compiler -E -x c - | tail -n 1)
 if [ "x$with_patchlevel" != "x" ] ; then
 	PATCHLEVEL=$(echo __GNUC_PATCHLEVEL__ | $compiler -E -x c - | tail -n 1)
-	printf "%02d%02d%02d\\n" $MAJOR $MINOR $PATCHLEVEL
+	version=$(printf "%02d%02d%02d" $MAJOR $MINOR $PATCHLEVEL)
 else
-	printf "%02d%02d\\n" $MAJOR $MINOR
+	version=$(printf "%02d%02d" $MAJOR $MINOR)
+fi
+
+if [ "x$strip_zero" != "x" ] ; then
+	echo $version | sed 's/^0*//'
+else
+	echo $version
 fi
