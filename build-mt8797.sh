@@ -7,5 +7,6 @@ curl -L -o "$CLANG_BIN/clang" "https://github.com/Kevin233B/TALIH-PD2-Kernel/rel
 chmod +x "$CLANG_BIN/clang"
 fi
 curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s builtin
+export PATH="$PWD/$CLANG_BIN:$PATH"
 make O=out ARCH=arm64 CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump READELF=llvm-readelf OBJSIZE=llvm-size STRIP=llvm-strip CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1 ls12_mt8797_wifi_64_defconfig
 make O=out ARCH=arm64 CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump READELF=llvm-readelf OBJSIZE=llvm-size STRIP=llvm-strip CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1 -j$(nproc)
