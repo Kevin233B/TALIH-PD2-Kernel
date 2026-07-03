@@ -25,7 +25,6 @@ jobs:
           chmod +x download_clang.sh
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
-          ./Integrate_SUSFS.sh
           ./download_clang.sh
           ./build-mt8797.sh
 
