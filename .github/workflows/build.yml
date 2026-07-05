@@ -28,18 +28,20 @@ jobs:
           ./download_clang.sh
           ./build-mt8797.sh
 
-      - name: Package artifacts
+      - name: Package Image.gz
         run: |
           mkdir -p artifacts
-          cp -r out/* artifacts/ 2>/dev/null || true
+          # 复制 Image.gz 到 artifacts 目录
+          cp arch/arm64/boot/Image.gz artifacts/
+          # 重命名为带哈希的文件名
           cd artifacts
-          tar -czf kernel-${GITHUB_SHA::8}.tar.gz *
+          mv Image.gz Image-${GITHUB_SHA::8}.gz
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-package
-          path: artifacts/kernel-*.tar.gz
+          name: kernel-image
+          path: artifacts/Image-*.gz
           retention-days: 7
 
   release:
@@ -51,14 +53,14 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          name: kernel-package
+          name: kernel-image
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: Kernel MT8797 ${{ github.ref_name }}
-          body: Kernel build for MT8797
-          files: kernel-*.tar.gz
+          body: Kernel Image.gz for MT8797
+          files: Image-*.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
