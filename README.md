@@ -1,5 +1,21 @@
 # TALIH-PD2_Kernel
 
+基本名词详解：
+
+1.TAL：好未来（包括旗下的学而思）
+
+2.TALPAD：学而思学习机（学而思平板;好未来平板）
+
+3.TALPAD-BOOM：由Public class 早茶光于2024年3月18日组建的TALPAD讨论群，并非TAL附属组织，其核心理念是“自由、开放与安全”，于2025年5月1日转移主权，其管理层仍处于核心地位，目前Public class 早茶光已不再参与主要破解/管理/开发工作，但其带来的影响力不可忽视
+
+4.内核Root：分为两大类，第一种是直接依靠外部修补的root管理器，如“FolkPatch”“APatch”，第二种是内核集成式root，如SukiSu，KernelSU
+
+5.GKI：通用内核映像，是Google自Kernel 5.4以来开始施行的统一开发管理，为解决不同设备、不同厂商内核源码的碎片化
+
+6.TALPAD-Kernel-Team：负责管理此内核源码的直属组织，衍生于TALPAD-BOOM，但由于TALPAD-BOOM人均技术水平不足3.8分（满分十分）而迟迟无法找到更多开发者
+
+---
+
 如你所见，这里如你所见
 
 这是一个由TALPAD-BOOM开发团队维护的TALPAD设备的Linux kernel，对，你没看错，就是那个Linux kernel，我们打算给TALPAD维护内核
@@ -24,15 +40,13 @@ Copyright (C) 2026 TAL (TALPAD-BOOM) (modified distribution)
 
 本仓库基于Linux内核源码修改发布，原始版权归Linux内核社区所有，修改部分版权归TALPAD-BOOM开发团队所有
 
-# 怎么编译这坨屎？
+# 怎么编译内核？~~再也不是屎了~~
 
 TALPAD的/proc/version记录的编译环境是llvm-r383902
 
 因此我特地准备了编译用的clang和lld
 
 [Download llvm-tools](https://github.com/Kevin233B/TALIH-PD2-Kernel/releases/download/llvm-r383902b/llvm-tools.zip)
-
-噢当然 如果要是你还费心费力的去下载 移到对应目录 那你就错了哈哈
 
 我已经把需要的东西放在prebuilts里面了 amd64开箱即用
 
@@ -48,7 +62,7 @@ TALPAD的/proc/version记录的编译环境是llvm-r383902
 
 4.最后执行build-mt8797.sh
 
-注意：这些脚本目前还处于开发阶段 原开发者执行都没执行过 就是个毛坯 你要lkm集成还是builtin都可以
+注意：这些脚本目前还处于开发阶段，因此可能会造成一些意外的问题
 
 如果你需要sukisu/ksu，请自行修改defconfig
 
