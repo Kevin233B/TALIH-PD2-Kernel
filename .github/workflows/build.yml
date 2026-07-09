@@ -32,7 +32,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: kernel-image
-          path: out/arch/arm64/boot/Image.gz
+          path: |
+            out/arch/arm64/boot/Image.gz
+            out/System.map
+            out/vmlinux
           retention-days: 7
 
   release:
