@@ -354,12 +354,12 @@ int mtkfb_set_backlight_level(unsigned int level)
 	struct drm_crtc *crtc;
 
 	/* this debug cmd only for crtc0 */
-	crtc = list_first_entry(&(drm_dev)->mode_config.crtc_list,
-				typeof(*crtc), head);
-	if (!crtc) {
+	if (!drm_dev || list_empty(&drm_dev->mode_config.crtc_list)) {
 		DDPPR_ERR("find crtc fail\n");
 		return 0;
 	}
+	crtc = list_first_entry(&drm_dev->mode_config.crtc_list,
+				typeof(*crtc), head);
 	mtk_drm_setbacklight(crtc, level);
 
 	return 0;
@@ -2546,12 +2546,12 @@ static int idletime_set(void *data, u64 val)
 	if (val > 1000000)
 		val = 1000000;
 
-	crtc = list_first_entry(&(drm_dev)->mode_config.crtc_list,
-				typeof(*crtc), head);
-	if (!crtc) {
+	if (!drm_dev || list_empty(&drm_dev->mode_config.crtc_list)) {
 		DDPPR_ERR("find crtc fail\n");
 		return -ENODEV;
 	}
+	crtc = list_first_entry(&drm_dev->mode_config.crtc_list,
+				typeof(*crtc), head);
 	ret = mtk_drm_set_idle_check_interval(crtc, val);
 	if (ret == 0)
 		return -ENODEV;
@@ -2563,12 +2563,12 @@ static int idletime_get(void *data, u64 *val)
 {
 	struct drm_crtc *crtc;
 
-	crtc = list_first_entry(&(drm_dev)->mode_config.crtc_list,
-				typeof(*crtc), head);
-	if (!crtc) {
+	if (!drm_dev || list_empty(&drm_dev->mode_config.crtc_list)) {
 		DDPPR_ERR("find crtc fail\n");
 		return -ENODEV;
 	}
+	crtc = list_first_entry(&drm_dev->mode_config.crtc_list,
+				typeof(*crtc), head);
 	*val = mtk_drm_get_idle_check_interval(crtc);
 	if (*val == 0)
 		return -ENODEV;

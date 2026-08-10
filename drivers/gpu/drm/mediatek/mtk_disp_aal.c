@@ -485,6 +485,8 @@ void disp_aal_notify_backlight_changed(int trans_backlight)
 	g_aal_hist.backlight = trans_backlight;
 	g_aal_hist.serviceFlags |= service_flags;
 	spin_unlock_irqrestore(&g_aal_hist_lock, flags);
+	if (!default_comp || !default_comp->mtk_crtc)
+		return;
 	// always notify aal service for LED changed
 	mtk_drm_idlemgr_kick(__func__, &default_comp->mtk_crtc->base, 1);
 	disp_aal_refresh_by_kernel();

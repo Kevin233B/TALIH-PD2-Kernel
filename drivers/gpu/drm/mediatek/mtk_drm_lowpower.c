@@ -188,6 +188,8 @@ void mtk_drm_idlemgr_kick(const char *source, struct drm_crtc *crtc,
 		return;
 	idlemgr = mtk_crtc->idlemgr;
 	idlemgr_ctx = idlemgr->idlemgr_ctx;
+	if (!idlemgr_ctx)
+		return;
 
 	/* get lock to protect idlemgr_last_kick_time and is_idle */
 	if (need_lock)
