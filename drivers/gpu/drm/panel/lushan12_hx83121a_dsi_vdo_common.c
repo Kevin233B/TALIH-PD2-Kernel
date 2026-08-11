@@ -28,6 +28,7 @@
 #include <video/of_videomode.h>
 #include <video/videomode.h>
 
+#define CONFIG_MTK_PANEL_EXT
 #if defined(CONFIG_MTK_PANEL_EXT)
 #include "../mediatek/mtk_panel_ext.h"
 #include "../mediatek/mtk_log.h"
