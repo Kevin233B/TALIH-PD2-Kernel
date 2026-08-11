@@ -1,0 +1,6 @@
+# 用户提供、永不提交（见 assets/模型交接文档.md 第 2 节）
+assets/
+boot_logs.zip
+
+# 反编译/参考产物持久目录（由 /tmp 迁移而来）
+.talih_ref/
