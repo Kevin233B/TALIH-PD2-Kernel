@@ -781,7 +781,7 @@ u8 tct_battery_read_once;
 
 int hx83121a_pen_bat_report(char *buf, int *battery, int mode)
 {
-	u8 val = 0;
+	u8 val[4] = { 0 };
 	int i;
 
 	*battery = tct_pen_battery;
@@ -790,31 +790,31 @@ int hx83121a_pen_bat_report(char *buf, int *battery, int mode)
 		tct_pen_battery = 0;
 	} else if (hx_s_core_fp._register_read) {
 		for (i = 0; i < 30; i++) {
-			hx_s_core_fp._register_read(0x10007450, &val, 4);
-			if (val <= 100)
+			hx_s_core_fp._register_read(0x10007450, val, 4);
+			if (val[0] <= 100)
 				break;
 			usleep_range(10000, 11000);
 		}
-		tct_pen_battery = val;
+		tct_pen_battery = val[0];
 	}
 
 	pr_info("\x016[HXTP] %s: Pen battery read Sucess\n", __func__);
-	pr_info("\x016[HXTP] %s, pen battery : %d%%\n", __func__, val);
+	pr_info("\x016[HXTP] %s, pen battery : %d%%\n", __func__, val[0]);
 
 	if (mode == 1) {
-		if (val > 100)
-			val = 0xff;
-		sprintf(buf, "%d", val);
+		if (val[0] > 100)
+			val[0] = 0xff;
+		sprintf(buf, "%d", val[0]);
 		return 0;
 	}
 
-	if (val == 0 || val > 100)
+	if (val[0] == 0 || val[0] > 100)
 		sprintf(buf, "Unknown");
-	else if (val <= 12)
+	else if (val[0] <= 12)
 		sprintf(buf, "Empty");
-	else if (val <= 24)
+	else if (val[0] <= 24)
 		sprintf(buf, "Low");
-	else if (val <= 49)
+	else if (val[0] <= 49)
 		sprintf(buf, "Medium");
 	else
 		sprintf(buf, "High");
@@ -825,7 +825,7 @@ int hx83121a_pen_bat_report(char *buf, int *battery, int mode)
 static ssize_t himax_proc_battery_read(struct file *file, char __user *buf,
 				       size_t count, loff_t *ppos)
 {
-	u8 val = 0;
+	u8 val[4] = { 0 };
 	char *tmp;
 	int len;
 
@@ -836,9 +836,9 @@ static ssize_t himax_proc_battery_read(struct file *file, char __user *buf,
 	if (!hx_s_core_fp._register_read)
 		return 0;
 
-	hx_s_core_fp._register_read(0x10007450, &val, 4);
-	pr_info("\x016[HXTP] %s, 0x10007450 = : 0x%x\n", __func__, val);
-	tct_pen_battery = val;
+	hx_s_core_fp._register_read(0x10007450, val, 4);
+	pr_info("\x016[HXTP] %s, 0x10007450 = : 0x%x\n", __func__, val[0]);
+	tct_pen_battery = val[0];
 
 	tmp = kmalloc(count, GFP_KERNEL);
 	if (!tmp)
