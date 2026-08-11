@@ -1003,7 +1003,7 @@ int himax_ts_unregister_interrupt(void)
 
 #if defined(HX_CONFIG_DRM) || defined(HX_CONFIG_FB) ||\
 	defined(HX_CONFIG_PM) || defined(HX_CONFIG_DRM_PANEL)
-static int himax_common_suspend(struct device *dev)
+int himax_common_suspend(struct device *dev)
 {
 	struct himax_ts_data *ts = dev_get_drvdata(dev);
 
@@ -1015,6 +1015,7 @@ static int himax_common_suspend(struct device *dev)
 	himax_chip_common_suspend(ts);
 	return 0;
 }
+EXPORT_SYMBOL(himax_common_suspend);
 #if !defined(HX_CONTAINER_SPEED_UP)
 int himax_common_resume(struct device *dev)
 {

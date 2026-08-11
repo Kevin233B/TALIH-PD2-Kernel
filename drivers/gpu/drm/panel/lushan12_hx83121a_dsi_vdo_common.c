@@ -43,8 +43,10 @@
  * the TDDI stays in sync after LCM power-on.
  */
 extern int himax_common_resume(struct device *dev);
+extern int himax_common_suspend(struct device *dev);
 extern struct device *tct_get_touch_dev(void);
 extern int tct_get_panel_resume_flag(void);
+extern int tct_get_gesture_en(void);
 
 #ifndef PANEL_DRIVER_NAME
 #error "PANEL_DRIVER_NAME must be defined by the including file"
@@ -285,6 +287,16 @@ static int lcm_unprepare(struct drm_panel *panel)
 	ctx->prepared = false;
 	mdelay(1);
 
+	/*
+	 * TCT: keep the panel powered when single-click wake is enabled so
+	 * the touch IC can still wake the system (same as the OEM kernel).
+	 */
+	if (tct_get_gesture_en()) {
+		pr_info("lcm_unprepare tct_singleclkick_wakeup_en is enable, "
+			"skip power down\n");
+		return 0;
+	}
+
 	ctx->reset_gpio = devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_LOW);
 	if (IS_ERR(ctx->reset_gpio)) {
 		dev_err(ctx->dev, "%s: cannot get reset_gpio %ld\n",
@@ -315,6 +327,9 @@ static int lcm_unprepare(struct drm_panel *panel)
 	gpiod_set_value(ctx->bias_pos, 0);
 	devm_gpiod_put(ctx->dev, ctx->bias_pos);
 	mdelay(5);
+
+	if (tct_get_panel_resume_flag() && tct_get_touch_dev())
+		himax_common_suspend(tct_get_touch_dev());
 
 	pr_info("%s-\n", __func__);
 	return 0;
