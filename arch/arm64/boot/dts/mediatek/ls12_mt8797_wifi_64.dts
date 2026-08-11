@@ -399,10 +399,27 @@ fsa4480@42 {
 	clock-frequency = <400000>;
 	status = "okay";
 //Begin by yongzhuo for LUSHAN-3 on 2023.07.01
-	tct_i2c_lcd_bias:tct_i2c_lcd_bias@3e {
-		compatible = "tct,i2c_lcd_bias";
+	aw3750x: aw3750x@3e {
+		compatible = "awinic,aw3750x_led";
+		aw3750x_gpio_ctrl = <0>;
 		reg = <0x3e>;
-		status = "okay";
+		limit = <0x172>;
+		outp = <0x0e>;
+		outn = <0x0e>;
+
+		enp {
+			label = "outp";
+			regulator-name = "outp";
+			regulator-min-microvolt = <4000000>;
+			regulator-max-microvolt = <6000000>;
+		};
+
+		enn {
+			label = "outn";
+			regulator-name = "outn";
+			regulator-min-microvolt = <4000000>;
+			regulator-max-microvolt = <6000000>;
+		};
 	};
 //End by yongzhuo for LUSHAN-3 on 2023.07.01
 	speaker_amp: speaker_amp@34 {
@@ -851,19 +868,36 @@ fsa4480@42 {
 	status = "okay";
 	#address-cells = <1>;
 	#size-cells = <0>;
-	panel@0 {
-		compatible = "hera,hx83121a_cdot_csot_wqxga_dsi_vdo";
-		//compatible = "hera,hx83121a";
+	panel1@0 {
+		compatible = "lushan12,hx83121a_cdot_csot_without_vcom_wqxga_dsi_vdo";
 		reg = <0>;
 		reset-gpios = <&pio 42 0>; /* LCM reset */
-                bias-gpios = <&pio 29 0>, <&pio 28 0>; /* +-5.5V */
+		bias-gpios = <&pio 29 0>, <&pio 28 0>; /* +-5.5V */
 		vddi_18-gpios = <&pio 27 0>;
 		vdd_12-gpios = <&pio 127 0>;
 		tp_reset-gpios = <&pio 14 0>;
+		tct_esd_te_master = <&pio 41 0>;
+		tct_esd_te_slave = <&pio 7 0>;
 		pinctrl-names = "default";
-		//pinctrl-0 = <&dsi0_reset_pin>;
 		port {
-			panel_in: endpoint {
+			panel_in1: endpoint {
+				remote-endpoint = <&dsi_out>;
+			};
+		};
+	};
+	panel2@0 {
+		compatible = "lushan12,hx83121a_cdot_csot_wqxga_dsi_vdo";
+		reg = <1>;
+		reset-gpios = <&pio 42 0>;
+		bias-gpios = <&pio 29 0>, <&pio 28 0>;
+		vddi_18-gpios = <&pio 27 0>;
+		vdd_12-gpios = <&pio 127 0>;
+		tp_reset-gpios = <&pio 14 0>;
+		tct_esd_te_master = <&pio 41 0>;
+		tct_esd_te_slave = <&pio 7 0>;
+		pinctrl-names = "default";
+		port {
+			panel_in2: endpoint {
 				remote-endpoint = <&dsi_out>;
 			};
 		};
@@ -872,7 +906,7 @@ fsa4480@42 {
 		port@0 {
 			reg = <0>;
 			dsi_out: endpoint {
-				remote-endpoint = <&panel_in>;
+				remote-endpoint = <&panel_in1>;
 			};
 		};
 		port@1 {

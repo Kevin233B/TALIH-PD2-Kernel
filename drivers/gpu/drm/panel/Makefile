@@ -75,6 +75,8 @@ obj-$(CONFIG_BACKLIGHT_KTZ8866) += ktz8866.o
 obj-$(CONFIG_DRM_PANEL_NT36532_DSI_VDO_BOE_6382) += panel-nt36532-dsi-vdo-boe-6382.o
 #Begin by yongzhuo for LUSHAN-3 on 2023.07.01
 obj-$(CONFIG_TCT_BIAS_TPS65132_I2C) +=tct-panel-lcd-power.o
-obj-$(CONFIG_DRM_PANEL_LUSHAN12_HX83121A_CDOT_CSOT_WQXGA_VDO) +=lushan12_hx83121a_cdot_csot_1600x2560_dsi_vdo.o
+obj-$(CONFIG_DRM_PANEL_LUSHAN12_HX83121A_CDOT_CSOT_WQXGA_VDO) +=lushan12_hx83121a_cdot_csot_wqxga_dsi_vdo.o
+obj-$(CONFIG_DRM_PANEL_LUSHAN12_HX83121A_CDOT_CSOT_WITHOUT_VCOM_WQXGA_VDO) +=lushan12_hx83121a_cdot_csot_without_vcom_wqxga_dsi_vdo.o
+obj-$(CONFIG_AW3750X_POWER) +=aw3750x_power.o
 obj-$(CONFIG_DRM_PANEL_LUSHAN14_NT36532_CDOT_CSOT_2880X1800_VDO) +=lushan14_nt36532_cdot_csot_2880x1800_dsi_vdo.o
 #End by yongzhuo for LUSHAN-3 on 2023.07.01

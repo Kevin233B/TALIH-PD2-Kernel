@@ -1,0 +1,646 @@
+/* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * TALPAD (TALIH-PD2, ls12_mt8797_wifi_64) HX83121A CDOT CSOT WQXGA DSI VDO
+ * panel driver, reconstructed from the OEM kernel 4.19.191+ (2026-03-26).
+ *
+ * Two variants share this implementation:
+ *   - without_vcom: lushan12,hx83121a_cdot_csot_without_vcom_wqxga_dsi_vdo
+ *   - with_vcom:    lushan12,hx83121a_cdot_csot_wqxga_dsi_vdo
+ * The only differences are the compatible/driver name and one extra DSI
+ * command (0xb6 0x88 0x88 0x03) sent by the with_vcom variant.
+ */
+#include <linux/backlight.h>
+#include <linux/delay.h>
+#include <linux/gpio.h>
+#include <linux/gpio/consumer.h>
+#include <linux/module.h>
+#include <linux/of.h>
+#include <linux/of_device.h>
+#include <linux/of_gpio.h>
+#include <linux/of_platform.h>
+#include <linux/platform_device.h>
+
+#include <drm/drmP.h>
+#include <drm/drm_mipi_dsi.h>
+#include <drm/drm_panel.h>
+
+#include <video/mipi_display.h>
+#include <video/of_videomode.h>
+#include <video/videomode.h>
+
+#if defined(CONFIG_MTK_PANEL_EXT)
+#include "../mediatek/mtk_panel_ext.h"
+#include "../mediatek/mtk_log.h"
+#include "../mediatek/mtk_drm_graphics_base.h"
+#endif
+
+#include "lushan12_hx83121a_dsi_vdo_init.h"
+#include "aw3750x_power.h"
+
+#ifndef PANEL_DRIVER_NAME
+#error "PANEL_DRIVER_NAME must be defined by the including file"
+#endif
+#ifndef PANEL_COMPATIBLE
+#error "PANEL_COMPATIBLE must be defined by the including file"
+#endif
+
+#ifndef PANEL_HAS_EXTRA_VCOM_CMD
+#define PANEL_HAS_EXTRA_VCOM_CMD 0
+#endif
+
+#define PANEL_WIDTH		1600
+#define PANEL_HEIGHT		2560
+#define PHYSICAL_WIDTH_UM	166244
+#define PHYSICAL_HEIGHT_UM	265958
+
+#define HSA			20
+#define HBP			40
+#define HFP			60
+#define VSA			4
+#define VBP			18
+
+/* 72 Hz mode */
+#define MODE_0_FPS		72
+#define MODE_0_VFP		3246
+#define PANEL_CLOCK_72HZ	579110
+
+/* 64 Hz mode */
+#define MODE_1_FPS		64
+#define MODE_1_VFP		332
+#define PANEL_CLOCK_64HZ	568972
+
+struct lcm {
+	struct device *dev;
+	struct drm_panel panel;
+	struct backlight_device *backlight;
+	struct gpio_desc *reset_gpio;
+	struct gpio_desc *bias_pos;
+	struct gpio_desc *bias_neg;
+	struct gpio_desc *vddi_18;
+	struct gpio_desc *vdd_12;
+	int esd_te_master;
+	int esd_te_slave;
+	bool prepared;
+	bool enabled;
+	int error;
+};
+
+static inline struct lcm *panel_to_lcm(struct drm_panel *panel)
+{
+	return container_of(panel, struct lcm, panel);
+}
+
+static int lcm_dcs_write(struct lcm *ctx, const void *data, size_t len)
+{
+	struct mipi_dsi_device *dsi = to_mipi_dsi_device(ctx->dev);
+
+	return mipi_dsi_generic_write(dsi, data, len);
+}
+
+static void lcm_panel_init(struct lcm *ctx)
+{
+	struct mipi_dsi_device *dsi = to_mipi_dsi_device(ctx->dev);
+	const struct hx83121a_init_cmd *cmd;
+	int i, ret;
+
+	/* vddi_18 */
+	ctx->vddi_18 = devm_gpiod_get(ctx->dev, "vddi_18", GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->vddi_18))
+		dev_err(ctx->dev, "%s: cannot get vddi_18 %ld\n",
+			__func__, PTR_ERR(ctx->vddi_18));
+	else
+		devm_gpiod_put(ctx->dev, ctx->vddi_18);
+	mdelay(2);
+
+	ctx->bias_pos = devm_gpiod_get_index(ctx->dev, "bias", 0,
+					     GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->bias_pos))
+		dev_err(ctx->dev, "%s: cannot get bias_pos %ld\n",
+			__func__, PTR_ERR(ctx->bias_pos));
+	else
+		devm_gpiod_put(ctx->dev, ctx->bias_pos);
+	mdelay(5);
+
+	ctx->bias_neg = devm_gpiod_get_index(ctx->dev, "bias", 1,
+					     GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->bias_neg))
+		dev_err(ctx->dev, "%s: cannot get bias_neg %ld\n",
+			__func__, PTR_ERR(ctx->bias_neg));
+	else
+		devm_gpiod_put(ctx->dev, ctx->bias_neg);
+	mdelay(5);
+
+	ctx->reset_gpio = devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->reset_gpio))
+		dev_err(ctx->dev, "%s: cannot get reset_gpio %ld\n",
+			__func__, PTR_ERR(ctx->reset_gpio));
+	else
+		devm_gpiod_put(ctx->dev, ctx->reset_gpio);
+	mdelay(5);
+
+	/* AW3750x LCD bias: 5.6 V positive/negative, 150 mA */
+	tct_aw3750x_ldo_current_set(150000, 150000);
+	tct_aw3750x_volt_outp_set(0x10);
+	tct_aw3750x_volt_outn_set(0x10);
+	mdelay(1);
+
+	ctx->bias_pos = devm_gpiod_get_index(ctx->dev, "bias", 0,
+					     GPIOD_OUT_HIGH);
+	if (!IS_ERR(ctx->bias_pos)) {
+		gpiod_set_value(ctx->bias_pos, 1);
+		devm_gpiod_put(ctx->dev, ctx->bias_pos);
+	}
+	mdelay(5);
+
+	ctx->bias_neg = devm_gpiod_get_index(ctx->dev, "bias", 1,
+					     GPIOD_OUT_HIGH);
+	if (!IS_ERR(ctx->bias_neg)) {
+		gpiod_set_value(ctx->bias_neg, 1);
+		devm_gpiod_put(ctx->dev, ctx->bias_neg);
+	}
+	mdelay(1);
+
+	ctx->reset_gpio = devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
+	if (!IS_ERR(ctx->reset_gpio)) {
+		gpiod_set_value(ctx->reset_gpio, 1);
+		mdelay(5);
+		gpiod_set_value(ctx->reset_gpio, 0);
+		mdelay(5);
+		gpiod_set_value(ctx->reset_gpio, 1);
+		mdelay(5);
+		devm_gpiod_put(ctx->dev, ctx->reset_gpio);
+	}
+	mdelay(141);
+
+	ctx->error = 0;
+	for (i = 0; i < 7; i++) {
+		cmd = &hx83121a_cdot_csot_init_seq[i];
+		ret = mipi_dsi_generic_write(dsi, cmd->data, cmd->len);
+		if (ret < 0) {
+			ctx->error = ret;
+			dev_err(ctx->dev, "%s: init cmd %d failed: %d\n",
+				__func__, i, ret);
+			return;
+		}
+	}
+
+#if PANEL_HAS_EXTRA_VCOM_CMD
+	cmd = &hx83121a_cdot_csot_with_vcom_extra_seq[0];
+	ret = mipi_dsi_generic_write(dsi, cmd->data, cmd->len);
+	if (ret < 0) {
+		ctx->error = ret;
+		dev_err(ctx->dev, "%s: with_vcom extra cmd failed: %d\n",
+			__func__, ret);
+		return;
+	}
+#endif
+
+	for (; i < HX83121A_CDOT_CSOT_INIT_SEQ_LEN; i++) {
+		cmd = &hx83121a_cdot_csot_init_seq[i];
+		ret = mipi_dsi_generic_write(dsi, cmd->data, cmd->len);
+		if (ret < 0) {
+			ctx->error = ret;
+			dev_err(ctx->dev, "%s: init cmd %d failed: %d\n",
+				__func__, i, ret);
+			return;
+		}
+	}
+
+	if (!ctx->error) {
+		ret = lcm_dcs_write(ctx, hx83121a_cdot_csot_sleep_out_seq,
+				    HX83121A_CDOT_CSOT_SLEEP_OUT_SEQ_LEN);
+		if (ret < 0) {
+			ctx->error = ret;
+			dev_err(ctx->dev, "%s: sleep out failed: %d\n",
+				__func__, ret);
+			return;
+		}
+		mdelay(120);
+	}
+
+	if (!ctx->error) {
+		ret = lcm_dcs_write(ctx, hx83121a_cdot_csot_display_on_seq,
+				    HX83121A_CDOT_CSOT_DISPLAY_ON_SEQ_LEN);
+		if (ret < 0) {
+			ctx->error = ret;
+			dev_err(ctx->dev, "%s: display on failed: %d\n",
+				__func__, ret);
+			return;
+		}
+		mdelay(50);
+	}
+}
+
+static int lcm_disable(struct drm_panel *panel)
+{
+	struct lcm *ctx = panel_to_lcm(panel);
+
+	if (!ctx->enabled)
+		return 0;
+
+	if (ctx->backlight) {
+		ctx->backlight->props.power = FB_BLANK_POWERDOWN;
+		backlight_update_status(ctx->backlight);
+	}
+
+	ctx->enabled = false;
+	return 0;
+}
+
+static int lcm_unprepare(struct drm_panel *panel)
+{
+	struct lcm *ctx = panel_to_lcm(panel);
+	u8 cmd;
+
+	pr_info("%s()+ %d,%d,%d\n", __func__, ctx->prepared, ctx->enabled,
+		ctx->error);
+	if (!ctx->prepared)
+		return 0;
+
+	if (ctx->error >= 0) {
+		cmd = 0x28; /* display off */
+		lcm_dcs_write(ctx, &cmd, 1);
+		mdelay(50);
+	}
+
+	if (ctx->error >= 0) {
+		cmd = 0x10; /* sleep in */
+		lcm_dcs_write(ctx, &cmd, 1);
+		mdelay(120);
+	}
+
+	ctx->error = 0;
+	ctx->prepared = false;
+	mdelay(1);
+
+	ctx->reset_gpio = devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_LOW);
+	if (IS_ERR(ctx->reset_gpio)) {
+		dev_err(ctx->dev, "%s: cannot get reset_gpio %ld\n",
+			__func__, PTR_ERR(ctx->reset_gpio));
+		return PTR_ERR(ctx->reset_gpio);
+	}
+	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
+	mdelay(5);
+
+	ctx->bias_neg = devm_gpiod_get_index(ctx->dev, "bias", 1,
+					     GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->bias_neg)) {
+		dev_err(ctx->dev, "%s: cannot get bias_neg %ld\n",
+			__func__, PTR_ERR(ctx->bias_neg));
+		return PTR_ERR(ctx->bias_neg);
+	}
+	gpiod_set_value(ctx->bias_neg, 0);
+	devm_gpiod_put(ctx->dev, ctx->bias_neg);
+	mdelay(5);
+
+	ctx->bias_pos = devm_gpiod_get_index(ctx->dev, "bias", 0,
+					     GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->bias_pos)) {
+		dev_err(ctx->dev, "%s: cannot get bias_pos %ld\n",
+			__func__, PTR_ERR(ctx->bias_pos));
+		return PTR_ERR(ctx->bias_pos);
+	}
+	gpiod_set_value(ctx->bias_pos, 0);
+	devm_gpiod_put(ctx->dev, ctx->bias_pos);
+	mdelay(5);
+
+	pr_info("%s-\n", __func__);
+	return 0;
+}
+
+static int lcm_prepare(struct drm_panel *panel)
+{
+	struct lcm *ctx = panel_to_lcm(panel);
+	int ret;
+
+	pr_info("%s\n", __func__);
+	if (ctx->prepared)
+		return 0;
+
+	lcm_panel_init(ctx);
+	ret = ctx->error;
+	if (ret < 0)
+		lcm_unprepare(panel);
+
+	ctx->prepared = true;
+	return ret;
+}
+
+static int lcm_enable(struct drm_panel *panel)
+{
+	struct lcm *ctx = panel_to_lcm(panel);
+
+	if (ctx->enabled)
+		return 0;
+
+	if (ctx->backlight) {
+		ctx->backlight->props.power = FB_BLANK_UNBLANK;
+		backlight_update_status(ctx->backlight);
+	}
+
+	ctx->enabled = true;
+	return 0;
+}
+
+static const struct drm_display_mode default_mode = {
+	.clock		= PANEL_CLOCK_72HZ,
+	.hdisplay	= PANEL_WIDTH,
+	.hsync_start	= PANEL_WIDTH + HFP,
+	.hsync_end	= PANEL_WIDTH + HFP + HSA,
+	.htotal		= PANEL_WIDTH + HFP + HSA + HBP,
+	.vdisplay	= PANEL_HEIGHT,
+	.vsync_start	= PANEL_HEIGHT + MODE_0_VFP,
+	.vsync_end	= PANEL_HEIGHT + MODE_0_VFP + VSA,
+	.vtotal		= PANEL_HEIGHT + MODE_0_VFP + VSA + VBP,
+	.vrefresh	= MODE_0_FPS,
+};
+
+static const struct drm_display_mode performance_mode = {
+	.clock		= PANEL_CLOCK_64HZ,
+	.hdisplay	= PANEL_WIDTH,
+	.hsync_start	= PANEL_WIDTH + HFP,
+	.hsync_end	= PANEL_WIDTH + HFP + HSA,
+	.htotal		= PANEL_WIDTH + HFP + HSA + HBP,
+	.vdisplay	= PANEL_HEIGHT,
+	.vsync_start	= PANEL_HEIGHT + MODE_1_VFP,
+	.vsync_end	= PANEL_HEIGHT + MODE_1_VFP + VSA,
+	.vtotal		= PANEL_HEIGHT + MODE_1_VFP + VSA + VBP,
+	.vrefresh	= MODE_1_FPS,
+};
+
+static int lcm_get_modes(struct drm_panel *panel)
+{
+	struct drm_connector *connector = panel->connector;
+	struct drm_display_mode *mode;
+	struct drm_display_mode *mode_64hz;
+
+	mode = drm_mode_duplicate(panel->drm, &default_mode);
+	if (!mode) {
+		dev_err(panel->dev, "failed to add mode %dx%d@%d\n",
+			PANEL_WIDTH, PANEL_HEIGHT, MODE_0_FPS);
+		return -ENOMEM;
+	}
+	mode->vrefresh = MODE_0_FPS;
+	drm_mode_set_name(mode);
+	drm_mode_probed_add(connector, mode);
+
+	mode_64hz = drm_mode_duplicate(panel->drm, &performance_mode);
+	if (!mode_64hz) {
+		dev_err(panel->dev, "failed to add mode %dx%d@%d\n",
+			PANEL_WIDTH, PANEL_HEIGHT, MODE_1_FPS);
+		return -ENOMEM;
+	}
+	mode_64hz->vrefresh = MODE_1_FPS;
+	drm_mode_set_name(mode_64hz);
+	drm_mode_probed_add(connector, mode_64hz);
+
+	connector->display_info.width_mm = 166;
+	connector->display_info.height_mm = 266;
+	return 2;
+}
+
+static const struct drm_panel_funcs lcm_drm_funcs = {
+	.disable = lcm_disable,
+	.unprepare = lcm_unprepare,
+	.prepare = lcm_prepare,
+	.enable = lcm_enable,
+	.get_modes = lcm_get_modes,
+};
+
+#if defined(CONFIG_MTK_PANEL_EXT)
+static struct mtk_panel_params ext_params = {
+	.pll_clk = 1,
+	.data_rate = 485,
+	.cust_esd_check = 0,
+	.esd_check_enable = 0,
+	.physical_width_um = PHYSICAL_WIDTH_UM,
+	.physical_height_um = PHYSICAL_HEIGHT_UM,
+	.output_mode = MTK_PANEL_DUAL_PORT,
+	.lcm_cmd_if = MTK_PANEL_DUAL_PORT,
+	.dsc_params = {
+		.enable = 1,
+		.bdg_dsc_enable = 0,
+		.ver = 17,
+		.slice_mode = 0,
+		.rgb_swap = 0,
+		.dsc_cfg = 34,
+		.rct_on = 1,
+		.bit_per_channel = 8,
+		.dsc_line_buf_depth = 9,
+		.bp_enable = 1,
+		.bit_per_pixel = 128,
+		.pic_height = PANEL_HEIGHT,
+		.pic_width = 800,
+		.slice_height = 20,
+		.slice_width = 800,
+		.chunk_size = 800,
+		.xmit_delay = 512,
+		.dec_delay = 657,
+		.scale_value = 32,
+		.increment_interval = 583,
+		.decrement_interval = 11,
+		.line_bpg_offset = 12,
+		.nfl_bpg_offset = 1294,
+		.slice_bpg_offset = 872,
+		.initial_offset = 6144,
+		.final_offset = 4320,
+		.flatness_minqp = 3,
+		.flatness_maxqp = 12,
+		.rc_model_size = 8192,
+		.rc_edge_factor = 6,
+		.rc_quant_incr_limit0 = 11,
+		.rc_quant_incr_limit1 = 11,
+		.rc_tgt_offset_hi = 3,
+		.rc_tgt_offset_lo = 3,
+		.rc_buf_thresh[0] = 14,
+		.rc_buf_thresh[1] = 28,
+		.rc_buf_thresh[2] = 42,
+		.rc_buf_thresh[3] = 56,
+		.rc_buf_thresh[4] = 70,
+		.rc_buf_thresh[5] = 84,
+		.rc_buf_thresh[6] = 98,
+		.rc_buf_thresh[7] = 105,
+		.rc_buf_thresh[8] = 112,
+		.rc_buf_thresh[9] = 119,
+		.rc_buf_thresh[10] = 123,
+		.rc_buf_thresh[11] = 125,
+		.rc_buf_thresh[12] = 126,
+		.rc_buf_thresh[13] = 127,
+		.rc_range_parameters[0] = { 0, 4, 2 },
+		.rc_range_parameters[1] = { 0, 4, 0 },
+		.rc_range_parameters[2] = { 1, 5, 0 },
+		.rc_range_parameters[3] = { 1, 6, -2 },
+		.rc_range_parameters[4] = { 3, 7, -4 },
+		.rc_range_parameters[5] = { 3, 7, -6 },
+		.rc_range_parameters[6] = { 3, 7, -8 },
+		.rc_range_parameters[7] = { 3, 8, -8 },
+		.rc_range_parameters[8] = { 3, 9, -8 },
+		.rc_range_parameters[9] = { 3, 10, -10 },
+		.rc_range_parameters[10] = { 5, 11, -10 },
+		.rc_range_parameters[11] = { 5, 12, -12 },
+		.rc_range_parameters[12] = { 5, 13, -12 },
+		.rc_range_parameters[13] = { 7, 13, -12 },
+		.rc_range_parameters[14] = { 13, 13, -12 },
+	},
+};
+
+static int mtk_panel_ext_param_set(struct drm_panel *panel,
+				   unsigned int mode)
+{
+	struct mtk_panel_ext *ext = find_panel_ext(panel);
+
+	if (mode > 1)
+		return 1;
+
+	ext->params = &ext_params;
+	return 0;
+}
+
+static int panel_ext_reset(struct drm_panel *panel, int on)
+{
+	struct lcm *ctx = panel_to_lcm(panel);
+
+	ctx->reset_gpio = devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->reset_gpio)) {
+		dev_err(ctx->dev, "%s: cannot get reset_gpio %ld\n",
+			__func__, PTR_ERR(ctx->reset_gpio));
+		return PTR_ERR(ctx->reset_gpio);
+	}
+	gpiod_set_value(ctx->reset_gpio, on);
+	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
+	return 0;
+}
+
+static struct mtk_panel_funcs ext_funcs = {
+	.reset = panel_ext_reset,
+	.ext_param_set = mtk_panel_ext_param_set,
+};
+#endif
+
+static int lcm_probe(struct mipi_dsi_device *dsi)
+{
+	struct device *dev = &dsi->dev;
+	struct device_node *backlight;
+	struct lcm *ctx;
+	int ret;
+
+	ctx = devm_kzalloc(dev, sizeof(*ctx), GFP_KERNEL);
+	if (!ctx)
+		return -ENOMEM;
+
+	ctx->dev = dev;
+	ctx->esd_te_master = -1;
+	ctx->esd_te_slave = -1;
+	mipi_dsi_set_drvdata(dsi, ctx);
+
+	backlight = of_parse_phandle(dev->of_node, "backlight", 0);
+	if (backlight) {
+		ctx->backlight = of_find_backlight_by_node(backlight);
+		of_node_put(backlight);
+		if (!ctx->backlight)
+			return -EPROBE_DEFER;
+	}
+
+	ctx->vddi_18 = devm_gpiod_get(dev, "vddi_18", GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->vddi_18)) {
+		dev_err(dev, "%s: cannot get vddi_18 %ld\n",
+			__func__, PTR_ERR(ctx->vddi_18));
+		return PTR_ERR(ctx->vddi_18);
+	}
+	devm_gpiod_put(dev, ctx->vddi_18);
+
+	ctx->bias_pos = devm_gpiod_get_index(dev, "bias", 0, GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->bias_pos)) {
+		dev_err(dev, "%s: cannot get bias_pos %ld\n",
+			__func__, PTR_ERR(ctx->bias_pos));
+		return PTR_ERR(ctx->bias_pos);
+	}
+	devm_gpiod_put(dev, ctx->bias_pos);
+
+	ctx->bias_neg = devm_gpiod_get_index(dev, "bias", 1, GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->bias_neg)) {
+		dev_err(dev, "%s: cannot get bias_neg %ld\n",
+			__func__, PTR_ERR(ctx->bias_neg));
+		return PTR_ERR(ctx->bias_neg);
+	}
+	devm_gpiod_put(dev, ctx->bias_neg);
+
+	ctx->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->reset_gpio)) {
+		dev_err(dev, "%s: cannot get reset_gpio %ld\n",
+			__func__, PTR_ERR(ctx->reset_gpio));
+		return PTR_ERR(ctx->reset_gpio);
+	}
+	devm_gpiod_put(dev, ctx->reset_gpio);
+
+	/* ESD TE pins, requested as inputs for future ESD support */
+	ctx->esd_te_master = of_get_named_gpio(dev->of_node,
+					       "tct_esd_te_master", 0);
+	if (gpio_is_valid(ctx->esd_te_master))
+		gpio_request_one(ctx->esd_te_master, GPIOF_IN,
+				 "lcm_esd_te_master");
+	ctx->esd_te_slave = of_get_named_gpio(dev->of_node,
+					      "tct_esd_te_slave", 0);
+	if (gpio_is_valid(ctx->esd_te_slave))
+		gpio_request_one(ctx->esd_te_slave, GPIOF_IN,
+				 "lcm_esd_te_slave");
+
+	drm_panel_init(&ctx->panel);
+	ctx->panel.dev = dev;
+	ctx->panel.funcs = &lcm_drm_funcs;
+	ret = drm_panel_add(&ctx->panel);
+	if (ret < 0) {
+		dev_err(dev, "%s: drm_panel_add failed: %d\n", __func__, ret);
+		return ret;
+	}
+
+	ret = mipi_dsi_attach(dsi);
+	if (ret < 0) {
+		dev_err(dev, "%s: mipi_dsi_attach failed: %d\n", __func__, ret);
+		drm_panel_remove(&ctx->panel);
+		return ret;
+	}
+
+#if defined(CONFIG_MTK_PANEL_EXT)
+	ret = mtk_panel_ext_create(dev, &ext_params, &ext_funcs, &ctx->panel);
+	if (ret < 0) {
+		dev_err(dev, "%s: mtk_panel_ext_create failed: %d\n",
+			__func__, ret);
+		return ret;
+	}
+#endif
+
+	pr_info("%s: %s probed\n", __func__, PANEL_DRIVER_NAME);
+	return 0;
+}
+
+static int lcm_remove(struct mipi_dsi_device *dsi)
+{
+	struct lcm *ctx = mipi_dsi_get_drvdata(dsi);
+
+	mipi_dsi_detach(dsi);
+	drm_panel_remove(&ctx->panel);
+	return 0;
+}
+
+static const struct of_device_id lcm_of_match[] = {
+	{ .compatible = PANEL_COMPATIBLE },
+	{ }
+};
+MODULE_DEVICE_TABLE(of, lcm_of_match);
+
+static struct mipi_dsi_driver lcm_driver = {
+	.probe = lcm_probe,
+	.remove = lcm_remove,
+	.driver = {
+		.name = PANEL_DRIVER_NAME,
+		.owner = THIS_MODULE,
+		.of_match_table = lcm_of_match,
+	},
+};
+
+module_mipi_dsi_driver(lcm_driver);
+
+MODULE_AUTHOR("TALPAD-BOOM / reconstructed from OEM kernel");
+MODULE_DESCRIPTION("Lushan12 HX83121A CDOT CSOT WQXGA DSI VDO panel driver");
+MODULE_LICENSE("GPL v2");

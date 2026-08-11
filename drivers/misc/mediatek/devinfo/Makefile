@@ -13,3 +13,4 @@
 
 # legacy chip devinfo driver
 obj-y += devinfo.o
+obj-$(CONFIG_TCT_DEVICEINFO) += tct_deviceinfo.o
