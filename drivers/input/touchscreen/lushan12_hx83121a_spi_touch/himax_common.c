@@ -784,23 +784,20 @@ int hx83121a_pen_bat_report(char *buf, int *battery, int mode)
 	u8 val = 0;
 	int i;
 
+	*battery = tct_pen_battery;
 	if (!tct_pen_bat_ready) {
 		pr_info("\x016[HXTP] %s: No Pen touch\n", __func__);
-		*battery = 0;
-		return -EINVAL;
-	}
-	if (!hx_s_core_fp._register_read)
-		return -EINVAL;
-
-	for (i = 0; i < 30; i++) {
-		hx_s_core_fp._register_read(0x10007450, &val, 4);
-		if (val <= 100)
-			break;
-		usleep_range(10000, 11000);
+		tct_pen_battery = 0;
+	} else if (hx_s_core_fp._register_read) {
+		for (i = 0; i < 30; i++) {
+			hx_s_core_fp._register_read(0x10007450, &val, 4);
+			if (val <= 100)
+				break;
+			usleep_range(10000, 11000);
+		}
+		tct_pen_battery = val;
 	}
 
-	*battery = val;
-	tct_pen_battery = val;
 	pr_info("\x016[HXTP] %s: Pen battery read Sucess\n", __func__);
 	pr_info("\x016[HXTP] %s, pen battery : %d%%\n", __func__, val);
 

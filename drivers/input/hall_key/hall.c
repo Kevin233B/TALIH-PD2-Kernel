@@ -66,6 +66,7 @@ static int hall_probe(struct platform_device *pdev)
         struct hall_data *hall = NULL;
         struct device_node *np = pdev->dev.of_node;
         struct device *hall_dev = NULL;
+	int gpio_status;
         int rc = 0;
 	if (!np)
 		return -ENODEV;
