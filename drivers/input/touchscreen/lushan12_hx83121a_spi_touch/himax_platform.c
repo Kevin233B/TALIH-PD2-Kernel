@@ -1016,7 +1016,7 @@ static int himax_common_suspend(struct device *dev)
 	return 0;
 }
 #if !defined(HX_CONTAINER_SPEED_UP)
-static int himax_common_resume(struct device *dev)
+int himax_common_resume(struct device *dev)
 {
 	struct himax_ts_data *ts = dev_get_drvdata(dev);
 
@@ -1039,8 +1039,63 @@ static int himax_common_resume(struct device *dev)
 	himax_chip_common_resume(ts);
 	return 0;
 }
+EXPORT_SYMBOL(himax_common_resume);
 #endif
 #endif
+
+/*
+ * TCT touch control bridge, reconstructed from the OEM kernel
+ * (4.19.191+, 2026-03-26 build).  The OEM touch driver exposes
+ * tct_set_gesture_en() to TCT_DEVICEINFO and lets the LCM driver
+ * call himax_common_resume() after the panel reset/power sequence.
+ */
+extern int tct_devinfo_register_singleclick(int (*cb)(struct device *dev,
+						      int enable));
+extern int tct_devinfo_register_pen_bat(int (*cb)(char *buf, int *battery,
+						  int mode));
+extern void hx83121a_pen_bat_report(char *buf, int *battery, int mode);
+
+static struct device *tct_touch_dev;
+static int tct_panel_resume_flag;
+static int tct_gesture_en;
+
+int tct_set_gesture_en(struct device *dev, int enable)
+{
+	struct himax_ts_data *ts = hx_s_ts;
+
+	if (enable < 0 || enable > 1) {
+		pr_err("%s: invalid enable %d\n", __func__, enable);
+		return -EINVAL;
+	}
+	if (!ts)
+		return -ENODEV;
+
+	tct_gesture_en = enable;
+	ts->SMWP_enable = enable;
+	if (hx_s_core_fp._set_SMWP_enable)
+		hx_s_core_fp._set_SMWP_enable(enable, ts->suspended);
+
+	return 0;
+}
+EXPORT_SYMBOL(tct_set_gesture_en);
+
+struct device *tct_get_touch_dev(void)
+{
+	return tct_touch_dev;
+}
+EXPORT_SYMBOL(tct_get_touch_dev);
+
+int tct_get_panel_resume_flag(void)
+{
+	return tct_panel_resume_flag;
+}
+EXPORT_SYMBOL(tct_get_panel_resume_flag);
+
+int tct_get_gesture_en(void)
+{
+	return tct_gesture_en;
+}
+EXPORT_SYMBOL(tct_get_gesture_en);
 
 #if defined(HX_CONFIG_FB)
 int fb_notifier_callback(struct notifier_block *self,
@@ -1321,6 +1376,11 @@ int himax_chip_common_probe(struct spi_device *spi)
 #endif
 
 	ts->probe_finish = true;
+
+	tct_touch_dev = &spi->dev;
+	tct_panel_resume_flag = 1;
+	tct_devinfo_register_singleclick(tct_set_gesture_en);
+	tct_devinfo_register_pen_bat(hx83121a_pen_bat_report);
 
 	return ret;
 

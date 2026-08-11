@@ -251,6 +251,9 @@ struct proc_dir_entry *proc_hsen_file;
 #define HX_PROC_VENDOR_FILE "vendor"
 struct proc_dir_entry *proc_vendor_file;
 
+#define HX_PROC_PEN_BATTERY_FILE "pen_battery"
+struct proc_dir_entry *proc_pen_battery_file;
+
 #if defined(HX_PALM_REPORT)
 static int himax_palm_detect(const uint8_t *buf)
 {
@@ -767,6 +770,93 @@ static const struct proc_ops_name hx_proc_vendor_ops = {
 	.proc_op(read) = hx_proc_vendor_read,
 };
 
+/*
+ * TCT pen battery support, reconstructed from the OEM kernel.
+ * The pen battery level is read from touch IC register 0x10007450
+ * through the regular bus-read path.
+ */
+u8 tct_pen_bat_ready;
+u8 tct_pen_battery;
+u8 tct_battery_read_once;
+
+void hx83121a_pen_bat_report(char *buf, int *battery, int mode)
+{
+	u8 val = 0;
+	int i;
+
+	if (!tct_pen_bat_ready) {
+		pr_info("\x016[HXTP] %s: No Pen touch\n", __func__);
+		*battery = 0;
+		return;
+	}
+
+	for (i = 0; i < 30; i++) {
+		himax_bus_read(0x10007450, &val, 4);
+		if (val <= 100)
+			break;
+		usleep_range(10000, 11000);
+	}
+
+	*battery = val;
+	tct_pen_battery = val;
+	pr_info("\x016[HXTP] %s: Pen battery read Sucess\n", __func__);
+	pr_info("\x016[HXTP] %s, pen battery : %d%%\n", __func__, val);
+
+	if (mode == 1) {
+		if (val > 100)
+			val = 0xff;
+		sprintf(buf, "%d", val);
+		return;
+	}
+
+	if (val == 0 || val > 100)
+		sprintf(buf, "Unknown");
+	else if (val <= 12)
+		sprintf(buf, "Empty");
+	else if (val <= 24)
+		sprintf(buf, "Low");
+	else if (val <= 49)
+		sprintf(buf, "Medium");
+	else
+		sprintf(buf, "High");
+}
+
+static ssize_t himax_proc_battery_read(struct file *file, char __user *buf,
+				       size_t count, loff_t *ppos)
+{
+	u8 val = 0;
+	char *tmp;
+	int len;
+
+	if (tct_battery_read_once) {
+		tct_battery_read_once = 0;
+		return 0;
+	}
+
+	himax_bus_read(0x10007450, &val, 4);
+	pr_info("\x016[HXTP] %s, 0x10007450 = : 0x%x\n", __func__, val);
+	tct_pen_battery = val;
+
+	tmp = kmalloc(count, GFP_KERNEL);
+	if (!tmp)
+		return 0;
+
+	memset(tmp, 0, count);
+	len = snprintf(tmp, count, "pen battery is : 0x%x\n",
+		       tct_pen_battery);
+	if (copy_to_user(buf, tmp, count))
+		pr_err("%s: copy_to_user failed\n", __func__);
+	kfree(tmp);
+	tct_battery_read_once = 1;
+
+	return len;
+}
+
+static const struct proc_ops_name himax_proc_pen_battery_ops = {
+	owner_line
+	.proc_op(read) = himax_proc_battery_read,
+};
+
 int himax_common_proc_init(void)
 {
 	hx_touch_proc_dir = proc_mkdir(HX_PROC_TOUCH_FOLDER, NULL);
@@ -830,8 +920,17 @@ int himax_common_proc_init(void)
 		goto fail_6;
 	}
 
+	proc_pen_battery_file = proc_create(HX_PROC_PEN_BATTERY_FILE, 0666,
+			hx_touch_proc_dir, &himax_proc_pen_battery_ops);
+	if (proc_pen_battery_file == NULL) {
+		E(" %s: proc pen_battery file create failed!\n", __func__);
+		goto fail_7;
+	}
+
 	return 0;
 
+fail_7:
+	remove_proc_entry(HX_PROC_VENDOR_FILE, hx_touch_proc_dir);
 fail_6:
 #if defined(HX_SMART_WAKEUP)
 #if defined(HX_ULTRA_LOW_POWER)
@@ -854,6 +953,7 @@ fail_1:
 
 void himax_common_proc_deinit(void)
 {
+	remove_proc_entry(HX_PROC_PEN_BATTERY_FILE, hx_touch_proc_dir);
 	remove_proc_entry(HX_PROC_VENDOR_FILE, hx_touch_proc_dir);
 #if defined(HX_SMART_WAKEUP)
 #if defined(HX_ULTRA_LOW_POWER)
@@ -2252,6 +2352,7 @@ int himax_parse_report_points(struct himax_ts_data *ts,
 		if (!p_id_en) {
 			g_target_report_data->s[0].battery_info =
 				hx_s_touch_data->coord_buf[base + 9];
+			tct_pen_bat_ready = 1;
 			if (g_ts_dbg != 0) {
 				I("%s:update battery info = %x\n", __func__,
 				g_target_report_data->s[0].battery_info);

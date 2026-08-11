@@ -37,6 +37,15 @@
 #include "lushan12_hx83121a_dsi_vdo_init.h"
 #include "aw3750x_power.h"
 
+/*
+ * TCT touch resume hook: the OEM panel driver calls the Himax touch resume
+ * after the panel reset/power sequence when the touch driver is ready, so
+ * the TDDI stays in sync after LCM power-on.
+ */
+extern int himax_common_resume(struct device *dev);
+extern struct device *tct_get_touch_dev(void);
+extern int tct_get_panel_resume_flag(void);
+
 #ifndef PANEL_DRIVER_NAME
 #error "PANEL_DRIVER_NAME must be defined by the including file"
 #endif
@@ -171,6 +180,9 @@ static void lcm_panel_init(struct lcm *ctx)
 		devm_gpiod_put(ctx->dev, ctx->reset_gpio);
 	}
 	mdelay(141);
+
+	if (tct_get_panel_resume_flag() && tct_get_touch_dev())
+		himax_common_resume(tct_get_touch_dev());
 
 	ctx->error = 0;
 	for (i = 0; i < 7; i++) {

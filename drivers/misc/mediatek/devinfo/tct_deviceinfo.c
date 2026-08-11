@@ -36,6 +36,52 @@ struct tct_deviceinfo_node {
 
 static LIST_HEAD(tct_deviceinfo_nodes);
 
+/*
+ * Control bridge between TCT_DEVICEINFO and the touch driver, mirroring the
+ * OEM kernel: the touch driver registers callbacks during probe and the
+ * sysfs nodes below invoke them.
+ */
+struct tct_devinfo_ctrl {
+	int (*double_wakeup_set)(int enable);
+	int (*singleclick_set)(struct device *dev, int enable);
+	int (*prox_set)(int enable);
+	void (*pen_bat_report)(char *buf, int *battery, int mode);
+	u8 double_wakeup_en;
+	u8 singleclick_en;
+	u8 prox_en;
+	int pen_bat_mode;
+};
+
+static struct tct_devinfo_ctrl tct_ctrl;
+
+int tct_devinfo_register_double_wakeup(int (*cb)(int enable))
+{
+	tct_ctrl.double_wakeup_set = cb;
+	return 0;
+}
+EXPORT_SYMBOL(tct_devinfo_register_double_wakeup);
+
+int tct_devinfo_register_singleclick(int (*cb)(struct device *dev, int enable))
+{
+	tct_ctrl.singleclick_set = cb;
+	return 0;
+}
+EXPORT_SYMBOL(tct_devinfo_register_singleclick);
+
+int tct_devinfo_register_prox(int (*cb)(int enable))
+{
+	tct_ctrl.prox_set = cb;
+	return 0;
+}
+EXPORT_SYMBOL(tct_devinfo_register_prox);
+
+int tct_devinfo_register_pen_bat(void (*cb)(char *buf, int *battery, int mode))
+{
+	tct_ctrl.pen_bat_report = cb;
+	return 0;
+}
+EXPORT_SYMBOL(tct_devinfo_register_pen_bat);
+
 struct device *get_deviceinfo_dev(void)
 {
 	if (tct_deviceinfo_dev)
@@ -135,6 +181,128 @@ static ssize_t tct_all_deviceinfo_store(struct device *dev,
 
 static DEVICE_ATTR_RW(tct_all_deviceinfo);
 
+static ssize_t double_wakeup_enable_show(struct device *dev,
+					 struct device_attribute *attr,
+					 char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n", tct_ctrl.double_wakeup_en);
+}
+
+static ssize_t double_wakeup_enable_store(struct device *dev,
+					  struct device_attribute *attr,
+					  const char *buf, size_t count)
+{
+	unsigned long val;
+	int ret;
+
+	ret = kstrtoul(buf, 0, &val);
+	if (ret)
+		return ret;
+	if (val > 1)
+		return -EINVAL;
+
+	if (tct_ctrl.double_wakeup_set)
+		tct_ctrl.double_wakeup_set(val);
+	tct_ctrl.double_wakeup_en = val;
+	return count;
+}
+static DEVICE_ATTR_RW(double_wakeup_enable);
+
+static ssize_t singleclick_wakeup_enable_show(struct device *dev,
+					      struct device_attribute *attr,
+					      char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n", tct_ctrl.singleclick_en);
+}
+
+static ssize_t singleclick_wakeup_enable_store(struct device *dev,
+					       struct device_attribute *attr,
+					       const char *buf, size_t count)
+{
+	unsigned long val;
+	int ret;
+
+	ret = kstrtoul(buf, 0, &val);
+	if (ret)
+		return ret;
+	if (val > 1)
+		return -EINVAL;
+
+	if (tct_ctrl.singleclick_set)
+		tct_ctrl.singleclick_set(NULL, val);
+	tct_ctrl.singleclick_en = val;
+	return count;
+}
+static DEVICE_ATTR_RW(singleclick_wakeup_enable);
+
+static ssize_t prox_enable_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n", tct_ctrl.prox_en);
+}
+
+static ssize_t prox_enable_store(struct device *dev,
+				 struct device_attribute *attr,
+				 const char *buf, size_t count)
+{
+	unsigned long val;
+	int ret;
+
+	ret = kstrtoul(buf, 0, &val);
+	if (ret)
+		return ret;
+	if (val > 1)
+		return -EINVAL;
+
+	if (tct_ctrl.prox_set)
+		tct_ctrl.prox_set(val);
+	tct_ctrl.prox_en = val;
+	return count;
+}
+static DEVICE_ATTR_RW(prox_enable);
+
+static ssize_t prox_status_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n", tct_ctrl.prox_en);
+}
+
+static ssize_t prox_status_store(struct device *dev,
+				 struct device_attribute *attr,
+				 const char *buf, size_t count)
+{
+	return count;
+}
+static DEVICE_ATTR_RW(prox_status);
+
+static ssize_t tct_penbat_show(struct device *dev,
+			       struct device_attribute *attr, char *buf)
+{
+	char tmp[64] = {0};
+	int battery = 0;
+
+	if (!tct_ctrl.pen_bat_report)
+		return 0;
+
+	tct_ctrl.pen_bat_report(tmp, &battery, tct_ctrl.pen_bat_mode);
+	return snprintf(buf, PAGE_SIZE, "%s\n", tmp);
+}
+
+static ssize_t tct_penbat_store(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t count)
+{
+	int val, ret;
+
+	ret = kstrtoint(buf, 0, &val);
+	if (ret)
+		return ret;
+
+	tct_ctrl.pen_bat_mode = val;
+	return count;
+}
+static DEVICE_ATTR(penbat, 0644, tct_penbat_show, tct_penbat_store);
+
 int Create_tct_all_deviceinfo_node_ForMMI(void)
 {
 	struct device *dev = get_deviceinfo_dev();
@@ -200,9 +368,15 @@ static const char * const tct_deviceinfo_mmi_nodes[] = {
 
 /* Control nodes exposed by the OEM sysfs groups */
 static const char * const tct_deviceinfo_ctrl_nodes[] = {
-	"charger_mode", "grip_mode", "double_wakeup_enable",
-	"prox_enable", "prox_status", "singleclick_wakeup_enable",
-	"penbat", "aod_mode",
+	"charger_mode", "grip_mode", "aod_mode",
+};
+
+static const struct device_attribute * const tct_deviceinfo_ctrl_attrs[] = {
+	&dev_attr_double_wakeup_enable,
+	&dev_attr_prox_enable,
+	&dev_attr_prox_status,
+	&dev_attr_singleclick_wakeup_enable,
+	&dev_attr_penbat,
 };
 
 static int __init deviceinfo_init(void)
@@ -223,6 +397,18 @@ static int __init deviceinfo_init(void)
 		ret = tct_deviceinfo_create_node(tct_deviceinfo_ctrl_nodes[i]);
 		if (ret < 0)
 			return ret;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(tct_deviceinfo_ctrl_attrs); i++) {
+		struct device *dev = get_deviceinfo_dev();
+
+		if (!dev)
+			return -ENODEV;
+		ret = device_create_file(dev, tct_deviceinfo_ctrl_attrs[i]);
+		if (ret < 0) {
+			pr_err("Failed to create ctrl node: %d\n", ret);
+			return ret;
+		}
 	}
 
 	pr_info("TCT deviceinfo nodes created\n");
