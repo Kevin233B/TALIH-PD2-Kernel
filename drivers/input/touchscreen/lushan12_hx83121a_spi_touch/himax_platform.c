@@ -15,6 +15,7 @@
 
 #include "himax_platform.h"
 #include "himax_common.h"
+#include "himax_ic_core.h"
 
 int i2c_error_count;
 bool ic_boot_done;
@@ -1054,7 +1055,7 @@ extern int tct_devinfo_register_singleclick(int (*cb)(struct device *dev,
 						      int enable));
 extern int tct_devinfo_register_pen_bat(int (*cb)(char *buf, int *battery,
 						  int mode));
-extern void hx83121a_pen_bat_report(char *buf, int *battery, int mode);
+extern int hx83121a_pen_bat_report(char *buf, int *battery, int mode);
 
 static struct device *tct_touch_dev;
 static int tct_panel_resume_flag;

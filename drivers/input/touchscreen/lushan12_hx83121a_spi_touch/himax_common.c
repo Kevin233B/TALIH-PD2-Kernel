@@ -779,7 +779,7 @@ u8 tct_pen_bat_ready;
 u8 tct_pen_battery;
 u8 tct_battery_read_once;
 
-void hx83121a_pen_bat_report(char *buf, int *battery, int mode)
+int hx83121a_pen_bat_report(char *buf, int *battery, int mode)
 {
 	u8 val = 0;
 	int i;
@@ -787,11 +787,13 @@ void hx83121a_pen_bat_report(char *buf, int *battery, int mode)
 	if (!tct_pen_bat_ready) {
 		pr_info("\x016[HXTP] %s: No Pen touch\n", __func__);
 		*battery = 0;
-		return;
+		return -EINVAL;
 	}
+	if (!hx_s_core_fp._register_read)
+		return -EINVAL;
 
 	for (i = 0; i < 30; i++) {
-		himax_bus_read(0x10007450, &val, 4);
+		hx_s_core_fp._register_read(0x10007450, &val, 4);
 		if (val <= 100)
 			break;
 		usleep_range(10000, 11000);
@@ -806,7 +808,7 @@ void hx83121a_pen_bat_report(char *buf, int *battery, int mode)
 		if (val > 100)
 			val = 0xff;
 		sprintf(buf, "%d", val);
-		return;
+		return 0;
 	}
 
 	if (val == 0 || val > 100)
@@ -819,6 +821,8 @@ void hx83121a_pen_bat_report(char *buf, int *battery, int mode)
 		sprintf(buf, "Medium");
 	else
 		sprintf(buf, "High");
+
+	return 0;
 }
 
 static ssize_t himax_proc_battery_read(struct file *file, char __user *buf,
@@ -832,8 +836,10 @@ static ssize_t himax_proc_battery_read(struct file *file, char __user *buf,
 		tct_battery_read_once = 0;
 		return 0;
 	}
+	if (!hx_s_core_fp._register_read)
+		return 0;
 
-	himax_bus_read(0x10007450, &val, 4);
+	hx_s_core_fp._register_read(0x10007450, &val, 4);
 	pr_info("\x016[HXTP] %s, 0x10007450 = : 0x%x\n", __func__, val);
 	tct_pen_battery = val;
 

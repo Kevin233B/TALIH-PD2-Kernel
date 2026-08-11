@@ -46,7 +46,7 @@ struct tct_devinfo_ctrl {
 	int (*double_wakeup_set)(int enable);
 	int (*singleclick_set)(struct device *dev, int enable);
 	int (*prox_set)(int enable);
-	void (*pen_bat_report)(char *buf, int *battery, int mode);
+	int (*pen_bat_report)(char *buf, int *battery, int mode);
 	int (*charge_process_set)(int enable);
 	int (*grip_set)(int screen_mode, int grip_level);
 	int (*aod_set)(int enable);
@@ -88,7 +88,7 @@ int tct_devinfo_register_prox(int (*cb)(int enable))
 }
 EXPORT_SYMBOL(tct_devinfo_register_prox);
 
-int tct_devinfo_register_pen_bat(void (*cb)(char *buf, int *battery, int mode))
+int tct_devinfo_register_pen_bat(int (*cb)(char *buf, int *battery, int mode))
 {
 	tct_ctrl.pen_bat_report = cb;
 	return 0;
@@ -377,11 +377,14 @@ static ssize_t tct_penbat_show(struct device *dev,
 {
 	char tmp[64] = {0};
 	int battery = 0;
+	int ret;
 
 	if (!tct_ctrl.pen_bat_report)
 		return 0;
 
-	tct_ctrl.pen_bat_report(tmp, &battery, tct_ctrl.pen_bat_mode);
+	ret = tct_ctrl.pen_bat_report(tmp, &battery, tct_ctrl.pen_bat_mode);
+	if (ret)
+		return 0;
 	return snprintf(buf, PAGE_SIZE, "%s\n", tmp);
 }
 
