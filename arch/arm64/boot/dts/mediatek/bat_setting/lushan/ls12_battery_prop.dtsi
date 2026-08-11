@@ -1,0 +1,13 @@
+/* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * TALPAD (TALIH-PD2, ls12_mt8797_wifi_64) battery ID ranges,
+ * aligned with the OEM dtbo (fragment@49).
+ */
+&bat_gm30 {
+	bat_id_max0 = <0x38f>;
+	bat_id_min0 = <0x2c7>;
+	battery_name0 = "TLp100A7:VEKEN:10000mAh:CACA100002C7";
+	bat_id_max1 = <0x177>;
+	bat_id_min1 = <0xaf>;
+	battery_name1 = "TLp100A1:BYD:10000mAh:CACA100000C1";
+};

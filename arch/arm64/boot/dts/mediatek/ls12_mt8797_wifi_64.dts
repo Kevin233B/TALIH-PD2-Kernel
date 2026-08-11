@@ -1053,6 +1053,7 @@ fsa4480@42 {
 /* Add-end by baiwei.peng for usb2.0 eye diagram on 2023/08/02 */
 
 #include "mediatek/bat_setting/lushan/ls_charge.dtsi"
+#include "mediatek/bat_setting/lushan/ls12_battery_prop.dtsi"
 //Begin by yongzhuo for LUSHAN-4 on 2023.07.03
 #include "mediatek/cust_lushan12_touch_spi.dtsi"
 //End by yongzhuo for LUSHAN-4 on 2023.07.03

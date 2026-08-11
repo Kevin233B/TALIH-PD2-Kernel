@@ -596,89 +596,54 @@ bool __attribute__ ((weak)) mt_usb_is_device(void)
 /* ============================================================ */
 /* custom setting */
 /* ============================================================ */
-#ifdef MTK_GET_BATTERY_ID_BY_AUXADC
+/*
+ * Reconstructed from the OEM kernel: read the battery ID through
+ * battery_get_batt_id() and match it against the "mediatek,bat_gm30" node's
+ * bat_id_max%d / bat_id_min%d / battery_name%d ranges. Missing node/ranges
+ * or no match falls back to profile 0, exactly like the OEM implementation.
+ */
 void fgauge_get_profile_id(void)
 {
-	int id_volt = 0;
-	int id = 0;
-	int ret = 0;
-	int auxadc_voltage = 0;
-	struct iio_channel *channel;
-	struct device_node *batterty_node;
-	struct platform_device *battery_dev;
+	struct device_node *node;
+	const char *name = NULL;
+	char prop[32];
+	u32 id_max = 0, id_min = 0;
+	int batt_id = battery_get_batt_id();
+	int i;
 
-	batterty_node = of_find_node_by_name(NULL, "battery");
-	if (!batterty_node) {
-		bm_err("[%s] of_find_node_by_name fail\n", __func__);
+	node = of_find_compatible_node(NULL, NULL, "mediatek,bat_gm30");
+	if (!node) {
+		gm.battery_id = 0;
+		bm_err("[%s] mediatek,bat_gm30 node not found, batt_id=%d\n",
+			__func__, batt_id);
 		return;
 	}
 
-	battery_dev = of_find_device_by_node(batterty_node);
-	if (!battery_dev) {
-		bm_err("[%s] of_find_device_by_node fail\n", __func__);
-		return;
-	}
-
-	channel = iio_channel_get(&(battery_dev->dev), "batteryID-channel");
-	if (IS_ERR(channel)) {
-		ret = PTR_ERR(channel);
-		bm_err("[%s] iio channel not found %d\n",
-		__func__, ret);
-		return;
-	}
-
-	if (channel)
-		ret = iio_read_channel_processed(channel, &auxadc_voltage);
-
-
-	if (ret <= 0) {
-		bm_err("[%s] iio_read_channel_processed failed\n", __func__);
-		return;
-	}
-
-	bm_err("[%s]auxadc_voltage is %d\n", __func__, auxadc_voltage);
-	id_volt = auxadc_voltage * 1500 / 4096;
-	bm_err("[%s]battery_id_voltage is %d\n", __func__, id_volt);
-
-	if ((sizeof(g_battery_id_voltage) /
-		sizeof(int)) != TOTAL_BATTERY_NUMBER) {
-		bm_debug("[%s]error! voltage range incorrect!\n",
-			__func__);
-		return;
-	}
-
-	for (id = 0; id < TOTAL_BATTERY_NUMBER; id++) {
-		if (id_volt < g_battery_id_voltage[id]) {
-			gm.battery_id = id;
+	for (i = 0; i < TOTAL_BATTERY_NUMBER; i++) {
+		sprintf(prop, "bat_id_max%d", i);
+		if (of_property_read_u32(node, prop, &id_max))
 			break;
-		} else if (g_battery_id_voltage[id] == -1) {
-			gm.battery_id = TOTAL_BATTERY_NUMBER - 1;
+		sprintf(prop, "bat_id_min%d", i);
+		if (of_property_read_u32(node, prop, &id_min))
+			break;
+		if (id_max == 0 || id_min == 0)
+			break;
+		if (batt_id < id_max && batt_id > id_min) {
+			sprintf(prop, "battery_name%d", i);
+			if (!of_property_read_string(node, prop, &name))
+				bm_err("[%s] battery profile %d: %s\n",
+					__func__, i, name);
+			gm.battery_id = i;
+			bm_err("[%s] battery id %d matched, index %d\n",
+				__func__, batt_id, i);
+			return;
 		}
 	}
 
-	bm_debug("[%s]Battery id (%d)\n",
-		__func__,
-		gm.battery_id);
-}
-#elif defined(MTK_GET_BATTERY_ID_BY_GPIO)
-void fgauge_get_profile_id(void)
-{
 	gm.battery_id = 0;
+	bm_err("[%s] no battery profile matched batt_id=%d\n",
+		__func__, batt_id);
 }
-#else
-void fgauge_get_profile_id(void)
-{
-	if (get_ec()->debug_bat_id_en == 1)
-		gm.battery_id = get_ec()->debug_bat_id_value;
-	else
-		gm.battery_id = BATTERY_PROFILE_ID;
-
-	bm_err("[%s]Battery id=(%d) en:%d,%d\n",
-		__func__,
-		gm.battery_id, get_ec()->debug_bat_id_en,
-		get_ec()->debug_bat_id_value);
-}
-#endif
 
 /*
  * TCT exported helper, reconstructed from the OEM kernel: read the battery
@@ -5074,4 +5039,3 @@ void gm3_log_dump(bool force)
 	gm.log.phone_state = 0;
 
 }
-
