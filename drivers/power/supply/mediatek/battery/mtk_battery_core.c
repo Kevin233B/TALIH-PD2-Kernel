@@ -44,6 +44,7 @@
 #include <linux/proc_fs.h>
 #include <linux/of_fdt.h>	/*of_dt API*/
 #include <linux/of.h>
+#include <linux/iio/consumer.h>
 #include <linux/vmalloc.h>
 #include <linux/math64.h>
 #include <linux/alarmtimer.h>
@@ -678,6 +679,52 @@ void fgauge_get_profile_id(void)
 		get_ec()->debug_bat_id_value);
 }
 #endif
+
+/*
+ * TCT exported helper, reconstructed from the OEM kernel: read the battery
+ * ID ADC channel and return the processed value (mV).
+ *
+ * OEM disassembly shows the function takes no argument and returns the
+ * channel value directly; missing DT node/device are reported as 0 (OEM
+ * behavior), channel/read failures return the negative errno.
+ */
+int battery_get_batt_id(void)
+{
+	struct device_node *node;
+	struct platform_device *battery_dev;
+	struct iio_channel *channel;
+	int id = 0;
+	int ret;
+
+	node = of_find_node_by_name(NULL, "battery");
+	if (!node) {
+		bm_err("[%s] of_find_node_by_name fail\n", __func__);
+		return 0;
+	}
+
+	battery_dev = of_find_device_by_node(node);
+	if (!battery_dev) {
+		bm_err("[%s] of_find_device_by_node fail\n", __func__);
+		return 0;
+	}
+
+	channel = iio_channel_get(&battery_dev->dev, "batteryID-channel");
+	if (IS_ERR(channel)) {
+		ret = PTR_ERR(channel);
+		bm_err("[%s] iio channel not found %d\n", __func__, ret);
+		return ret;
+	}
+
+	ret = iio_read_channel_processed(channel, &id);
+	iio_channel_release(channel);
+	if (ret <= 0) {
+		bm_err("[%s] iio_read_channel_processed failed\n", __func__);
+		return ret;
+	}
+
+	return id;
+}
+EXPORT_SYMBOL(battery_get_batt_id);
 
 void fg_custom_init_from_header(void)
 {
@@ -5027,6 +5074,4 @@ void gm3_log_dump(bool force)
 	gm.log.phone_state = 0;
 
 }
-
-
 

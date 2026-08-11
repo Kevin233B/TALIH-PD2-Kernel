@@ -1791,8 +1791,9 @@ void battery_update_psd(struct mtk_battery *gm)
 {
 	struct battery_data *bat_data = &gm->bs_data;
 
-	gauge_get_property(GAUGE_PROP_BATTERY_VOLTAGE, &bat_data->bat_batt_vol);
-	bat_data->bat_batt_temp = force_get_tbat(gm, true);
+	bat_data->bat_batt_vol = battery_get_bat_voltage();
+	bat_data->bat_batt_temp = battery_get_bat_temperature();
+	bat_data->bat_batt_id = battery_get_batt_id();
 }
 void battery_update(struct mtk_battery *gm)
 {
@@ -3170,4 +3171,3 @@ int battery_init(struct platform_device *pdev)
 
 	return 0;
 }
-
