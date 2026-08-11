@@ -366,8 +366,9 @@ int _ioctl_prepare_present_fence(unsigned long arg)
 	} else {
 		layer_info = _get_sync_info(pnt_fence.session_id,
 			timeline_id);
-		if (layer_info == NULL) {
-			DISPERR("layer_info is null\n");
+		if (layer_info == NULL || !layer_info->inited ||
+		    layer_info->timeline == NULL) {
+			DISPERR("layer_info/timeline is null or not inited\n");
 			ret = -EFAULT;
 			return ret;
 		}

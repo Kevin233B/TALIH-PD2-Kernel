@@ -528,8 +528,8 @@ int mtk_release_present_fence(unsigned int session_id, unsigned int fence_idx, k
 
 	timeline_id = mtk_fence_get_present_timeline_id(session_id);
 	layer_info = _disp_sync_get_sync_info(session_id, timeline_id);
-	if (layer_info == NULL) {
-		DDPFENCE("%s:%d layer_info is null\n", __func__, __LINE__);
+	if (layer_info == NULL || layer_info->timeline == NULL) {
+		DDPFENCE("%s:%d layer_info/timeline is null\n", __func__, __LINE__);
 		return -1;
 	}
 
@@ -596,8 +596,8 @@ int mtk_release_sf_present_fence(unsigned int session_id,
 
 	timeline_id = mtk_fence_get_sf_present_timeline_id(session_id);
 	layer_info = _disp_sync_get_sync_info(session_id, timeline_id);
-	if (layer_info == NULL) {
-		DDPFENCE("ERROR:%s:%d layer_info is null\n", __func__, __LINE__);
+	if (layer_info == NULL || layer_info->timeline == NULL) {
+		DDPFENCE("ERROR:%s:%d layer_info/timeline is null\n", __func__, __LINE__);
 		return -1;
 	}
 
@@ -831,6 +831,13 @@ struct mtk_fence_buf_info *mtk_fence_prepare_buf(struct drm_device *dev,
 	if (layer_info->inited == 0) {
 		DDPPR_ERR(
 			"FATAL ERROR, sync info not inited, session_id=0x%08x|layer_id=%d\n",
+			session_id, timeline_id);
+		return NULL;
+	}
+
+	if (layer_info->timeline == NULL) {
+		DDPPR_ERR(
+			"FATAL ERROR, timeline not created, session_id=0x%08x|layer_id=%d\n",
 			session_id, timeline_id);
 		return NULL;
 	}

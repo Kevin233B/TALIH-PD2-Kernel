@@ -1194,6 +1194,13 @@ struct mtkfb_fence_buf_info *disp_sync_prepare_buf(
 		return NULL;
 	}
 
+	if (layer_info->timeline == NULL) {
+		DISPERR(
+			"FATAL ERROR, timeline not created, session_id=0x%08x|layer_id=%d\n",
+			session_id, timeline_id);
+		return NULL;
+	}
+
 	dprec_start(&session_info->event_prepare, buf->layer_id, buf->ion_fd);
 
 	buf_info = mtkfb_get_buf_info();
