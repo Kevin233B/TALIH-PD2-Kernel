@@ -44,6 +44,7 @@
 #include <linux/proc_fs.h>
 #include <linux/of_fdt.h>	/*of_dt API*/
 #include <linux/of.h>
+#include <linux/of_platform.h>
 #include <linux/iio/consumer.h>
 #include <linux/vmalloc.h>
 #include <linux/math64.h>
