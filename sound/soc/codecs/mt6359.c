@@ -306,6 +306,13 @@ struct mt6359_priv {
 	/* vow dmic low power mode, 1: enable, 0: disable */
 	int vow_dmic_lp;
 	int vow_single_mic_select;
+
+	/* TCT: es7210 micbias controls */
+	int es7210_micbias0;
+	int es7210_micbias2;
+	int es7210_micbias0_sel;
+	int es7210_micbias2_sel;
+	int es7210_audglb_sel;
 };
 
 /* static function declaration */
@@ -1174,6 +1181,98 @@ static int mic_type_set(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+/* TCT: ES7210 micbias bringup (mirrors official kernel behavior) */
+static int mt6359_set_aud_global_bias_for_es7210(struct mt6359_priv *priv,
+						 unsigned int reg,
+						 bool enable,
+						 bool micbias_sel)
+{
+	unsigned int val = 0;
+
+	if (enable) {
+		regmap_update_bits(priv->regmap, MT6359_AUDDEC_ANA_CON13,
+				   RG_AUDGLB_PWRDN_VA32_MASK_SFT, 0);
+		regmap_read(priv->regmap, MT6359_AUDDEC_ANA_CON13, &val);
+		dev_info(priv->dev, "%s(), MT6359_AUDDEC_ANA_CON13 0x%x\n",
+			 __func__, val);
+		regmap_update_bits(priv->regmap, reg, 0x70, 0x20);
+		regmap_update_bits(priv->regmap, reg, 0x01, 0x01);
+	} else {
+		if (micbias_sel) {
+			if (priv->es7210_audglb_sel)
+				regmap_update_bits(priv->regmap, reg,
+						   0x04, 0x04);
+		} else {
+			regmap_write(priv->regmap, reg, 0x00);
+		}
+
+		if (!priv->es7210_micbias0 && !priv->es7210_micbias2 &&
+		    !priv->es7210_micbias0_sel && !priv->es7210_micbias2_sel)
+			regmap_update_bits(priv->regmap,
+					   MT6359_AUDDEC_ANA_CON13,
+					   RG_AUDGLB_PWRDN_VA32_MASK_SFT,
+					   RG_AUDGLB_PWRDN_VA32_MASK_SFT);
+
+		regmap_read(priv->regmap, MT6359_AUDDEC_ANA_CON13, &val);
+		dev_info(priv->dev, "%s(), MT6359_AUDDEC_ANA_CON13 0x%x\n",
+			 __func__, val);
+	}
+
+	return 0;
+}
+
+static int Mic_bias0_es7210_get(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *cmpnt = snd_soc_kcontrol_component(kcontrol);
+	struct mt6359_priv *priv = snd_soc_component_get_drvdata(cmpnt);
+
+	ucontrol->value.integer.value[0] = priv->es7210_micbias0;
+	return 0;
+}
+
+static int Mic_bias0_es7210_set(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *cmpnt = snd_soc_kcontrol_component(kcontrol);
+	struct mt6359_priv *priv = snd_soc_component_get_drvdata(cmpnt);
+
+	priv->es7210_micbias0 = ucontrol->value.integer.value[0];
+	dev_info(priv->dev, "%s(), priv->es7210_micbias0 0x%x\n",
+		 __func__, priv->es7210_micbias0);
+
+	return mt6359_set_aud_global_bias_for_es7210(priv,
+			MT6359_AUDENC_ANA_CON15,
+			priv->es7210_micbias0 == 1,
+			priv->es7210_micbias0_sel);
+}
+
+static int Mic_bias2_es7210_get(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *cmpnt = snd_soc_kcontrol_component(kcontrol);
+	struct mt6359_priv *priv = snd_soc_component_get_drvdata(cmpnt);
+
+	ucontrol->value.integer.value[0] = priv->es7210_micbias2;
+	return 0;
+}
+
+static int Mic_bias2_es7210_set(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *cmpnt = snd_soc_kcontrol_component(kcontrol);
+	struct mt6359_priv *priv = snd_soc_component_get_drvdata(cmpnt);
+
+	priv->es7210_micbias2 = ucontrol->value.integer.value[0];
+	dev_info(priv->dev, "%s(), es7210_micbias2 0x%x\n",
+		 __func__, priv->es7210_micbias2);
+
+	return mt6359_set_aud_global_bias_for_es7210(priv,
+			MT6359_AUDENC_ANA_CON17,
+			priv->es7210_micbias2 == 1,
+			priv->es7210_micbias2_sel);
+}
+
 static const struct snd_kcontrol_new mt6359_snd_ul_controls[] = {
 	/* ul pga gain */
 	SOC_SINGLE_EXT_TLV("PGA1 Volume",
@@ -1206,6 +1305,11 @@ static const struct snd_kcontrol_new mt6359_snd_ul_controls[] = {
 	MT_SOC_ENUM_EXT_ID("Mic_Type_Mux_2", mic_type_mux_enum[0],
 			   mic_type_get, mic_type_set,
 			   MUX_MIC_TYPE_2),
+
+	SOC_SINGLE_EXT("Mic_bias0_es7210", 0, 0, 1, 0,
+		       Mic_bias0_es7210_get, Mic_bias0_es7210_set),
+	SOC_SINGLE_EXT("Mic_bias2_es7210", 0, 0, 1, 0,
+		       Mic_bias2_es7210_get, Mic_bias2_es7210_set),
 };
 
 /* MUX */

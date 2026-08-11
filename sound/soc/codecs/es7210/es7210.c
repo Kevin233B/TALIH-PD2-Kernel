@@ -231,6 +231,12 @@ static int es7210_pcm_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
+static void es7210_pcm_shutdown(struct snd_pcm_substream *substream,
+				struct snd_soc_dai *dai)
+{
+	printk("Enter into %s()\n", __func__);
+}
+
 #define es7210_RATES SNDRV_PCM_RATE_8000_96000
 
 #define es7210_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S20_3LE |\
@@ -238,6 +244,7 @@ static int es7210_pcm_hw_params(struct snd_pcm_substream *substream,
 
 static struct snd_soc_dai_ops es7210_ops = {
 	.startup = es7210_pcm_startup,
+	.shutdown = es7210_pcm_shutdown,
 	.hw_params = es7210_pcm_hw_params,
 	.set_fmt = es7210_set_dai_fmt,
 	.set_sysclk = es7210_set_dai_sysclk,
@@ -735,6 +742,52 @@ static const struct i2c_device_id es7210_i2c_id[] = {
 
 MODULE_DEVICE_TABLE(i2c, es7210_i2c_id);
 
+/*
+ * TCT: power down/up sequence for ES7210, keep in sync with the official
+ * kernel: suspend writes 0x06/0x00, 0x4b/0xff, 0x4c/0xff, 0x0b/0xd0,
+ * 0x01/0x7f, 0x06/0x07; resume writes 0x06/0x00, 0x01/0x20, 0x0b/0x02,
+ * 0x4b/0x00, 0x4c/0x00.
+ */
+static int es7210_i2c_suspend(struct device *dev)
+{
+	struct i2c_client *client = i2c_clt1[0];
+
+	if (!client)
+		return 0;
+
+	printk("tct %s\n", __func__);
+	es7210_write(0x06, 0x00, client);
+	es7210_write(0x4b, 0xff, client);
+	es7210_write(0x4c, 0xff, client);
+	es7210_write(0x0b, 0xd0, client);
+	es7210_write(0x01, 0x7f, client);
+	es7210_write(0x06, 0x07, client);
+
+	return 0;
+}
+
+static int es7210_i2c_resume(struct device *dev)
+{
+	struct i2c_client *client = i2c_clt1[0];
+
+	if (!client)
+		return 0;
+
+	printk("tct %s\n", __func__);
+	es7210_write(0x06, 0x00, client);
+	es7210_write(0x01, 0x20, client);
+	es7210_write(0x0b, 0x02, client);
+	es7210_write(0x4b, 0x00, client);
+	es7210_write(0x4c, 0x00, client);
+
+	return 0;
+}
+
+static const struct dev_pm_ops es7210_pm_ops = {
+	.suspend = es7210_i2c_suspend,
+	.resume = es7210_i2c_resume,
+};
+
 static struct i2c_driver es7210_i2c_driver = {
 	.driver = {
 		   .name = "es7210",
@@ -742,6 +795,7 @@ static struct i2c_driver es7210_i2c_driver = {
 #if ES7210_MATCH_DTS_EN
 		   .of_match_table = es7210_dt_ids,
 #endif
+		   .pm = &es7210_pm_ops,
 		   },
 	.probe = es7210_i2c_probe,
 	.remove = __exit_p(es7210_i2c_remove),
