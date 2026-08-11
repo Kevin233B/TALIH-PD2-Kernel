@@ -46,10 +46,22 @@ struct tct_devinfo_ctrl {
 	int (*singleclick_set)(struct device *dev, int enable);
 	int (*prox_set)(int enable);
 	void (*pen_bat_report)(char *buf, int *battery, int mode);
+	int (*charge_process_set)(int enable);
+	int (*grip_set)(int screen_mode, int grip_level);
+	int (*aod_set)(int enable);
+	int (*current_boost_set)(int enable);
+	int (*night_mode_set)(int enable);
 	u8 double_wakeup_en;
 	u8 singleclick_en;
 	u8 prox_en;
+	u8 charge_process_en;
+	u8 aod_en;
+	u8 current_boost_en;
+	u8 night_mode_en;
 	int pen_bat_mode;
+	int screen_mode;
+	int grip_level;
+	struct mutex grip_lock;
 };
 
 static struct tct_devinfo_ctrl tct_ctrl;
@@ -81,6 +93,41 @@ int tct_devinfo_register_pen_bat(void (*cb)(char *buf, int *battery, int mode))
 	return 0;
 }
 EXPORT_SYMBOL(tct_devinfo_register_pen_bat);
+
+int tct_devinfo_register_charge_process(int (*cb)(int enable))
+{
+	tct_ctrl.charge_process_set = cb;
+	return 0;
+}
+EXPORT_SYMBOL(tct_devinfo_register_charge_process);
+
+int tct_devinfo_register_grip(int (*cb)(int screen_mode, int grip_level))
+{
+	tct_ctrl.grip_set = cb;
+	return 0;
+}
+EXPORT_SYMBOL(tct_devinfo_register_grip);
+
+int tct_devinfo_register_aod(int (*cb)(int enable))
+{
+	tct_ctrl.aod_set = cb;
+	return 0;
+}
+EXPORT_SYMBOL(tct_devinfo_register_aod);
+
+int tct_devinfo_register_current_boost(int (*cb)(int enable))
+{
+	tct_ctrl.current_boost_set = cb;
+	return 0;
+}
+EXPORT_SYMBOL(tct_devinfo_register_current_boost);
+
+int tct_devinfo_register_night_mode(int (*cb)(int enable))
+{
+	tct_ctrl.night_mode_set = cb;
+	return 0;
+}
+EXPORT_SYMBOL(tct_devinfo_register_night_mode);
 
 struct device *get_deviceinfo_dev(void)
 {
@@ -303,6 +350,150 @@ static ssize_t tct_penbat_store(struct device *dev,
 }
 static DEVICE_ATTR(penbat, 0644, tct_penbat_show, tct_penbat_store);
 
+static ssize_t charge_process_enable_show(struct device *dev,
+					  struct device_attribute *attr,
+					  char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n", tct_ctrl.charge_process_en);
+}
+
+static ssize_t charge_process_enable_store(struct device *dev,
+					   struct device_attribute *attr,
+					   const char *buf, size_t count)
+{
+	unsigned long val;
+	int ret;
+
+	ret = kstrtoul(buf, 0, &val);
+	if (ret)
+		return ret;
+	if (val > 1)
+		return -EINVAL;
+
+	if (tct_ctrl.charge_process_set)
+		tct_ctrl.charge_process_set(val);
+	tct_ctrl.charge_process_en = val;
+	return count;
+}
+static DEVICE_ATTR(charger_mode, 0644, charge_process_enable_show,
+		   charge_process_enable_store);
+
+static ssize_t tct_grip_mode_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "screen_mode=%d, grip_level=%d\n",
+			tct_ctrl.screen_mode, tct_ctrl.grip_level);
+}
+
+static ssize_t tct_grip_mode_store(struct device *dev,
+				   struct device_attribute *attr,
+				   const char *buf, size_t count)
+{
+	int screen_mode, grip_level;
+	int prev_mode, prev_level;
+
+	mutex_lock(&tct_ctrl.grip_lock);
+	prev_mode = tct_ctrl.screen_mode;
+	prev_level = tct_ctrl.grip_level;
+	if (sscanf(buf, "%d,%d", &screen_mode, &grip_level) != 2) {
+		mutex_unlock(&tct_ctrl.grip_lock);
+		return -EINVAL;
+	}
+
+	pr_info("\x016%s, val=%d,%d previos screen_mode=%d, grip_level=%d\n",
+		"tct_grip_mode_store", screen_mode, grip_level,
+		prev_mode, prev_level);
+	tct_ctrl.screen_mode = screen_mode;
+	tct_ctrl.grip_level = grip_level;
+
+	if (tct_ctrl.grip_set)
+		tct_ctrl.grip_set(screen_mode, grip_level);
+	mutex_unlock(&tct_ctrl.grip_lock);
+
+	return count;
+}
+static DEVICE_ATTR(grip_mode, 0644, tct_grip_mode_show, tct_grip_mode_store);
+
+static ssize_t aod_process_enable_show(struct device *dev,
+				       struct device_attribute *attr,
+				       char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n", tct_ctrl.aod_en);
+}
+
+static ssize_t aod_process_enable_store(struct device *dev,
+					struct device_attribute *attr,
+					const char *buf, size_t count)
+{
+	unsigned long val;
+	int ret;
+
+	ret = kstrtoul(buf, 0, &val);
+	if (ret)
+		return ret;
+	if (val > 1)
+		return -EINVAL;
+
+	if (tct_ctrl.aod_set)
+		tct_ctrl.aod_set(val);
+	tct_ctrl.aod_en = val;
+	return count;
+}
+static DEVICE_ATTR(aod_mode, 0644, aod_process_enable_show,
+		   aod_process_enable_store);
+
+static ssize_t current_boost_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n", tct_ctrl.current_boost_en);
+}
+
+static ssize_t current_boost_store(struct device *dev,
+				   struct device_attribute *attr,
+				   const char *buf, size_t count)
+{
+	unsigned long val;
+	int ret;
+
+	ret = kstrtoul(buf, 0, &val);
+	if (ret)
+		return ret;
+	if (val > 1)
+		return -EINVAL;
+
+	if (tct_ctrl.current_boost_set)
+		tct_ctrl.current_boost_set(val);
+	tct_ctrl.current_boost_en = val;
+	return count;
+}
+static DEVICE_ATTR_RW(current_boost);
+
+static ssize_t night_mode_show(struct device *dev,
+			       struct device_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n", tct_ctrl.night_mode_en);
+}
+
+static ssize_t night_mode_store(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t count)
+{
+	unsigned long val;
+	int ret;
+
+	ret = kstrtoul(buf, 0, &val);
+	if (ret)
+		return ret;
+	if (val > 1)
+		return -EINVAL;
+
+	if (tct_ctrl.night_mode_set)
+		tct_ctrl.night_mode_set(val);
+	tct_ctrl.night_mode_en = val;
+	return count;
+}
+static DEVICE_ATTR_RW(night_mode);
+
 int Create_tct_all_deviceinfo_node_ForMMI(void)
 {
 	struct device *dev = get_deviceinfo_dev();
@@ -366,22 +557,24 @@ static const char * const tct_deviceinfo_mmi_nodes[] = {
 	"DDR", "charger",
 };
 
-/* Control nodes exposed by the OEM sysfs groups */
-static const char * const tct_deviceinfo_ctrl_nodes[] = {
-	"charger_mode", "grip_mode", "aod_mode",
-};
-
 static const struct device_attribute * const tct_deviceinfo_ctrl_attrs[] = {
 	&dev_attr_double_wakeup_enable,
 	&dev_attr_prox_enable,
 	&dev_attr_prox_status,
 	&dev_attr_singleclick_wakeup_enable,
 	&dev_attr_penbat,
+	&dev_attr_charger_mode,
+	&dev_attr_grip_mode,
+	&dev_attr_aod_mode,
+	&dev_attr_current_boost,
+	&dev_attr_night_mode,
 };
 
 static int __init deviceinfo_init(void)
 {
 	int i, ret;
+
+	mutex_init(&tct_ctrl.grip_lock);
 
 	ret = Create_tct_all_deviceinfo_node_ForMMI();
 	if (ret < 0)
@@ -389,12 +582,6 @@ static int __init deviceinfo_init(void)
 
 	for (i = 0; i < ARRAY_SIZE(tct_deviceinfo_mmi_nodes); i++) {
 		ret = tct_deviceinfo_create_node(tct_deviceinfo_mmi_nodes[i]);
-		if (ret < 0)
-			return ret;
-	}
-
-	for (i = 0; i < ARRAY_SIZE(tct_deviceinfo_ctrl_nodes); i++) {
-		ret = tct_deviceinfo_create_node(tct_deviceinfo_ctrl_nodes[i]);
 		if (ret < 0)
 			return ret;
 	}
