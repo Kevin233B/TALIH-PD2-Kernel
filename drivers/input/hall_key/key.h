@@ -1,5 +1,6 @@
 #ifndef __key_H
 #define __key_H
+#include <linux/notifier.h>
 #ifdef CONFIG_PM_WAKELOCKS
 #include <linux/pm_wakeup.h>
 #else
@@ -18,6 +19,7 @@ struct key_data {
 	int key_status;
 	int power_enabled;
 	bool probe_flag;
+	struct notifier_block fb_notif;
 #ifdef CONFIG_PM_WAKELOCKS
         struct wakeup_source key_wakelock;
 #else

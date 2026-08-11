@@ -193,32 +193,30 @@ fsa4480@42 {
        hall-gpio = <&pio 22 0x0>;
 	   interrupt-parent = <0x48>;
 	   interrupts = <0x16 0x08 0x16 0x00>;
-       linux,keycode_up =<586>;
-       linux,keycode_down =<587>;
+       linux,hall = <0x15>;
     };
     hall_2:hall_2  {
 	   compatible = "mediatek,hall_switch_2";
        hall-gpio = <&pio 23 0x0>;
 	   interrupt-parent = <0x48>;
 	   interrupts = <0x17 0x08 0x17 0x00>;
-       linux,keycode_up =<590>;
-       linux,keycode_down =<591>;
+       linux,hall = <0x16>;
     };
 	key_1:key_1 {
 	   compatible = "mediatek,key_switch_1";
        key-gpio = <&pio 5 0x0>;
-	   //interrupt-parent = <0x48>;
-	   //interrupts = <0x05 0x08 0x05 0x00>;
-       linux,keycode_up =<586>;
-       linux,keycode_down =<587>;
+	   interrupt-parent = <0x48>;
+	   interrupts = <0x05 0x01 0x05 0x00>;
+       linux,keycode_down = <0x74>;
+	   status = "okay";
     };
     key_2:key_2  {
 	   compatible = "mediatek,key_switch_2";
       key-gpio = <&pio 9 0x0>;
-	  // interrupt-parent = <0x48>;
-	   //interrupts = <0x09 0x08 0x09 0x00>;
-       linux,keycode_up =<590>;
-       linux,keycode_down =<591>;
+	  interrupt-parent = <0x48>;
+	   interrupts = <0x09 0x01 0x09 0x00>;
+       linux,keycode_down = <0x74>;
+	   status = "okay";
     };
 //end  by xiakang.chen for hallkey on 2023/8/1
 	

@@ -19,11 +19,6 @@
 
 #include <linux/of_irq.h>
 
-//Begin add by yan.gong for FR 9441870 on 2020-05-15
-#define KEY_HALL_SENSOR_DOWN 587
-#define KEY_HALL_SENSOR_UP 586
-//End add by yan.gong for FR 9441870 on 2020-05-15
-
 static struct class *hall_class = NULL;
 static void do_hall_work(struct work_struct *work)
 {
@@ -35,30 +30,11 @@ static void do_hall_work(struct work_struct *work)
     wake_lock_timeout(&hall->hall_wakelock, HZ/2);
 #endif
     gpio_status = gpio_get_value(hall->irq_gpio);
-#if 1
-//Begin Modified by yan.gong for FR 10464744 on 2020-12-23
-    if(!gpio_status)
-    {
-        input_report_key(hall->input, hall->keycode_down, 1);
-		input_sync(hall->input);
-		mdelay(10);
-        input_report_key(hall->input, hall->keycode_down, 0);
-        input_sync(hall->input);
-        printk("%s,%d,keycode = %d,report key\n",__func__,__LINE__,hall->keycode_down);
-        
-    }
-    else
-    {
-        input_report_key(hall->input, hall->keycode_up, 1);
-		input_sync(hall->input);
-		mdelay(10);
-        input_report_key(hall->input, hall->keycode_up, 0);
-        input_sync(hall->input);
-        printk("%s,%d,keycode = %d,report key\n",__func__,__LINE__,hall->keycode_up);
-    }
-#endif
+    input_event(hall->input, EV_SW, hall->switch_code, !gpio_status);
+    input_event(hall->input, EV_SYN, 0, 0);
+    printk("%s,%d,switch = %d,status = %d\n", __func__, __LINE__,
+	    hall->switch_code, gpio_status);
     enable_irq(hall->irq);
-//End Modified by yan.gong for FR 10464744 on 2020-12-23
 }
 
 static irqreturn_t interrupt_hall_irq(int irq, void *dev)
@@ -103,7 +79,9 @@ static int hall_probe(struct platform_device *pdev)
         hall->pdev = pdev;
         dev_set_drvdata(&pdev->dev, hall);
 
-        rc = request_irq(hall->irq , interrupt_hall_irq, IRQ_TYPE_EDGE_BOTH, pdev->name, pdev);
+        rc = request_threaded_irq(hall->irq, interrupt_hall_irq, NULL,
+				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+				pdev->name, pdev);
         if (rc) {
             rc = -1;
             printk("%s : requesting IRQ error\n", __func__);
@@ -120,18 +98,11 @@ static int hall_probe(struct platform_device *pdev)
                 return -ENOMEM;
         }
         hall->input->name = pdev->name;
-//Begin Modified by yan.gong for FR 10464744 on 2020-12-23
-        if (of_property_read_u32(np, "linux,keycode_down", &hall->keycode_down)) {
-                hall->keycode_down = KEY_HALL_SENSOR_DOWN;
+        if (of_property_read_u32(np, "linux,hall", &hall->switch_code)) {
                 printk("KEY_HALL_SENSOR without setting in dts\n");
+                return -EINVAL;
         }
-        if (of_property_read_u32(np, "linux,keycode_up", &hall->keycode_up)) {
-                hall->keycode_up = KEY_HALL_SENSOR_UP;
-                printk("KEY_HALL_SENSOR without setting in dts\n");
-        }
-        input_set_capability(hall->input, EV_KEY, hall->keycode_down);
-        input_set_capability(hall->input, EV_KEY, hall->keycode_up);
-//End Modified by yan.gong for FR 10464744 on 2020-12-23
+        input_set_capability(hall->input, EV_SW, hall->switch_code);
     rc = input_register_device(hall->input);
     if (rc) {
         printk("hall.c: Failed to register device\n");
@@ -144,7 +115,7 @@ static int hall_probe(struct platform_device *pdev)
     }
 
     INIT_WORK(&hall->hall_work, do_hall_work);
-    enable_irq_wake(hall->irq);
+    irq_set_irq_wake(hall->irq, 1);
      if (!hall_class)
     hall_class= class_create(THIS_MODULE, "hall_switch");
     hall_dev = device_create(hall_class, NULL, 0, hall, pdev->name);
@@ -160,6 +131,9 @@ static int hall_probe(struct platform_device *pdev)
 #endif
 
     printk("hall probe completed\n");
+    gpio_status = gpio_get_value(hall->irq_gpio);
+    input_event(hall->input, EV_SW, hall->switch_code, !gpio_status);
+    input_event(hall->input, EV_SYN, 0, 0);
     hall->probe_flag = true;
     return 0;
 }
@@ -214,4 +188,3 @@ static void __init hall_exit(void)
 module_init(hall_init);
 module_exit(hall_exit);
 MODULE_LICENSE("GPL");
-

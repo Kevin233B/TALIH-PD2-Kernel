@@ -18,39 +18,75 @@
 #include <linux/slab.h>
 
 #include <linux/of_irq.h>
+#include <linux/fb.h>
 
-//Begin add by yan.gong for FR 9441870 on 2020-05-15
-#define KEY_key_SENSOR_DOWN 587
-//#define KEY_key_SENSOR_UP 586
-//End add by yan.gong for FR 9441870 on 2020-05-15
+/*
+ * TCT addition, reconstructed from the OEM kernel: the key GPIO is only
+ * reported while the display is blanked (FB_EARLY_EVENT_BLANK/POWERDOWN).
+ */
+static bool tct_key_screen_off;
+
+static int tct_key_hid_fb_notifier_callback(struct notifier_block *nb,
+					    unsigned long event, void *data)
+{
+	struct fb_event *evdata = data;
+	int *blank;
+
+	if (!evdata || !evdata->data)
+		return 0;
+
+	blank = evdata->data;
+
+	if (event == FB_EARLY_EVENT_BLANK && *blank == FB_BLANK_POWERDOWN) {
+		tct_key_screen_off = true;
+		pr_info("%s: screen off, blank=%d\n", __func__, *blank);
+	} else if (event == FB_EVENT_BLANK && *blank == FB_BLANK_UNBLANK) {
+		tct_key_screen_off = false;
+		pr_info("%s: screen on, blank=%d\n", __func__, *blank);
+	}
+
+	return 0;
+}
 
 static struct class *key_class = NULL;
 static void do_key_work(struct work_struct *work)
 {
         struct key_data *key = container_of(work, struct key_data, key_work);
         unsigned int gpio_status;
+	int gpio_status2;
 #ifdef CONFIG_PM_WAKELOCKS
     __pm_wakeup_event(&key->key_wakelock, jiffies_to_msecs(HZ/2));
 #else
     wake_lock_timeout(&key->key_wakelock, HZ/2);
 #endif
-    msleep(10);
     gpio_status = gpio_get_value(key->irq_gpio);
-    if(gpio_status)
-    {
-        input_report_key(key->input, key->keycode_down, 1);
-		input_sync(key->input);
-        printk("%s,%d,keycode = %d,report key 1 \n",__func__,__LINE__,key->keycode_down);
-        
+    msleep(50);
+    gpio_status2 = gpio_get_value(key->irq_gpio);
+
+    /*
+     * Debounce and only report while the display is off, matching the OEM
+     * kernel: the key must be stable high for 50 ms and the screen must be
+     * blanked before a KEY_POWER event is emitted.
+     */
+    if (gpio_status != gpio_status2 || gpio_status != 1) {
+	    msleep(800);
+	    enable_irq(key->irq);
+	    return;
     }
-    else
-    {
-        input_report_key(key->input, key->keycode_down, 0);
-        input_sync(key->input);
-        printk("%s,%d,keycode = %d,report key 0\n",__func__,__LINE__,key->keycode_down);
+
+    if (!tct_key_screen_off) {
+	    msleep(800);
+	    enable_irq(key->irq);
+	    return;
     }
+
+    input_report_key(key->input, key->keycode_down, 1);
+    input_sync(key->input);
+    input_report_key(key->input, key->keycode_down, 0);
+    input_sync(key->input);
+    printk("%s,%d,keycode = %d,report key\n",__func__,__LINE__,key->keycode_down);
+    msleep(800);
     enable_irq(key->irq);
-//End Modified by yan.gong for FR 10464744 on 2020-12-23
 }
 
 static irqreturn_t interrupt_key_irq(int irq, void *dev)
@@ -95,7 +131,9 @@ static int key_probe(struct platform_device *pdev)
         key->pdev = pdev;
         dev_set_drvdata(&pdev->dev, key);
 
-        rc = request_irq(key->irq , interrupt_key_irq, IRQ_TYPE_EDGE_BOTH, pdev->name, pdev);
+        rc = request_threaded_irq(key->irq, interrupt_key_irq, NULL,
+				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+				pdev->name, pdev);
         if (rc) {
             rc = -1;
             printk("%s : requesting IRQ error\n", __func__);
@@ -112,18 +150,11 @@ static int key_probe(struct platform_device *pdev)
                 return -ENOMEM;
         }
         key->input->name = pdev->name;
-//Begin Modified by yan.gong for FR 10464744 on 2020-12-23
         if (of_property_read_u32(np, "linux,keycode_down", &key->keycode_down)) {
-                key->keycode_down = KEY_key_SENSOR_DOWN;
+                key->keycode_down = KEY_POWER;
                 printk("KEY_key_SENSOR without setting in dts\n");
         }
-        /*if (of_property_read_u32(np, "linux,keycode_up", &key->keycode_up)) {
-                key->keycode_up = KEY_key_SENSOR_UP;
-                printk("KEY_key_SENSOR without setting in dts\n");
-        }*/
         input_set_capability(key->input, EV_KEY, key->keycode_down);
-        //input_set_capability(key->input, EV_KEY, key->keycode_up);
-//End Modified by yan.gong for FR 10464744 on 2020-12-23
     rc = input_register_device(key->input);
     if (rc) {
         printk("key.c: Failed to register device\n");
@@ -137,6 +168,12 @@ static int key_probe(struct platform_device *pdev)
 
     INIT_WORK(&key->key_work, do_key_work);
     enable_irq_wake(key->irq);
+    key->fb_notif.notifier_call = tct_key_hid_fb_notifier_callback;
+    rc = fb_register_client(&key->fb_notif);
+    if (rc) {
+        printk("key.c: Failed to register fb notifier, rc = %d\n", rc);
+        return rc;
+    }
      if (!key_class)
     key_class= class_create(THIS_MODULE, "key_switch");
     key_dev = device_create(key_class, NULL, 0, key, pdev->name);
@@ -160,6 +197,7 @@ static int key_remove(struct platform_device *pdev)
 {
     struct key_data *key = platform_get_drvdata(pdev);
 
+    fb_unregister_client(&key->fb_notif);
     free_irq(key->irq, pdev);
 #ifdef CONFIG_PM_WAKELOCKS
     wakeup_source_trash(&key->key_wakelock);
@@ -206,4 +244,3 @@ static void __init volumekey_exit(void)
 module_init(volumekey_init);
 module_exit(volumekey_exit);
 MODULE_LICENSE("GPL");
-

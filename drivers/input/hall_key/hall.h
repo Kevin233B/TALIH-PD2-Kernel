@@ -9,8 +9,7 @@
 struct hall_data {
 	int irq;
 	int irq_gpio;
-	int keycode_up;
-	int keycode_down;
+	int switch_code;
 	struct input_dev *input;
 	struct workqueue_struct *hall_wq;
 	struct work_struct hall_work;
