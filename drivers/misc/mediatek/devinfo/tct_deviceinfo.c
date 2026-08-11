@@ -15,6 +15,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/of_fdt.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/sysfs.h>
@@ -192,6 +193,55 @@ static ssize_t tct_deviceinfo_generic_store(struct device *dev,
 
 	return count;
 }
+
+static struct tct_deviceinfo_node *tct_deviceinfo_find_node(const char *name)
+{
+	struct tct_deviceinfo_node *node;
+
+	list_for_each_entry(node, &tct_deviceinfo_nodes, list)
+		if (!strcmp(node->name, name))
+			return node;
+	return NULL;
+}
+
+/*
+ * TCT CPU devinfo, reconstructed from the OEM kernel: when the DT machine
+ * name matches, write the full CPU info string into the "CPU" MMI node.
+ */
+void set_cpu_devinfo(const char *name)
+{
+	struct tct_deviceinfo_node *node;
+	char buf[64];
+
+	if (!name || strcmp(name, "MT8797Z/CNZA"))
+		return;
+
+	snprintf(buf, sizeof(buf), "%s:%s:%s:%s",
+		 "MT8797Z/CNZA", "MTK", "NULL", "AMA0001228C1");
+	node = tct_deviceinfo_find_node("CPU");
+	if (node)
+		strlcpy(node->value, buf, sizeof(node->value));
+}
+EXPORT_SYMBOL(set_cpu_devinfo);
+
+int tct_cpu_devinfo_init(void)
+{
+	const char *name = of_flat_dt_get_machine_name();
+
+	if (!name)
+		return -ENODEV;
+
+	set_cpu_devinfo(name);
+	return 0;
+}
+EXPORT_SYMBOL(tct_cpu_devinfo_init);
+
+void tct_cpu_devinfo_exit(void)
+{
+}
+EXPORT_SYMBOL(tct_cpu_devinfo_exit);
+
+late_initcall(tct_cpu_devinfo_init);
 
 static ssize_t tct_all_deviceinfo_show(struct device *dev,
 				       struct device_attribute *attr,
