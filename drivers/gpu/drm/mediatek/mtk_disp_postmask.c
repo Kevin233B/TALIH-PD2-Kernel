@@ -6,11 +6,14 @@
 #include <drm/drmP.h>
 #include <linux/clk.h>
 #include <linux/component.h>
+#include <linux/delay.h>
+#include <linux/io.h>
 #include <linux/of_device.h>
 #include <linux/of_irq.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/soc/mediatek/mtk-cmdq.h>
+#include <linux/workqueue.h>
 
 #include "mtk_drm_crtc.h"
 #include "mtk_drm_ddp_comp.h"
@@ -441,15 +444,85 @@ static void mtk_postmask_stop(struct mtk_ddp_comp *comp,
 		       comp->regs_pa + DISP_POSTMASK_INTSTA, 0, ~0);
 }
 
+static void v9_dump_all(void)
+{
+	void __iomem *b;
+	static int cnt;
+
+	cnt++;
+	pr_err("[v9] ===== display regs dump #%d =====\n", cnt);
+
+	b = ioremap(0x1400d000, 0x200);
+	if (b) {
+		pr_err("[v9] PM0: EN=0x%x INTEN=0x%x INTSTA=0x%x CFG=0x%x SIZE=0x%x STA=0x%x ICNT=0x%x MADDR=0x%x MLEN=0x%x\n",
+			readl(b+0x0), readl(b+0x8), readl(b+0xc), readl(b+0x20),
+			readl(b+0x30), readl(b+0xa0), readl(b+0xa4),
+			readl(b+0x100), readl(b+0x104));
+		iounmap(b);
+	}
+	b = ioremap(0x1410d000, 0x200);
+	if (b) {
+		pr_err("[v9] PM1: EN=0x%x CFG=0x%x STA=0x%x MADDR=0x%x MLEN=0x%x\n",
+			readl(b+0x0), readl(b+0x20), readl(b+0xa0),
+			readl(b+0x100), readl(b+0x104));
+		iounmap(b);
+	}
+	b = ioremap(0x14000000, 0x100);
+	if (b) {
+		pr_err("[v9] OVL0: STA=0x%x EN=0x%x ROI=0x%x\n",
+			readl(b+0x0), readl(b+0xc), readl(b+0x20));
+		iounmap(b);
+	}
+	b = ioremap(0x14003000, 0x100);
+	if (b) {
+		pr_err("[v9] RDMA0: 0=0x%x 4=0x%x 8=0x%x c=0x%x 10=0x%x 14=0x%x 18=0x%x 1c=0x%x 20=0x%x 24=0x%x\n",
+			readl(b+0x0), readl(b+0x4), readl(b+0x8), readl(b+0xc),
+			readl(b+0x10), readl(b+0x14), readl(b+0x18),
+			readl(b+0x1c), readl(b+0x20), readl(b+0x24));
+		iounmap(b);
+	}
+	b = ioremap(0x14117000, 0x100);
+	if (b) {
+		pr_err("[v9] MUTEX: 0=0x%x 4=0x%x 8=0x%x c=0x%x 10=0x%x 14=0x%x 18=0x%x 1c=0x%x 20=0x%x 24=0x%x 28=0x%x 2c=0x%x 30=0x%x 34=0x%x 38=0x%x 3c=0x%x\n",
+			readl(b+0x0), readl(b+0x4), readl(b+0x8), readl(b+0xc),
+			readl(b+0x10), readl(b+0x14), readl(b+0x18),
+			readl(b+0x1c), readl(b+0x20), readl(b+0x24),
+			readl(b+0x28), readl(b+0x2c), readl(b+0x30),
+			readl(b+0x34), readl(b+0x38), readl(b+0x3c));
+		iounmap(b);
+	}
+	b = ioremap(0x1400e000, 0x100);
+	if (b) {
+		pr_err("[v9] DSI0: 0=0x%x 4=0x%x 8=0x%x c=0x%x 10=0x%x 14=0x%x 18=0x%x 1c=0x%x 20=0x%x 24=0x%x\n",
+			readl(b+0x0), readl(b+0x4), readl(b+0x8), readl(b+0xc),
+			readl(b+0x10), readl(b+0x14), readl(b+0x18),
+			readl(b+0x1c), readl(b+0x20), readl(b+0x24));
+		iounmap(b);
+	}
+}
+
+static void v9_dump_work(struct work_struct *work)
+{
+	v9_dump_all();
+}
+
+static DECLARE_DELAYED_WORK(v9_dump_dwork, v9_dump_work);
+
+static void v9_schedule_dumps(void)
+{
+	schedule_delayed_work(&v9_dump_dwork, msecs_to_jiffies(3000));
+	schedule_delayed_work(&v9_dump_dwork, msecs_to_jiffies(10000));
+	schedule_delayed_work(&v9_dump_dwork, msecs_to_jiffies(20000));
+	schedule_delayed_work(&v9_dump_dwork, msecs_to_jiffies(30000));
+}
+
 static int mtk_disp_postmask_bind(struct device *dev, struct device *master,
 				  void *data)
 {
 	struct mtk_disp_postmask *priv = dev_get_drvdata(dev);
 	struct drm_device *drm_dev = data;
 	unsigned int value;
-	int ret;
-
-	DDPINFO("%s\n", __func__);
+	int ret;	DDPINFO("%s\n", __func__);
 
 	/*
 	 * LK leaves POSTMASK in mask-active DRAM mode with MEM_ADDR pointing
@@ -472,6 +545,8 @@ static int mtk_disp_postmask_bind(struct device *dev, struct device *master,
 		DDPPR_ERR("%s: switched LK POSTMASK to relay, cfg=0x%x\n",
 			__func__, value);
 	}
+
+	v9_schedule_dumps();
 
 	ret = mtk_ddp_comp_register(drm_dev, &priv->ddp_comp);
 	if (ret < 0) {
