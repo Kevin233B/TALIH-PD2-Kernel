@@ -5036,7 +5036,12 @@ void mtk_crtc_first_enable_ddp_config(struct mtk_drm_crtc *mtk_crtc)
 			     mtk_crtc->gce_obj.event[EVENT_CMD_EOF]);
 	cmdq_pkt_clear_event(cmdq_handle,
 			     mtk_crtc->gce_obj.event[EVENT_VDO_EOF]);
-	mtk_crtc_wait_frame_done(mtk_crtc, cmdq_handle, DDP_FIRST_PATH, 0);
+	/*
+	 * TALIH-PD2: LK 遗留的管线不会产生 frame-done(DSI underrun 无法完成一帧),
+	 * 此等待会永久卡住, 导致后续所有 comp 配置(含 POSTMASK relay 切换)永远
+	 * 不执行 -> 花屏。首次使能时跳过等待, 让配置立即生效。
+	 */
+	DDPPR_ERR("%s: skip wait_frame_done at first enable\n", __func__);
 
 	/*1. Show LK logo only */
 	mtk_crtc_all_layer_off(mtk_crtc, cmdq_handle);
