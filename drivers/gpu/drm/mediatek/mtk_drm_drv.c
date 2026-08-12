@@ -753,10 +753,10 @@ static void mtk_atomit_doze_bypass_pq(struct drm_crtc *crtc)
 		cb_data->crtc = crtc;
 		cb_data->cmdq_handle = cmdq_handle;
 
-		if (mtk_crtc_is_frame_trigger_mode(crtc))
+		if (0 && mtk_crtc_is_frame_trigger_mode(crtc))
 			cmdq_pkt_wait_no_clear(cmdq_handle,
 				mtk_crtc->gce_obj.event[EVENT_STREAM_EOF]);
-		else
+		else if (0)
 			cmdq_pkt_wait_no_clear(cmdq_handle,
 				mtk_crtc->gce_obj.event[EVENT_CMD_EOF]);
 
@@ -817,10 +817,10 @@ static void mtk_atomit_doze_enable_pq(struct drm_crtc *crtc)
 		cb_data->crtc = crtc;
 		cb_data->cmdq_handle = cmdq_handle;
 
-		if (mtk_crtc_is_frame_trigger_mode(crtc))
+		if (0 && mtk_crtc_is_frame_trigger_mode(crtc))
 			cmdq_pkt_wait_no_clear(cmdq_handle,
 				mtk_crtc->gce_obj.event[EVENT_STREAM_EOF]);
-		else
+		else if (0)
 			cmdq_pkt_wait_no_clear(cmdq_handle,
 				mtk_crtc->gce_obj.event[EVENT_CMD_EOF]);
 
