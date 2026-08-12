@@ -88,8 +88,6 @@ struct lcm {
 	struct gpio_desc *reset_gpio;
 	struct gpio_desc *bias_pos;
 	struct gpio_desc *bias_neg;
-	struct gpio_desc *vddi_18;
-	struct gpio_desc *vdd_12;
 	int esd_te_master;
 	int esd_te_slave;
 	bool prepared;
@@ -126,15 +124,6 @@ static void lcm_panel_init(struct lcm *ctx)
 	const struct hx83121a_init_cmd *cmd;
 	int i, ret;
 
-	/* vddi_18 */
-	ctx->vddi_18 = devm_gpiod_get(ctx->dev, "vddi_18", GPIOD_OUT_HIGH);
-	if (IS_ERR(ctx->vddi_18))
-		dev_err(ctx->dev, "%s: cannot get vddi_18 %ld\n",
-			__func__, PTR_ERR(ctx->vddi_18));
-	else
-		devm_gpiod_put(ctx->dev, ctx->vddi_18);
-	mdelay(2);
-
 	/*
 	 * 官核 2026 lcm_prepare 反汇编上电时序（__const_udelay 换算：
 	 * 0x8312b0=8.6ms、0x147aeb8=21.5ms、0x418958=4.3ms，
@@ -155,7 +144,7 @@ static void lcm_panel_init(struct lcm *ctx)
 	if (IS_ERR(ctx->bias_pos))
 		dev_err(ctx->dev, "%s: cannot get bias_pos %ld\n",
 			__func__, PTR_ERR(ctx->bias_pos));
-	mdelay(22);
+	mdelay(21);
 
 	ctx->bias_neg = devm_gpiod_get_index(ctx->dev, "bias", 1,
 					     GPIOD_OUT_HIGH);
@@ -178,7 +167,7 @@ static void lcm_panel_init(struct lcm *ctx)
 		gpiod_set_value(ctx->bias_pos, 1);
 		devm_gpiod_put(ctx->dev, ctx->bias_pos);
 	}
-	mdelay(22);
+	mdelay(21);
 
 	if (!IS_ERR(ctx->bias_neg)) {
 		gpiod_set_value(ctx->bias_neg, 1);
@@ -188,11 +177,11 @@ static void lcm_panel_init(struct lcm *ctx)
 
 	if (!IS_ERR(ctx->reset_gpio)) {
 		gpiod_set_value(ctx->reset_gpio, 1);
-		mdelay(22);
+		mdelay(21);
 		gpiod_set_value(ctx->reset_gpio, 0);
-		mdelay(22);
+		mdelay(21);
 		gpiod_set_value(ctx->reset_gpio, 1);
-		mdelay(22);
+		mdelay(21);
 		devm_gpiod_put(ctx->dev, ctx->reset_gpio);
 	}
 	mdelay(606);
@@ -210,7 +199,7 @@ static void lcm_panel_init(struct lcm *ctx)
 			ctx->error = ret;
 			dev_err(ctx->dev, "%s: init cmd %d failed: %d\n",
 				__func__, i, ret);
-			return;
+			goto init_wait;
 		}
 	}
 
@@ -221,7 +210,7 @@ static void lcm_panel_init(struct lcm *ctx)
 		ctx->error = ret;
 		dev_err(ctx->dev, "%s: with_vcom extra cmd failed: %d\n",
 			__func__, ret);
-		return;
+		goto init_wait;
 	}
 #endif
 
@@ -232,39 +221,37 @@ static void lcm_panel_init(struct lcm *ctx)
 			ctx->error = ret;
 			dev_err(ctx->dev, "%s: init cmd %d failed: %d\n",
 				__func__, i, ret);
-			return;
+			goto init_wait;
 		}
 	}
 
-	if (!ctx->error) {
-		ret = lcm_dcs_write(ctx, hx83121a_cdot_csot_sleep_out_seq,
-				    HX83121A_CDOT_CSOT_SLEEP_OUT_SEQ_LEN);
-		if (ret < 0) {
-			ctx->error = ret;
-			dev_err(ctx->dev, "%s: sleep out failed: %d\n",
-				__func__, ret);
-			return;
-		}
-		/*
-		 * 官核 lcm_prepare 出口反汇编：0x11 后 120 次
-		 * __const_udelay(0x418958=4.3ms)≈516ms；0x29 后 50 次
-		 * ≈215ms。冷启动时偏短会让 Display On 落在面板未就绪窗口，
-		 * 表现为首帧异常/花屏。
-		 */
-		mdelay(516);
+	ret = lcm_dcs_write(ctx, hx83121a_cdot_csot_sleep_out_seq,
+			    HX83121A_CDOT_CSOT_SLEEP_OUT_SEQ_LEN);
+	if (ret < 0) {
+		ctx->error = ret;
+		dev_err(ctx->dev, "%s: sleep out failed: %d\n",
+			__func__, ret);
 	}
 
-	if (!ctx->error) {
+init_wait:
+	/*
+	 * 官核 lcm_prepare 出口反汇编（0x867cd88）：无论前面命令是否
+	 * 失败都等待 120*4.295ms≈515ms；error>=0 才发 0x29；再等
+	 * 50*4.295ms≈215ms。失败时 0x11 可能未发出，官核同样只等
+	 * 515ms 后跳过 0x29。
+	 */
+	mdelay(515);
+
+	if (ctx->error >= 0) {
 		ret = lcm_dcs_write(ctx, hx83121a_cdot_csot_display_on_seq,
 				    HX83121A_CDOT_CSOT_DISPLAY_ON_SEQ_LEN);
 		if (ret < 0) {
 			ctx->error = ret;
 			dev_err(ctx->dev, "%s: display on failed: %d\n",
 				__func__, ret);
-			return;
 		}
-		mdelay(215);
 	}
+	mdelay(215);
 }
 
 static int lcm_disable(struct drm_panel *panel)
@@ -296,18 +283,18 @@ static int lcm_unprepare(struct drm_panel *panel)
 	if (ctx->error >= 0) {
 		cmd = 0x28; /* display off */
 		lcm_dcs_write(ctx, &cmd, 1);
-		mdelay(50);
+		/* 官核 lcm_unprepare：0x28 后 1*4.3ms、0x10 后 2*4.3ms */
+		mdelay(4);
 	}
 
 	if (ctx->error >= 0) {
 		cmd = 0x10; /* sleep in */
 		lcm_dcs_write(ctx, &cmd, 1);
-		mdelay(120);
+		mdelay(9);
 	}
 
 	ctx->error = 0;
 	ctx->prepared = false;
-	mdelay(1);
 
 	/*
 	 * TCT: keep the panel powered when single-click wake is enabled so
@@ -327,7 +314,7 @@ static int lcm_unprepare(struct drm_panel *panel)
 	}
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
 	/* 官核 lcm_unprepare 下电步进为 21.5ms（0x147aeb8），保证放电完成 */
-	mdelay(22);
+	mdelay(21);
 
 	ctx->bias_neg = devm_gpiod_get_index(ctx->dev, "bias", 1,
 					     GPIOD_OUT_HIGH);
@@ -338,7 +325,7 @@ static int lcm_unprepare(struct drm_panel *panel)
 	}
 	gpiod_set_value(ctx->bias_neg, 0);
 	devm_gpiod_put(ctx->dev, ctx->bias_neg);
-	mdelay(22);
+	mdelay(21);
 
 	ctx->bias_pos = devm_gpiod_get_index(ctx->dev, "bias", 0,
 					     GPIOD_OUT_HIGH);
@@ -349,7 +336,7 @@ static int lcm_unprepare(struct drm_panel *panel)
 	}
 	gpiod_set_value(ctx->bias_pos, 0);
 	devm_gpiod_put(ctx->dev, ctx->bias_pos);
-	mdelay(22);
+	mdelay(21);
 
 	if (tct_get_panel_resume_flag() && tct_get_touch_dev()) {
 		himax_common_suspend(tct_get_touch_dev());
@@ -607,14 +594,6 @@ static int lcm_probe(struct mipi_dsi_device *dsi)
 		if (!ctx->backlight)
 			return -EPROBE_DEFER;
 	}
-
-	ctx->vddi_18 = devm_gpiod_get(dev, "vddi_18", GPIOD_OUT_HIGH);
-	if (IS_ERR(ctx->vddi_18)) {
-		dev_err(dev, "%s: cannot get vddi_18 %ld\n",
-			__func__, PTR_ERR(ctx->vddi_18));
-		return PTR_ERR(ctx->vddi_18);
-	}
-	devm_gpiod_put(dev, ctx->vddi_18);
 
 	ctx->bias_pos = devm_gpiod_get_index(dev, "bias", 0, GPIOD_OUT_HIGH);
 	if (IS_ERR(ctx->bias_pos)) {
