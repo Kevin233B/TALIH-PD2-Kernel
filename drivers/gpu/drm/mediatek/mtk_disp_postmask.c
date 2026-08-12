@@ -350,6 +350,15 @@ static void mtk_postmask_config(struct mtk_ddp_comp *comp,
 			 REG_FLD_VAL((CFG_FLD_GCLAST_EN), 1) |
 			 REG_FLD_VAL((CFG_FLD_STALL_CG_ON), 1));
 		mtk_ddp_write_relaxed(comp, value, DISP_POSTMASK_CFG, handle);
+		/*
+		 * Clear the stale MEM_ADDR left by the bootloader (e.g. 0x482ca000).
+		 * In relay mode a zero address is a safe "no memory read" sentinel,
+		 * same as the force_relay path used when the round-corner buffer is
+		 * invalid; otherwise POSTMASK reads an unmapped IOVA and raises an
+		 * IOMMU translation fault which stalls the whole display pipeline.
+		 */
+		mtk_ddp_write_relaxed(comp, 0x0, DISP_POSTMASK_MEM_ADDR, handle);
+		mtk_ddp_write_relaxed(comp, 0x0, DISP_POSTMASK_MEM_LENGTH, handle);
 	}
 }
 
