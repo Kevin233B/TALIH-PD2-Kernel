@@ -65,26 +65,21 @@ extern int tct_get_gesture_en(void);
 #define PHYSICAL_WIDTH_UM	166244
 #define PHYSICAL_HEIGHT_UM	265958
 
-#define HSA			40
-#define HBP			60
+#define HSA			20
+#define HBP			40
 #define HFP			60
 #define VSA			4
 #define VBP			18
 
-/* 120 Hz mode */
-#define MODE_0_FPS		120
-#define MODE_0_VFP		112
-#define PANEL_CLOCK_120HZ	568972
+/* 72 Hz mode */
+#define MODE_0_FPS		72
+#define MODE_0_VFP		3246
+#define PANEL_CLOCK_72HZ	579110
 
-/* 90 Hz mode */
-#define MODE_1_FPS		90
-#define MODE_1_VFP		1000
-#define PANEL_CLOCK_90HZ	567388
-
-/* 60 Hz mode */
-#define MODE_2_FPS		60
-#define MODE_2_VFP		2902
-#define PANEL_CLOCK_60HZ	579110
+/* 64 Hz mode */
+#define MODE_1_FPS		64
+#define MODE_1_VFP		332
+#define PANEL_CLOCK_64HZ	568972
 
 struct lcm {
 	struct device *dev;
@@ -376,7 +371,7 @@ static int lcm_enable(struct drm_panel *panel)
 }
 
 static const struct drm_display_mode default_mode = {
-	.clock		= PANEL_CLOCK_120HZ,
+	.clock		= PANEL_CLOCK_72HZ,
 	.hdisplay	= PANEL_WIDTH,
 	.hsync_start	= PANEL_WIDTH + HFP,
 	.hsync_end	= PANEL_WIDTH + HFP + HSA,
@@ -388,8 +383,8 @@ static const struct drm_display_mode default_mode = {
 	.vrefresh	= MODE_0_FPS,
 };
 
-static const struct drm_display_mode performance_mode_90hz = {
-	.clock		= PANEL_CLOCK_90HZ,
+static const struct drm_display_mode performance_mode = {
+	.clock		= PANEL_CLOCK_64HZ,
 	.hdisplay	= PANEL_WIDTH,
 	.hsync_start	= PANEL_WIDTH + HFP,
 	.hsync_end	= PANEL_WIDTH + HFP + HSA,
@@ -401,25 +396,11 @@ static const struct drm_display_mode performance_mode_90hz = {
 	.vrefresh	= MODE_1_FPS,
 };
 
-static const struct drm_display_mode performance_mode_60hz = {
-	.clock		= PANEL_CLOCK_60HZ,
-	.hdisplay	= PANEL_WIDTH,
-	.hsync_start	= PANEL_WIDTH + HFP,
-	.hsync_end	= PANEL_WIDTH + HFP + HSA,
-	.htotal		= PANEL_WIDTH + HFP + HSA + HBP,
-	.vdisplay	= PANEL_HEIGHT,
-	.vsync_start	= PANEL_HEIGHT + MODE_2_VFP,
-	.vsync_end	= PANEL_HEIGHT + MODE_2_VFP + VSA,
-	.vtotal		= PANEL_HEIGHT + MODE_2_VFP + VSA + VBP,
-	.vrefresh	= MODE_2_FPS,
-};
-
 static int lcm_get_modes(struct drm_panel *panel)
 {
 	struct drm_connector *connector = panel->connector;
 	struct drm_display_mode *mode;
-	struct drm_display_mode *mode_90hz;
-	struct drm_display_mode *mode_60hz;
+	struct drm_display_mode *mode_64hz;
 
 	mode = drm_mode_duplicate(panel->drm, &default_mode);
 	if (!mode) {
@@ -429,32 +410,21 @@ static int lcm_get_modes(struct drm_panel *panel)
 	}
 	mode->vrefresh = MODE_0_FPS;
 	drm_mode_set_name(mode);
-	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
 	drm_mode_probed_add(connector, mode);
 
-	mode_90hz = drm_mode_duplicate(panel->drm, &performance_mode_90hz);
-	if (!mode_90hz) {
+	mode_64hz = drm_mode_duplicate(panel->drm, &performance_mode);
+	if (!mode_64hz) {
 		dev_err(panel->dev, "failed to add mode %dx%d@%d\n",
 			PANEL_WIDTH, PANEL_HEIGHT, MODE_1_FPS);
 		return -ENOMEM;
 	}
-	mode_90hz->vrefresh = MODE_1_FPS;
-	drm_mode_set_name(mode_90hz);
-	drm_mode_probed_add(connector, mode_90hz);
-
-	mode_60hz = drm_mode_duplicate(panel->drm, &performance_mode_60hz);
-	if (!mode_60hz) {
-		dev_err(panel->dev, "failed to add mode %dx%d@%d\n",
-			PANEL_WIDTH, PANEL_HEIGHT, MODE_2_FPS);
-		return -ENOMEM;
-	}
-	mode_60hz->vrefresh = MODE_2_FPS;
-	drm_mode_set_name(mode_60hz);
-	drm_mode_probed_add(connector, mode_60hz);
+	mode_64hz->vrefresh = MODE_1_FPS;
+	drm_mode_set_name(mode_64hz);
+	drm_mode_probed_add(connector, mode_64hz);
 
 	connector->display_info.width_mm = 166;
 	connector->display_info.height_mm = 266;
-	return 3;
+	return 2;
 }
 
 static const struct drm_panel_funcs lcm_drm_funcs = {
@@ -467,8 +437,8 @@ static const struct drm_panel_funcs lcm_drm_funcs = {
 
 #if defined(CONFIG_MTK_PANEL_EXT)
 static struct mtk_panel_params ext_params = {
-	.pll_clk = 490,
-	.data_rate = 980,
+	.pll_clk = 1,
+	.data_rate = 485,
 	.cust_esd_check = 0,
 	.esd_check_enable = 0,
 	.physical_width_um = PHYSICAL_WIDTH_UM,
