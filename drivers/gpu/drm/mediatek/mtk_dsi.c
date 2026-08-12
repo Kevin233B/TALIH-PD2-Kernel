@@ -2720,8 +2720,9 @@ static void mtk_dsi_clk_change_6382(struct mtk_dsi *dsi, int en)
 		mtk_crtc_pkt_create(&cmdq_handle, &mtk_crtc->base,
 				mtk_crtc->gce_obj.client[CLIENT_DSI_CFG]);
 
-		cmdq_pkt_wait_no_clear(cmdq_handle,
-			mtk_crtc->gce_obj.event[EVENT_CMD_EOF]);
+		if (0)
+			cmdq_pkt_wait_no_clear(cmdq_handle,
+				mtk_crtc->gce_obj.event[EVENT_CMD_EOF]);
 
 		mtk_dsi_porch_config(dsi, cmdq_handle);
 
@@ -2744,8 +2745,9 @@ static void mtk_dsi_clk_change_6382(struct mtk_dsi *dsi, int en)
 		mtk_crtc_pkt_create(&cmdq_handle, &mtk_crtc->base,
 				mtk_crtc->gce_obj.client[CLIENT_DSI_CFG]);
 
-		cmdq_pkt_wait_no_clear(cmdq_handle,
-				mtk_crtc->gce_obj.event[EVENT_STREAM_EOF]);
+		if (0)
+			cmdq_pkt_wait_no_clear(cmdq_handle,
+					mtk_crtc->gce_obj.event[EVENT_STREAM_EOF]);
 		/* cmd mode only change mipi clk and make sure tx buf enough */
 		mtk_mipi_clk_change_6382(dsi, cmdq_handle, data_rate);
 
@@ -3005,9 +3007,10 @@ static int mtk_dsi_wait_cmd_frame_done(struct mtk_dsi *dsi,
 		&mtk_crtc->base,
 		mtk_crtc->gce_obj.client[CLIENT_CFG]);
 
-	/* wait frame done */
-	cmdq_pkt_wait_no_clear(handle,
-		mtk_crtc->gce_obj.event[EVENT_STREAM_EOF]);
+	/* wait frame done (TALIH debug: skip) */
+	if (0)
+		cmdq_pkt_wait_no_clear(handle,
+			mtk_crtc->gce_obj.event[EVENT_STREAM_EOF]);
 
 	/* When system ready to go to Doze suspend stage, it has to
 	 * update the latest image before entering it to make sure display
@@ -3018,10 +3021,12 @@ static int mtk_dsi_wait_cmd_frame_done(struct mtk_dsi *dsi,
 	if (new_doze_state && !force_lcm_update) {
 		cmdq_pkt_set_event(handle,
 			mtk_crtc->gce_obj.event[EVENT_STREAM_DIRTY]);
-		cmdq_pkt_wait_no_clear(handle,
-			mtk_crtc->gce_obj.event[EVENT_CMD_EOF]);
-		cmdq_pkt_wait_no_clear(handle,
-			mtk_crtc->gce_obj.event[EVENT_STREAM_EOF]);
+		if (0) {
+			cmdq_pkt_wait_no_clear(handle,
+				mtk_crtc->gce_obj.event[EVENT_CMD_EOF]);
+			cmdq_pkt_wait_no_clear(handle,
+				mtk_crtc->gce_obj.event[EVENT_STREAM_EOF]);
+		}
 	}
 
 	cmdq_pkt_clear_event(
@@ -3454,9 +3459,10 @@ static int mtk_dsi_stop_vdo_mode(struct mtk_dsi *dsi, void *handle)
 			&mtk_crtc->base,
 			mtk_crtc->gce_obj.client[CLIENT_CFG]);
 
-		/* wait frame done */
-		cmdq_pkt_wait_no_clear(handle,
-		   mtk_crtc->gce_obj.event[EVENT_CMD_EOF]);
+		/* wait frame done (TALIH debug: skip) */
+		if (0)
+			cmdq_pkt_wait_no_clear(handle,
+			   mtk_crtc->gce_obj.event[EVENT_CMD_EOF]);
 	}
 	/* stop vdo mode */
 	_mtk_dsi_set_mode(&dsi->ddp_comp, handle, CMD_MODE);
@@ -4253,8 +4259,9 @@ static void mtk_dsi_clk_change(struct mtk_dsi *dsi, int en)
 			mtk_crtc->gce_obj.client[CLIENT_CFG]);
 
 	if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO) {
-		cmdq_pkt_wait_no_clear(cmdq_handle,
-			mtk_crtc->gce_obj.event[EVENT_CMD_EOF]);
+		if (0)
+			cmdq_pkt_wait_no_clear(cmdq_handle,
+				mtk_crtc->gce_obj.event[EVENT_CMD_EOF]);
 
 		if (dsi->slave_dsi)
 			mtk_dsi_phy_timconfig(dsi->slave_dsi, cmdq_handle);
@@ -5433,8 +5440,9 @@ int mtk_mipi_dsi_read_gce(struct mtk_dsi *dsi,
 	}
 
 	if (dsi_mode == 0) { /* CMD mode LP */
-		cmdq_pkt_wait_no_clear(cmdq_handle,
-				mtk_crtc->gce_obj.event[EVENT_STREAM_EOF]);
+		if (0)
+			cmdq_pkt_wait_no_clear(cmdq_handle,
+					mtk_crtc->gce_obj.event[EVENT_STREAM_EOF]);
 
 		cmdq_pkt_clear_event(cmdq_handle,
 				mtk_crtc->gce_obj.event[EVENT_ESD_EOF]);
