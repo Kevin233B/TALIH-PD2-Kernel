@@ -434,6 +434,7 @@ static int lcm_get_modes(struct drm_panel *panel)
 		return -ENOMEM;
 	}
 	mode->vrefresh = MODE_0_FPS;
+	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
 	drm_mode_set_name(mode);
 	drm_mode_probed_add(connector, mode);
 
@@ -444,6 +445,7 @@ static int lcm_get_modes(struct drm_panel *panel)
 		return -ENOMEM;
 	}
 	mode_64hz->vrefresh = MODE_1_FPS;
+	mode_64hz->type = DRM_MODE_TYPE_DRIVER;
 	drm_mode_set_name(mode_64hz);
 	drm_mode_probed_add(connector, mode_64hz);
 
