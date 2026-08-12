@@ -559,6 +559,18 @@ static int lcm_probe(struct mipi_dsi_device *dsi)
 	ctx->dev = dev;
 	ctx->esd_te_master = -1;
 	ctx->esd_te_slave = -1;
+
+	/*
+	 * 官核 lcm_probe 反汇编确认（offset 984/992）：
+	 * lanes = 4, mode_flags = 0xE05；format 默认 MIPI_DSI_FMT_RGB888。
+	 * 缺少这些配置会导致 DSI 以 0 lane/错误模式运行，表现为开机花屏。
+	 */
+	dsi->lanes = 4;
+	dsi->format = MIPI_DSI_FMT_RGB888;
+	dsi->mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_SYNC_PULSE
+			| MIPI_DSI_MODE_LPM | MIPI_DSI_MODE_EOT_PACKET
+			| MIPI_DSI_CLOCK_NON_CONTINUOUS;
+
 	mipi_dsi_set_drvdata(dsi, ctx);
 
 	backlight = of_parse_phandle(dev->of_node, "backlight", 0);
