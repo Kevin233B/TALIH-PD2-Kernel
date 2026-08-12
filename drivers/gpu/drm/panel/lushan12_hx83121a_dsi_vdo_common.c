@@ -105,13 +105,24 @@ static inline struct lcm *panel_to_lcm(struct drm_panel *panel)
 static int lcm_dcs_write(struct lcm *ctx, const void *data, size_t len)
 {
 	struct mipi_dsi_device *dsi = to_mipi_dsi_device(ctx->dev);
+	const u8 *cmd = data;
+
+	/*
+	 * 官核/2024 基驱动一致的分派规则：标准 DCS 命令（首字节 < 0xB0，
+	 * 如 0x11/0x29/0x51/0x53/0x35）必须用 DCS 包类型
+	 * （0x05/0x15/0x39）；厂商扩展命令（首字节 >= 0xB0）用 generic
+	 * 包类型（0x03/0x04/0x29）。此前全部走 generic，Sleep Out /
+	 * Display On 以 0x03 包发送会被 HX83121A 忽略，导致面板未真正
+	 * 退出 sleep/未开启显示，表现为开机花屏。
+	 */
+	if (cmd && len && cmd[0] < 0xb0)
+		return mipi_dsi_dcs_write_buffer(dsi, data, len);
 
 	return mipi_dsi_generic_write(dsi, data, len);
 }
 
 static void lcm_panel_init(struct lcm *ctx)
 {
-	struct mipi_dsi_device *dsi = to_mipi_dsi_device(ctx->dev);
 	const struct hx83121a_init_cmd *cmd;
 	int i, ret;
 
@@ -124,65 +135,69 @@ static void lcm_panel_init(struct lcm *ctx)
 		devm_gpiod_put(ctx->dev, ctx->vddi_18);
 	mdelay(2);
 
-	ctx->bias_pos = devm_gpiod_get_index(ctx->dev, "bias", 0,
-					     GPIOD_OUT_HIGH);
-	if (IS_ERR(ctx->bias_pos))
-		dev_err(ctx->dev, "%s: cannot get bias_pos %ld\n",
-			__func__, PTR_ERR(ctx->bias_pos));
-	else
-		devm_gpiod_put(ctx->dev, ctx->bias_pos);
-	mdelay(5);
-
-	ctx->bias_neg = devm_gpiod_get_index(ctx->dev, "bias", 1,
-					     GPIOD_OUT_HIGH);
-	if (IS_ERR(ctx->bias_neg))
-		dev_err(ctx->dev, "%s: cannot get bias_neg %ld\n",
-			__func__, PTR_ERR(ctx->bias_neg));
-	else
-		devm_gpiod_put(ctx->dev, ctx->bias_neg);
-	mdelay(5);
-
+	/*
+	 * 官核 2026 lcm_prepare 反汇编上电时序（__const_udelay 换算：
+	 * 0x8312b0=8.6ms、0x147aeb8=21.5ms、0x418958=4.3ms，
+	 * 复位后 141*4.3ms≈606ms 稳定窗口）。
+	 * 此前沿用 2024 基驱动的 5ms 级短时序，冷启动可能不满足
+	 * HX83121A 电源/复位建立时间，导致初始化不完整。
+	 */
 	ctx->reset_gpio = devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
 	if (IS_ERR(ctx->reset_gpio))
 		dev_err(ctx->dev, "%s: cannot get reset_gpio %ld\n",
 			__func__, PTR_ERR(ctx->reset_gpio));
 	else
 		devm_gpiod_put(ctx->dev, ctx->reset_gpio);
-	mdelay(5);
+	mdelay(9);
+
+	ctx->bias_pos = devm_gpiod_get_index(ctx->dev, "bias", 0,
+					     GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->bias_pos))
+		dev_err(ctx->dev, "%s: cannot get bias_pos %ld\n",
+			__func__, PTR_ERR(ctx->bias_pos));
+	mdelay(22);
+
+	ctx->bias_neg = devm_gpiod_get_index(ctx->dev, "bias", 1,
+					     GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->bias_neg))
+		dev_err(ctx->dev, "%s: cannot get bias_neg %ld\n",
+			__func__, PTR_ERR(ctx->bias_neg));
+	mdelay(22);
+
+	ctx->reset_gpio = devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_LOW);
+	if (IS_ERR(ctx->reset_gpio))
+		dev_err(ctx->dev, "%s: cannot get reset_gpio %ld\n",
+			__func__, PTR_ERR(ctx->reset_gpio));
+	mdelay(4);
 
 	/* AW3750x LCD bias: 5.6 V positive/negative, 150 mA */
 	tct_aw3750x_ldo_current_set(150000, 150000);
 	tct_aw3750x_volt_outp_set(0x10);
 	tct_aw3750x_volt_outn_set(0x10);
-	mdelay(1);
+	mdelay(4);
 
-	ctx->bias_pos = devm_gpiod_get_index(ctx->dev, "bias", 0,
-					     GPIOD_OUT_HIGH);
 	if (!IS_ERR(ctx->bias_pos)) {
 		gpiod_set_value(ctx->bias_pos, 1);
 		devm_gpiod_put(ctx->dev, ctx->bias_pos);
 	}
-	mdelay(5);
+	mdelay(22);
 
-	ctx->bias_neg = devm_gpiod_get_index(ctx->dev, "bias", 1,
-					     GPIOD_OUT_HIGH);
 	if (!IS_ERR(ctx->bias_neg)) {
 		gpiod_set_value(ctx->bias_neg, 1);
 		devm_gpiod_put(ctx->dev, ctx->bias_neg);
 	}
-	mdelay(1);
+	mdelay(4);
 
-	ctx->reset_gpio = devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
 	if (!IS_ERR(ctx->reset_gpio)) {
 		gpiod_set_value(ctx->reset_gpio, 1);
-		mdelay(5);
+		mdelay(22);
 		gpiod_set_value(ctx->reset_gpio, 0);
-		mdelay(5);
+		mdelay(22);
 		gpiod_set_value(ctx->reset_gpio, 1);
-		mdelay(5);
+		mdelay(22);
 		devm_gpiod_put(ctx->dev, ctx->reset_gpio);
 	}
-	mdelay(141);
+	mdelay(606);
 
 	if (tct_get_panel_resume_flag() && tct_get_touch_dev())
 		himax_common_resume(tct_get_touch_dev());
@@ -190,7 +205,7 @@ static void lcm_panel_init(struct lcm *ctx)
 	ctx->error = 0;
 	for (i = 0; i < 7; i++) {
 		cmd = &hx83121a_cdot_csot_init_seq[i];
-		ret = mipi_dsi_generic_write(dsi, cmd->data, cmd->len);
+		ret = lcm_dcs_write(ctx, cmd->data, cmd->len);
 		if (ret < 0) {
 			ctx->error = ret;
 			dev_err(ctx->dev, "%s: init cmd %d failed: %d\n",
@@ -201,7 +216,7 @@ static void lcm_panel_init(struct lcm *ctx)
 
 #if PANEL_HAS_EXTRA_VCOM_CMD
 	cmd = &hx83121a_cdot_csot_with_vcom_extra_seq[0];
-	ret = mipi_dsi_generic_write(dsi, cmd->data, cmd->len);
+	ret = lcm_dcs_write(ctx, cmd->data, cmd->len);
 	if (ret < 0) {
 		ctx->error = ret;
 		dev_err(ctx->dev, "%s: with_vcom extra cmd failed: %d\n",
@@ -212,7 +227,7 @@ static void lcm_panel_init(struct lcm *ctx)
 
 	for (; i < HX83121A_CDOT_CSOT_INIT_SEQ_LEN; i++) {
 		cmd = &hx83121a_cdot_csot_init_seq[i];
-		ret = mipi_dsi_generic_write(dsi, cmd->data, cmd->len);
+		ret = lcm_dcs_write(ctx, cmd->data, cmd->len);
 		if (ret < 0) {
 			ctx->error = ret;
 			dev_err(ctx->dev, "%s: init cmd %d failed: %d\n",
@@ -230,7 +245,13 @@ static void lcm_panel_init(struct lcm *ctx)
 				__func__, ret);
 			return;
 		}
-		mdelay(120);
+		/*
+		 * 官核 lcm_prepare 出口反汇编：0x11 后 120 次
+		 * __const_udelay(0x418958=4.3ms)≈516ms；0x29 后 50 次
+		 * ≈215ms。冷启动时偏短会让 Display On 落在面板未就绪窗口，
+		 * 表现为首帧异常/花屏。
+		 */
+		mdelay(516);
 	}
 
 	if (!ctx->error) {
@@ -242,7 +263,7 @@ static void lcm_panel_init(struct lcm *ctx)
 				__func__, ret);
 			return;
 		}
-		mdelay(50);
+		mdelay(215);
 	}
 }
 
