@@ -604,7 +604,7 @@ static irqreturn_t mtk_disp_ovl_irq_handler(int irq, void *dev_id)
 		dump_ovl_layer_trace(mtk_crtc, ovl);
 	}
 	if (val & (1 << 2)) {
-		DDPPR_ERR("[IRQ] %s: frame underflow! cnt=%d\n",
+		DDPPR_ERR_RL("[IRQ] %s: frame underflow! cnt=%d\n",
 				mtk_dump_comp_str(ovl), priv->underflow_cnt);
 		if ((priv->underflow_cnt % 50) == 0) {
 			if (ovl->mtk_crtc) {
@@ -619,18 +619,18 @@ static irqreturn_t mtk_disp_ovl_irq_handler(int irq, void *dev_id)
 	if (val & (1 << 3))
 		DDPIRQ("[IRQ] %s: sw reset done!\n", mtk_dump_comp_str(ovl));
 	if (val & (1 << 4))
-		DDPPR_ERR("[IRQ] %s: hw reset done!\n", mtk_dump_comp_str(ovl));
+		DDPPR_ERR_RL("[IRQ] %s: hw reset done!\n", mtk_dump_comp_str(ovl));
 	if (val & (1 << 5))
-		DDPPR_ERR("[IRQ] %s: L0 not complete until EOF!\n",
+		DDPPR_ERR_RL("[IRQ] %s: L0 not complete until EOF!\n",
 			  mtk_dump_comp_str(ovl));
 	if (val & (1 << 6))
-		DDPPR_ERR("[IRQ] %s: L1 not complete until EOF!\n",
+		DDPPR_ERR_RL("[IRQ] %s: L1 not complete until EOF!\n",
 			  mtk_dump_comp_str(ovl));
 	if (val & (1 << 7))
-		DDPPR_ERR("[IRQ] %s: L2 not complete until EOF!\n",
+		DDPPR_ERR_RL("[IRQ] %s: L2 not complete until EOF!\n",
 			  mtk_dump_comp_str(ovl));
 	if (val & (1 << 8))
-		DDPPR_ERR("[IRQ] %s: L3 not complete until EOF!\n",
+		DDPPR_ERR_RL("[IRQ] %s: L3 not complete until EOF!\n",
 			  mtk_dump_comp_str(ovl));
 
 	if (mtk_crtc) {

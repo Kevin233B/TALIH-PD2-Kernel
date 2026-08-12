@@ -69,6 +69,14 @@ int mtk_dprec_logger_pr(unsigned int type, char *fmt, ...);
 		pr_err(pr_fmt(fmt), ##arg);              \
 	} while (0)
 
+/* 限速版: 每调用点最多 1 条/秒, 用于逐帧 IRQ 错误刷屏 */
+#define DDPPR_ERR_RL(fmt, arg...)                                              \
+	do {                                                                   \
+		static unsigned long __rl_##__LINE__;                          \
+		if (printk_timed_ratelimit(&__rl_##__LINE__, 1000))            \
+			DDPPR_ERR(fmt, ##arg);                                \
+	} while (0)
+
 #define DDPIRQ(fmt, arg...)                                                    \
 	do {                                                                   \
 		if (g_irq_log)                                                 \
