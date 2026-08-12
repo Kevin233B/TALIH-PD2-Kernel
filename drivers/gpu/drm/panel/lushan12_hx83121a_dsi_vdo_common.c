@@ -162,13 +162,11 @@ static void lcm_panel_init(struct lcm *ctx)
 	if (IS_ERR(ctx->bias_neg))
 		dev_err(ctx->dev, "%s: cannot get bias_neg %ld\n",
 			__func__, PTR_ERR(ctx->bias_neg));
-	mdelay(22);
 
 	ctx->reset_gpio = devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_LOW);
 	if (IS_ERR(ctx->reset_gpio))
 		dev_err(ctx->dev, "%s: cannot get reset_gpio %ld\n",
 			__func__, PTR_ERR(ctx->reset_gpio));
-	mdelay(4);
 
 	/* AW3750x LCD bias: 5.6 V positive/negative, 150 mA */
 	tct_aw3750x_ldo_current_set(150000, 150000);
@@ -199,8 +197,10 @@ static void lcm_panel_init(struct lcm *ctx)
 	}
 	mdelay(606);
 
-	if (tct_get_panel_resume_flag() && tct_get_touch_dev())
+	if (tct_get_panel_resume_flag() && tct_get_touch_dev()) {
 		himax_common_resume(tct_get_touch_dev());
+		mdelay(9);
+	}
 
 	ctx->error = 0;
 	for (i = 0; i < 7; i++) {
@@ -326,7 +326,8 @@ static int lcm_unprepare(struct drm_panel *panel)
 		return PTR_ERR(ctx->reset_gpio);
 	}
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
-	mdelay(5);
+	/* 官核 lcm_unprepare 下电步进为 21.5ms（0x147aeb8），保证放电完成 */
+	mdelay(22);
 
 	ctx->bias_neg = devm_gpiod_get_index(ctx->dev, "bias", 1,
 					     GPIOD_OUT_HIGH);
@@ -337,7 +338,7 @@ static int lcm_unprepare(struct drm_panel *panel)
 	}
 	gpiod_set_value(ctx->bias_neg, 0);
 	devm_gpiod_put(ctx->dev, ctx->bias_neg);
-	mdelay(5);
+	mdelay(22);
 
 	ctx->bias_pos = devm_gpiod_get_index(ctx->dev, "bias", 0,
 					     GPIOD_OUT_HIGH);
@@ -348,10 +349,13 @@ static int lcm_unprepare(struct drm_panel *panel)
 	}
 	gpiod_set_value(ctx->bias_pos, 0);
 	devm_gpiod_put(ctx->dev, ctx->bias_pos);
-	mdelay(5);
+	mdelay(22);
 
-	if (tct_get_panel_resume_flag() && tct_get_touch_dev())
+	if (tct_get_panel_resume_flag() && tct_get_touch_dev()) {
 		himax_common_suspend(tct_get_touch_dev());
+		/* 官核 suspend 后 7*4.3ms≈30ms，等待触摸 IC 稳定 */
+		mdelay(30);
+	}
 
 	pr_info("%s-\n", __func__);
 	return 0;
