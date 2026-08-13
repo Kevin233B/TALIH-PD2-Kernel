@@ -60,7 +60,7 @@
 
 /*#define HX_NEW_EVENT_STACK_FORMAT*/
 #define HX_BOOT_UPGRADE
-/*#define HX_SMART_WAKEUP*/
+#define HX_SMART_WAKEUP
 /*#define HX_GESTURE_TRACK*/
 #define HX_RESUME_SEND_CMD	/*Need to enable on TDDI chipset*/
 /*#define HX_HIGH_SENSE*/
@@ -359,10 +359,10 @@ enum fix_touch_info {
 	FIX_HX_TX_NUM = 40,
 	FIX_HX_BT_NUM = 0,
 	FIX_HX_MAX_PT = 10,
-	FIX_HX_INT_IS_EDGE = false,
+	FIX_HX_INT_IS_EDGE = true,
 	FIX_HX_STYLUS_FUNC = 1,
 	FIX_HX_STYLUS_ID_V2 = 0,
-	FIX_HX_STYLUS_RATIO = 1,
+	FIX_HX_STYLUS_RATIO = 10,
 #if defined(HX_TP_PROC_2T2R)
 	FIX_HX_RX_NUM_2 = 0,
 	FIX_HX_TX_NUM_2 = 0,

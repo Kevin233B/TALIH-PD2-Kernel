@@ -1109,6 +1109,27 @@ int tct_set_gesture_en(struct device *dev, int enable)
 	if (hx_s_core_fp._set_SMWP_enable)
 		hx_s_core_fp._set_SMWP_enable(enable, ts->suspended);
 
+	/*
+	 * TALIH: 双击唤醒需把双击手势(ges_en[0])同步启用, 否则驱动在
+	 * himax_gesture_report 里因 gesture_cust_en[0]==0 丢弃事件.
+	 * 手势序号 0 = HX_KEY_DOUBLE_CLICK.
+	 */
+	if (enable)
+		ts->gesture_cust_en[0] = 1;
+	else
+		ts->gesture_cust_en[0] = 0;
+
+	/*
+	 * TALIH: 双击唤醒需把触控 IRQ 设为系统唤醒源, 否则 AP 挂起后
+	 * 触控的 SMWP 中断无法唤醒系统(出厂驱动有 enable_irq_wake).
+	 */
+	if (ts->hx_irq) {
+		if (enable)
+			enable_irq_wake(ts->hx_irq);
+		else
+			disable_irq_wake(ts->hx_irq);
+	}
+
 	return 0;
 }
 EXPORT_SYMBOL(tct_set_gesture_en);

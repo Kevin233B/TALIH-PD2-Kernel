@@ -92,6 +92,7 @@ struct lcm {
 	int esd_te_slave;
 	bool prepared;
 	bool enabled;
+	bool slept;
 	int error;
 };
 
@@ -303,8 +304,11 @@ static int lcm_unprepare(struct drm_panel *panel)
 	if (tct_get_gesture_en()) {
 		pr_info("lcm_unprepare tct_singleclkick_wakeup_en is enable, "
 			"skip power down\n");
+		/* 面板仅睡眠(未下电), 唤醒时走轻量 resume 免重跑完整 init */
+		ctx->slept = true;
 		return 0;
 	}
+	ctx->slept = false;
 
 	ctx->reset_gpio = devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_LOW);
 	if (IS_ERR(ctx->reset_gpio)) {
@@ -356,6 +360,28 @@ static int lcm_prepare(struct drm_panel *panel)
 	pr_info("%s\n", __func__);
 	if (ctx->prepared)
 		return 0;
+
+	/*
+	 * 轻量 resume: 面板在 single-click wake 时仅睡眠未下电,
+	 * 只需 sleep out + display on, 免重跑 reset/606ms/完整 init,
+	 * 消除电源键点亮的高延迟.
+	 */
+	if (ctx->slept) {
+		ret = lcm_dcs_write(ctx, hx83121a_cdot_csot_sleep_out_seq,
+				    HX83121A_CDOT_CSOT_SLEEP_OUT_SEQ_LEN);
+		if (ret < 0)
+			dev_err(ctx->dev, "%s: sleep out failed: %d\n",
+				__func__, ret);
+		ret = lcm_dcs_write(ctx, hx83121a_cdot_csot_display_on_seq,
+				    HX83121A_CDOT_CSOT_DISPLAY_ON_SEQ_LEN);
+		if (ret < 0)
+			dev_err(ctx->dev, "%s: display on failed: %d\n",
+				__func__, ret);
+		mdelay(30);
+		ctx->slept = false;
+		ctx->prepared = true;
+		return 0;
+	}
 
 	lcm_panel_init(ctx);
 	ret = ctx->error;
