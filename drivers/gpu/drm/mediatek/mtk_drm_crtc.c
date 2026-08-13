@@ -4537,11 +4537,10 @@ void mtk_crtc_stop(struct mtk_drm_crtc *mtk_crtc, bool need_wait)
 		if (gce_event > 0)
 			cmdq_pkt_wait_no_clear(cmdq_handle, gce_event);
 	} else if (mtk_crtc_is_frame_trigger_mode(&mtk_crtc->base)) {
-		/* 1. wait stream eof & clear tocken (TALIH debug: skip) */
+		/* 1. wait stream eof & clear tocken */
 		/* clear eof token to prevent any config after this command */
-		if (0)
-			cmdq_pkt_wfe(cmdq_handle,
-					 mtk_crtc->gce_obj.event[EVENT_STREAM_EOF]);
+		cmdq_pkt_wfe(cmdq_handle,
+				 mtk_crtc->gce_obj.event[EVENT_STREAM_EOF]);
 
 		/* clear dirty token to prevent trigger loop start */
 		cmdq_pkt_clear_event(
@@ -9438,11 +9437,10 @@ void mtk_crtc_stop_for_pm(struct mtk_drm_crtc *mtk_crtc, bool need_wait)
 		cmdq_pkt_wait_no_clear(cmdq_handle,
 				 mtk_crtc->gce_obj.event[EVENT_WDMA0_EOF]);
 	} else if (mtk_crtc_is_frame_trigger_mode(&mtk_crtc->base)) {
-		/* 1. wait stream eof & clear tocken (TALIH debug: skip) */
+		/* 1. wait stream eof & clear tocken */
 		/* clear eof token to prevent any config after this command */
-		if (0)
-			cmdq_pkt_wfe(cmdq_handle,
-					 mtk_crtc->gce_obj.event[EVENT_STREAM_EOF]);
+		cmdq_pkt_wfe(cmdq_handle,
+				 mtk_crtc->gce_obj.event[EVENT_STREAM_EOF]);
 
 		/* clear dirty token to prevent trigger loop start */
 		cmdq_pkt_clear_event(
