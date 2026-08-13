@@ -1859,7 +1859,7 @@ static irqreturn_t mtk_dsi_irq_status(int irq, void *dev_id)
 				pr_err(pr_fmt("[IRQ] %s: buffer underrun\n"),
 					mtk_dump_comp_str(&dsi->ddp_comp));
 #else
-			DDPPR_ERR("[IRQ] %s: buffer underrun\n",
+			DDPPR_ERR_RL("[IRQ] %s: buffer underrun\n",
 				mtk_dump_comp_str(&dsi->ddp_comp));
 #endif
 
@@ -1871,7 +1871,7 @@ static irqreturn_t mtk_dsi_irq_status(int irq, void *dev_id)
 		}
 
 		if (status & INP_UNFINISH_INT_EN)
-			DDPPR_ERR("[IRQ] %s: input relay unfinish\n",
+			DDPPR_ERR_RL("[IRQ] %s: input relay unfinish\n",
 				  mtk_dump_comp_str(&dsi->ddp_comp));
 
 		if (status & SLEEPOUT_DONE_INT_FLAG)

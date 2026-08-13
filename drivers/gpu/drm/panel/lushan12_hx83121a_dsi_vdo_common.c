@@ -71,12 +71,12 @@ extern int tct_get_gesture_en(void);
 #define VSA			4
 #define VBP			18
 
-/* 60 Hz mode */
+/* 60 Hz mode (clock/(htotal*vtotal) = 579110000/(1720*5828) = 57.8Hz) */
 #define MODE_0_FPS		60
 #define MODE_0_VFP		3246
 #define PANEL_CLOCK_60HZ	579110
 
-/* 120 Hz mode */
+/* 120 Hz mode (568972000/(1720*2914) = 113.5Hz, 半帧时序) */
 #define MODE_1_FPS		120
 #define MODE_1_VFP		332
 #define PANEL_CLOCK_120HZ	568972

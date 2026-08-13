@@ -6,11 +6,14 @@
 #include <drm/drmP.h>
 #include <linux/clk.h>
 #include <linux/component.h>
+#include <linux/delay.h>
+#include <linux/io.h>
 #include <linux/of_device.h>
 #include <linux/of_irq.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/soc/mediatek/mtk-cmdq.h>
+#include <linux/workqueue.h>
 
 #include "mtk_drm_crtc.h"
 #include "mtk_drm_ddp_comp.h"
@@ -162,7 +165,7 @@ static irqreturn_t mtk_postmask_irq_handler(int irq, void *dev_id)
 	}
 
 	if (val & (1 << 8)) {
-		DDPPR_ERR("[IRQ] %s: frame underflow! cnt=%d\n",
+		DDPPR_ERR_RL("[IRQ] %s: frame underflow! cnt=%d\n",
 			  mtk_dump_comp_str(postmask), priv->underflow_cnt);
 		priv->underflow_cnt++;
 	}
@@ -446,9 +449,31 @@ static int mtk_disp_postmask_bind(struct device *dev, struct device *master,
 {
 	struct mtk_disp_postmask *priv = dev_get_drvdata(dev);
 	struct drm_device *drm_dev = data;
-	int ret;
+	unsigned int value;
+	int ret;	DDPINFO("%s\n", __func__);
 
-	DDPINFO("%s\n", __func__);
+	/*
+	 * LK leaves POSTMASK in mask-active DRAM mode with MEM_ADDR pointing
+	 * at LK's IOVA (e.g. 0x482ca000), which the kernel M4U domain does
+	 * not map -> translation fault + pipeline stall from the very first
+	 * frame. Switch the engine to relay (pass-through) mode directly at
+	 * bind time so no memory read can happen until the driver configures
+	 * POSTMASK; EN stays as LK left it so the running pipeline keeps
+	 * flowing (disabling EN here breaks the LK data path -> DSI underrun).
+	 */
+	if (priv->ddp_comp.regs) {
+		value = (REG_FLD_VAL((CFG_FLD_RELAY_MODE), 1) |
+			 REG_FLD_VAL((CFG_FLD_DRAM_MODE), 1) |
+			 REG_FLD_VAL((CFG_FLD_BGCLR_IN_SEL), 1) |
+			 REG_FLD_VAL((CFG_FLD_GCLAST_EN), 1) |
+			 REG_FLD_VAL((CFG_FLD_STALL_CG_ON), 1));
+		writel(value, priv->ddp_comp.regs + DISP_POSTMASK_CFG);
+		writel(0x0, priv->ddp_comp.regs + DISP_POSTMASK_MEM_ADDR);
+		writel(0x0, priv->ddp_comp.regs + DISP_POSTMASK_MEM_LENGTH);
+		DDPPR_ERR("%s: switched LK POSTMASK to relay, cfg=0x%x\n",
+			__func__, value);
+	}
+
 
 	ret = mtk_ddp_comp_register(drm_dev, &priv->ddp_comp);
 	if (ret < 0) {
@@ -517,6 +542,7 @@ static int mtk_postmask_io_cmd(struct mtk_ddp_comp *comp,
 
 static const struct mtk_ddp_comp_funcs mtk_disp_postmask_funcs = {
 	.config = mtk_postmask_config,
+	.first_cfg = mtk_postmask_config,
 	.start = mtk_postmask_start,
 	.stop = mtk_postmask_stop,
 	.prepare = mtk_postmask_prepare,

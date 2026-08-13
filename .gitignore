@@ -4,3 +4,5 @@ boot_logs.zip
 
 # 反编译/参考产物持久目录（由 /tmp 迁移而来）
 .talih_ref/
+prebuilts/clang/host/linux-x86/clang-r383902/bin/
+out/
