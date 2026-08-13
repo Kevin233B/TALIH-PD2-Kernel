@@ -450,80 +450,135 @@ static const struct drm_panel_funcs lcm_drm_funcs = {
 };
 
 #if defined(CONFIG_MTK_PANEL_EXT)
-static struct mtk_panel_params ext_params = {
-	.pll_clk = 1,
-	.data_rate = 485,
+/*
+ * 官核 ext_params（0x97d61d8=mode0、0x97d6a00=mode1）反汇编核对：
+ * 官核 mtk_dsi_default_rate（0x8648080）读 params+4=pll_clk、
+ * +8=data_rate，实测 pll_clk=485、data_rate=970（此前误写 1/485，
+ * DSI 时钟减半会导致带宽不足）；dyn.switch_en=1、dyn.data_rate=970、
+ * dyn.vfp=3246/332；dyn_fps.switch_en=1、vact_timing_fps=60/120、
+ * dfps_cmd_table 3 项（B9 83 12 1A / E2 10|E2 00 / B9 00 00 00）。
+ * 60→120Hz 切换时 mtk_dsi_send_switch_cmd 发送该表，120Hz 档发
+ * E2 00；缺失则面板保持 60Hz 配置，切换后花屏。
+ */
+#define HX83121A_DSC_PARAMS \
+	.dsc_params = { \
+		.enable = 1, \
+		.bdg_dsc_enable = 0, \
+		.ver = 17, \
+		.slice_mode = 0, \
+		.rgb_swap = 0, \
+		.dsc_cfg = 34, \
+		.rct_on = 1, \
+		.bit_per_channel = 8, \
+		.dsc_line_buf_depth = 9, \
+		.bp_enable = 1, \
+		.bit_per_pixel = 128, \
+		.pic_height = PANEL_HEIGHT, \
+		.pic_width = 800, \
+		.slice_height = 20, \
+		.slice_width = 800, \
+		.chunk_size = 800, \
+		.xmit_delay = 512, \
+		.dec_delay = 657, \
+		.scale_value = 32, \
+		.increment_interval = 583, \
+		.decrement_interval = 11, \
+		.line_bpg_offset = 12, \
+		.nfl_bpg_offset = 1294, \
+		.slice_bpg_offset = 872, \
+		.initial_offset = 6144, \
+		.final_offset = 4320, \
+		.flatness_minqp = 3, \
+		.flatness_maxqp = 12, \
+		.rc_model_size = 8192, \
+		.rc_edge_factor = 6, \
+		.rc_quant_incr_limit0 = 11, \
+		.rc_quant_incr_limit1 = 11, \
+		.rc_tgt_offset_hi = 3, \
+		.rc_tgt_offset_lo = 3, \
+		.rc_buf_thresh[0] = 14, \
+		.rc_buf_thresh[1] = 28, \
+		.rc_buf_thresh[2] = 42, \
+		.rc_buf_thresh[3] = 56, \
+		.rc_buf_thresh[4] = 70, \
+		.rc_buf_thresh[5] = 84, \
+		.rc_buf_thresh[6] = 98, \
+		.rc_buf_thresh[7] = 105, \
+		.rc_buf_thresh[8] = 112, \
+		.rc_buf_thresh[9] = 119, \
+		.rc_buf_thresh[10] = 121, \
+		.rc_buf_thresh[11] = 123, \
+		.rc_buf_thresh[12] = 125, \
+		.rc_buf_thresh[13] = 126, \
+		.rc_range_parameters[0] = { 0, 4, 2 }, \
+		.rc_range_parameters[1] = { 0, 4, 0 }, \
+		.rc_range_parameters[2] = { 1, 5, 0 }, \
+		.rc_range_parameters[3] = { 1, 6, -2 }, \
+		.rc_range_parameters[4] = { 3, 7, -4 }, \
+		.rc_range_parameters[5] = { 3, 7, -6 }, \
+		.rc_range_parameters[6] = { 3, 7, -8 }, \
+		.rc_range_parameters[7] = { 3, 8, -8 }, \
+		.rc_range_parameters[8] = { 3, 9, -8 }, \
+		.rc_range_parameters[9] = { 3, 10, -10 }, \
+		.rc_range_parameters[10] = { 5, 11, -10 }, \
+		.rc_range_parameters[11] = { 5, 12, -12 }, \
+		.rc_range_parameters[12] = { 5, 13, -12 }, \
+		.rc_range_parameters[13] = { 7, 13, -12 }, \
+		.rc_range_parameters[14] = { 13, 13, -12 }, \
+	}
+
+#define HX83121A_DYN_FPS_CMDS(rate_cmd) \
+	.dfps_cmd_table = { \
+		[0] = { .src_fps = 0, .cmd_num = 4, \
+			.para_list = { 0xb9, 0x83, 0x12, 0x1a } }, \
+		[1] = { .src_fps = 0, .cmd_num = 2, \
+			.para_list = { 0xe2, rate_cmd } }, \
+		[2] = { .src_fps = 0, .cmd_num = 4, \
+			.para_list = { 0xb9, 0x00, 0x00, 0x00 } }, \
+	}
+
+static struct mtk_panel_params ext_params_60hz = {
+	.pll_clk = 485,
+	.data_rate = 970,
 	.cust_esd_check = 0,
 	.esd_check_enable = 0,
 	.physical_width_um = PHYSICAL_WIDTH_UM,
 	.physical_height_um = PHYSICAL_HEIGHT_UM,
 	.output_mode = MTK_PANEL_DUAL_PORT,
 	.lcm_cmd_if = MTK_PANEL_DUAL_PORT,
-	.dsc_params = {
-		.enable = 1,
-		.bdg_dsc_enable = 0,
-		.ver = 17,
-		.slice_mode = 0,
-		.rgb_swap = 0,
-		.dsc_cfg = 34,
-		.rct_on = 1,
-		.bit_per_channel = 8,
-		.dsc_line_buf_depth = 9,
-		.bp_enable = 1,
-		.bit_per_pixel = 128,
-		.pic_height = PANEL_HEIGHT,
-		.pic_width = 800,
-		.slice_height = 20,
-		.slice_width = 800,
-		.chunk_size = 800,
-		.xmit_delay = 512,
-		.dec_delay = 657,
-		.scale_value = 32,
-		.increment_interval = 583,
-		.decrement_interval = 11,
-		.line_bpg_offset = 12,
-		.nfl_bpg_offset = 1294,
-		.slice_bpg_offset = 872,
-		.initial_offset = 6144,
-		.final_offset = 4320,
-		.flatness_minqp = 3,
-		.flatness_maxqp = 12,
-		.rc_model_size = 8192,
-		.rc_edge_factor = 6,
-		.rc_quant_incr_limit0 = 11,
-		.rc_quant_incr_limit1 = 11,
-		.rc_tgt_offset_hi = 3,
-		.rc_tgt_offset_lo = 3,
-		.rc_buf_thresh[0] = 14,
-		.rc_buf_thresh[1] = 28,
-		.rc_buf_thresh[2] = 42,
-		.rc_buf_thresh[3] = 56,
-		.rc_buf_thresh[4] = 70,
-		.rc_buf_thresh[5] = 84,
-		.rc_buf_thresh[6] = 98,
-		.rc_buf_thresh[7] = 105,
-		.rc_buf_thresh[8] = 112,
-		.rc_buf_thresh[9] = 119,
-		.rc_buf_thresh[10] = 121,
-		.rc_buf_thresh[11] = 123,
-		.rc_buf_thresh[12] = 125,
-		.rc_buf_thresh[13] = 126,
-		.rc_range_parameters[0] = { 0, 4, 2 },
-		.rc_range_parameters[1] = { 0, 4, 0 },
-		.rc_range_parameters[2] = { 1, 5, 0 },
-		.rc_range_parameters[3] = { 1, 6, -2 },
-		.rc_range_parameters[4] = { 3, 7, -4 },
-		.rc_range_parameters[5] = { 3, 7, -6 },
-		.rc_range_parameters[6] = { 3, 7, -8 },
-		.rc_range_parameters[7] = { 3, 8, -8 },
-		.rc_range_parameters[8] = { 3, 9, -8 },
-		.rc_range_parameters[9] = { 3, 10, -10 },
-		.rc_range_parameters[10] = { 5, 11, -10 },
-		.rc_range_parameters[11] = { 5, 12, -12 },
-		.rc_range_parameters[12] = { 5, 13, -12 },
-		.rc_range_parameters[13] = { 7, 13, -12 },
-		.rc_range_parameters[14] = { 13, 13, -12 },
+	.dyn = {
+		.switch_en = 1,
+		.data_rate = 970,
+		.vfp = MODE_0_VFP,
 	},
+	.dyn_fps = {
+		.switch_en = 1,
+		.vact_timing_fps = MODE_0_FPS,
+		HX83121A_DYN_FPS_CMDS(0x10),
+	},
+	HX83121A_DSC_PARAMS,
+};
+
+static struct mtk_panel_params ext_params_120hz = {
+	.pll_clk = 485,
+	.data_rate = 970,
+	.cust_esd_check = 0,
+	.esd_check_enable = 0,
+	.physical_width_um = PHYSICAL_WIDTH_UM,
+	.physical_height_um = PHYSICAL_HEIGHT_UM,
+	.output_mode = MTK_PANEL_DUAL_PORT,
+	.lcm_cmd_if = MTK_PANEL_DUAL_PORT,
+	.dyn = {
+		.switch_en = 1,
+		.data_rate = 970,
+		.vfp = MODE_1_VFP,
+	},
+	.dyn_fps = {
+		.switch_en = 1,
+		.vact_timing_fps = MODE_1_FPS,
+		HX83121A_DYN_FPS_CMDS(0x00),
+	},
+	HX83121A_DSC_PARAMS,
 };
 
 static int mtk_panel_ext_param_set(struct drm_panel *panel,
@@ -534,7 +589,11 @@ static int mtk_panel_ext_param_set(struct drm_panel *panel,
 	if (mode > 1)
 		return 1;
 
-	ext->params = &ext_params;
+	/* 官核 mtk_panel_ext_param_set：mode0/1 切换两套 params */
+	if (mode == 0)
+		ext->params = &ext_params_60hz;
+	else
+		ext->params = &ext_params_120hz;
 	return 0;
 }
 
@@ -648,7 +707,8 @@ static int lcm_probe(struct mipi_dsi_device *dsi)
 	}
 
 #if defined(CONFIG_MTK_PANEL_EXT)
-	ret = mtk_panel_ext_create(dev, &ext_params, &ext_funcs, &ctx->panel);
+	ret = mtk_panel_ext_create(dev, &ext_params_60hz, &ext_funcs,
+				   &ctx->panel);
 	if (ret < 0) {
 		dev_err(dev, "%s: mtk_panel_ext_create failed: %d\n",
 			__func__, ret);
