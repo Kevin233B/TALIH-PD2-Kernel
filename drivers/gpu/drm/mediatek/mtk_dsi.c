@@ -6189,6 +6189,14 @@ static void mtk_dsi_vdo_timing_change(struct mtk_dsi *dsi,
 
 	if (fps_chg_index & DYNFPS_DSI_MIPI_CLK) {
 		DDPINFO("%s, change MIPI Clock\n", __func__);
+		/*
+		 * 参照 legacy ddp_dsi (DYNFPS_DSI_MIPI_CLK):
+		 * 重新配置 PHY 时序 + 重算/写入 VDO 时序
+		 * (原 DRM 实现为空 -> 切换后时序不变 -> 花屏)
+		 */
+		mtk_dsi_phy_timconfig(dsi, NULL);
+		mtk_dsi_calc_vdo_timing(dsi);
+		mtk_dsi_config_vdo_timing(dsi);
 	} else if (fps_chg_index & DYNFPS_DSI_HFP) {
 		DDPINFO("%s, change HFP\n", __func__);
 		/*wait and clear EOF
