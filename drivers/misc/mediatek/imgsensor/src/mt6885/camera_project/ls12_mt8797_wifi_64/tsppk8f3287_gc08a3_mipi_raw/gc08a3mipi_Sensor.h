@@ -38,10 +38,10 @@
 
 
 /* SENSOR MIRROR FLIP INFO */
-#define GC08A3_MIRROR_NORMAL    1
+#define GC08A3_MIRROR_NORMAL    0
 #define GC08A3_MIRROR_H         0
 #define GC08A3_MIRROR_V         0
-#define GC08A3_MIRROR_HV        0
+#define GC08A3_MIRROR_HV        1
 
 #if GC08A3_MIRROR_NORMAL
 #define GC08A3_MIRROR	        0x00
