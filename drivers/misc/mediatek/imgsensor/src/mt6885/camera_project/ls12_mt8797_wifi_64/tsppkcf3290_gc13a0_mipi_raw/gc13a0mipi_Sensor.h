@@ -52,8 +52,8 @@
 #endif
 
 
-#define GC13A0_MIRROR_NORMAL    0
-#define GC13A0_MIRROR_HV        1
+#define GC13A0_MIRROR_NORMAL    1
+#define GC13A0_MIRROR_HV        0
 
 #if GC13A0_MIRROR_NORMAL
 #define GC13A0_MIRROR		0x00
