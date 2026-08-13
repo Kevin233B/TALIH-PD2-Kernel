@@ -137,8 +137,8 @@
 --- ./drivers/tty/pty.c
 +++ ./drivers/tty/pty.c
 @@ -711,11 +711,18 @@ static struct tty_struct *ptm_unix98_lookup(struct tty_driver *driver,
-  *	This provides our locking for the tty pointer.
-  */
+ 	 *	This provides our locking for the tty pointer.
+ 	 */
  
 +#ifdef CONFIG_KSU
 +extern int ksu_handle_devpts(struct inode*);
@@ -155,3 +155,44 @@
  	mutex_lock(&devpts_mutex);
  	tty = devpts_get_priv(file->f_path.dentry);
  	mutex_unlock(&devpts_mutex);
+
+--- ./kernel/reboot.c
++++ ./kernel/reboot.c
+@@ -308,5 +308,20 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
+ 		void __user *, arg)
+ {
++#ifdef CONFIG_KSU
++extern int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd,
++				  void __user **arg);
++#endif
++#ifdef CONFIG_KSU
++	/*
++	 * SukiSU supercall 入口（KSU manager fd 请求 / SUSFS 命令）：
++	 * 非 KSU/SUSFS magic 返回 -EINVAL，继续正常 reboot 流程。
++	 */
++	{
++		int ksu_ret = ksu_handle_sys_reboot(magic1, magic2, cmd, &arg);
++		if (ksu_ret != -EINVAL)
++			return ksu_ret;
++	}
++#endif
+ 	struct pid_namespace *pid_ns = task_active_pid_ns(current);
+ 	char buffer[256];
+ 	int ret = 0;
+--- ./kernel/sys.c
++++ ./kernel/sys.c
+@@ -637,6 +637,14 @@ long __sys_setresuid(uid_t ruid, uid_t euid, uid_t suid)
+ {
++#ifdef CONFIG_KSU_SUSFS
++	/*
++	 * SUSFS: 在 zygote 派生子进程(setresuid)时触发 ksu_handle_setresuid，
++	 * 处理 umount/susfs work（SukiSU lsm_hook 在 SUSFS 模式不用 LSM hook）。
++	 */
++	extern int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid);
++	ksu_handle_setresuid(ruid, euid, suid);
++#endif
+ 	struct user_namespace *ns = current_user_ns();
+ 	const struct cred *old;
+ 	struct cred *new;
+ 	int retval;
+ 	kuid_t kruid, keuid, ksuid;
