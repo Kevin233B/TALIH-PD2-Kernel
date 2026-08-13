@@ -377,7 +377,15 @@ static int lcm_prepare(struct drm_panel *panel)
 		if (ret < 0)
 			dev_err(ctx->dev, "%s: display on failed: %d\n",
 				__func__, ret);
-		mdelay(30);
+		/* HX83121A sleep out 典型 120ms，30ms 后面板未稳定会延迟出图 */
+		mdelay(120);
+		/*
+		 * 触摸 IC 息屏时处于 SMWP 手势模式：立即恢复触摸，避免等
+		 * DRM/fb notifier 迟到触发 himax_common_resume 造成
+		 * 0.5-1s 触摸无响应。
+		 */
+		if (tct_get_panel_resume_flag() && tct_get_touch_dev())
+			himax_common_resume(tct_get_touch_dev());
 		ctx->slept = false;
 		ctx->prepared = true;
 		return 0;
