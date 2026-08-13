@@ -1359,10 +1359,6 @@ int cmdq_pkt_wfe(struct cmdq_pkt *pkt, u16 event)
 	if (event >= CMDQ_EVENT_MAX)
 		return -EINVAL;
 
-	/* TALIH debug: 定位 641 等待的调用者 */
-	if (event == 641 && !in_atomic())
-		WARN_ONCE(true, "TALIH: wfe event 641 caller:\n");
-
 	/*
 	 * WFE arg_b
 	 * bit 0-11: wait value
@@ -1383,10 +1379,6 @@ int cmdq_pkt_wait_no_clear(struct cmdq_pkt *pkt, u16 event)
 
 	if (event >= CMDQ_EVENT_MAX)
 		return -EINVAL;
-
-	/* TALIH debug: 定位 641 等待的调用者 */
-	if (event == 641 && !in_atomic())
-		WARN_ONCE(true, "TALIH: wait_no_clear event 641 caller:\n");
 
 	/*
 	 * WFE arg_b
