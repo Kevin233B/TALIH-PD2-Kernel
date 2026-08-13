@@ -2737,17 +2737,6 @@ void mtk_crtc_wait_frame_done(struct mtk_drm_crtc *mtk_crtc,
 			      int clear_event)
 {
 	int gce_event;
-	/*
-	 * TALIH-PD2 debug: LK 遗留管线不产 frame-done, 等待会卡死配置包
-	 * (事件641 永不触发), 导致 OVL/RDMA/DSI 配置永远不生效 -> 花屏.
-	 * 此处全局跳过等待, 配置立即执行. 副作用: 帧切换无等待(可能撕裂).
-	 */
-	static bool skip_wait = true;
-
-	if (skip_wait) {
-		DDPPR_ERR_RL("%s: skip all wait (TALIH debug)\n", __func__);
-		return;
-	}
 
 	gce_event = get_path_wait_event(mtk_crtc, ddp_path);
 	if (gce_event < 0)
