@@ -751,9 +751,8 @@ int mtk_drm_setbacklight(struct drm_crtc *crtc, unsigned int level)
 	if (is_frame_mode) {
 		cmdq_pkt_clear_event(cmdq_handle,
 			mtk_crtc->gce_obj.event[EVENT_STREAM_BLOCK]);
-		if (0)
-			cmdq_pkt_wfe(cmdq_handle,
-					mtk_crtc->gce_obj.event[EVENT_CABC_EOF]);
+		cmdq_pkt_wfe(cmdq_handle,
+			mtk_crtc->gce_obj.event[EVENT_CABC_EOF]);
 		cmdq_pkt_clear_event(cmdq_handle,
 			mtk_crtc->gce_obj.event[EVENT_STREAM_DIRTY]);
 	}
@@ -827,9 +826,8 @@ int mtk_drm_setbacklight_grp(struct drm_crtc *crtc, unsigned int level)
 	if (is_frame_mode) {
 		cmdq_pkt_clear_event(cmdq_handle,
 				mtk_crtc->gce_obj.event[EVENT_STREAM_BLOCK]);
-		if (0)
-			cmdq_pkt_wfe(cmdq_handle,
-					mtk_crtc->gce_obj.event[EVENT_CABC_EOF]);
+		cmdq_pkt_wfe(cmdq_handle,
+				mtk_crtc->gce_obj.event[EVENT_CABC_EOF]);
 		cmdq_pkt_clear_event(cmdq_handle,
 				mtk_crtc->gce_obj.event[EVENT_STREAM_DIRTY]);
 	}
@@ -929,9 +927,8 @@ int mtk_drm_aod_setbacklight(struct drm_crtc *crtc, unsigned int level)
 	if (is_frame_mode) {
 		cmdq_pkt_clear_event(cmdq_handle,
 			mtk_crtc->gce_obj.event[EVENT_STREAM_BLOCK]);
-		if (0)
-			cmdq_pkt_wfe(cmdq_handle,
-					mtk_crtc->gce_obj.event[EVENT_CABC_EOF]);
+		cmdq_pkt_wfe(cmdq_handle,
+			mtk_crtc->gce_obj.event[EVENT_CABC_EOF]);
 		cmdq_pkt_clear_event(cmdq_handle,
 			mtk_crtc->gce_obj.event[EVENT_STREAM_DIRTY]);
 	}
@@ -1011,9 +1008,8 @@ int mtk_drm_crtc_set_panel_hbm(struct drm_crtc *crtc, bool en)
 	if (is_frame_mode) {
 		cmdq_pkt_clear_event(cmdq_handle,
 				mtk_crtc->gce_obj.event[EVENT_STREAM_BLOCK]);
-		if (0)
-			cmdq_pkt_wfe(cmdq_handle,
-					mtk_crtc->gce_obj.event[EVENT_CABC_EOF]);
+		cmdq_pkt_wfe(cmdq_handle,
+				mtk_crtc->gce_obj.event[EVENT_CABC_EOF]);
 		cmdq_pkt_clear_event(cmdq_handle,
 				mtk_crtc->gce_obj.event[EVENT_STREAM_DIRTY]);
 	}
@@ -3021,12 +3017,9 @@ void mtk_crtc_dc_prim_path_update(struct drm_crtc *crtc)
 
 	mtk_crtc_pkt_create(&cmdq_handle, crtc,
 		mtk_crtc->gce_obj.client[CLIENT_CFG]);
-	if (0) {
-		cmdq_pkt_wait_no_clear(cmdq_handle,
-				       get_path_wait_event(mtk_crtc, DDP_FIRST_PATH));
-		mtk_crtc_wait_frame_done(mtk_crtc, cmdq_handle,
-					 DDP_SECOND_PATH, 0);
-	}
+	cmdq_pkt_wait_no_clear(cmdq_handle,
+			       get_path_wait_event(mtk_crtc, DDP_FIRST_PATH));
+	mtk_crtc_wait_frame_done(mtk_crtc, cmdq_handle, DDP_SECOND_PATH, 0);
 
 	ddp_ctx = &mtk_crtc->ddp_ctx[mtk_crtc->ddp_mode];
 
@@ -3638,12 +3631,10 @@ void mtk_crtc_start_trig_loop(struct drm_crtc *crtc)
 			cmdq_handle,
 			mtk_crtc->gce_obj.event[EVENT_STREAM_DIRTY]);
 #ifndef CONFIG_FPGA_EARLY_PORTING
-		if (0)
-			cmdq_pkt_wait_no_clear(cmdq_handle,
-					     mtk_crtc->gce_obj.event[EVENT_CABC_EOF]);
-		if (0)
-			cmdq_pkt_wait_no_clear(cmdq_handle,
-					       mtk_crtc->gce_obj.event[EVENT_ESD_EOF]);
+		cmdq_pkt_wait_no_clear(cmdq_handle,
+				     mtk_crtc->gce_obj.event[EVENT_CABC_EOF]);
+		cmdq_pkt_wait_no_clear(cmdq_handle,
+				       mtk_crtc->gce_obj.event[EVENT_ESD_EOF]);
 #endif
 
 		/*Trigger*/
@@ -3652,9 +3643,8 @@ void mtk_crtc_start_trig_loop(struct drm_crtc *crtc)
 		mtk_crtc_comp_trigger(mtk_crtc, cmdq_handle,
 				      MTK_TRIG_FLAG_TRIGGER);
 
-		if (0)
-			cmdq_pkt_wfe(cmdq_handle,
-				     mtk_crtc->gce_obj.event[EVENT_CMD_EOF]);
+		cmdq_pkt_wfe(cmdq_handle,
+			     mtk_crtc->gce_obj.event[EVENT_CMD_EOF]);
 
 		if (mtk_drm_helper_get_opt(priv->helper_opt,
 					   MTK_DRM_OPT_LAYER_REC)) {
