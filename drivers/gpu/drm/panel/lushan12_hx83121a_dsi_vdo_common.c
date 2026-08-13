@@ -71,15 +71,15 @@ extern int tct_get_gesture_en(void);
 #define VSA			4
 #define VBP			18
 
-/* 72 Hz mode */
-#define MODE_0_FPS		72
+/* 60 Hz mode */
+#define MODE_0_FPS		60
 #define MODE_0_VFP		3246
-#define PANEL_CLOCK_72HZ	579110
+#define PANEL_CLOCK_60HZ	579110
 
-/* 64 Hz mode */
-#define MODE_1_FPS		64
+/* 120 Hz mode */
+#define MODE_1_FPS		120
 #define MODE_1_VFP		332
-#define PANEL_CLOCK_64HZ	568972
+#define PANEL_CLOCK_120HZ	568972
 
 struct lcm {
 	struct device *dev;
@@ -383,7 +383,7 @@ static int lcm_enable(struct drm_panel *panel)
 }
 
 static const struct drm_display_mode default_mode = {
-	.clock		= PANEL_CLOCK_72HZ,
+	.clock		= PANEL_CLOCK_60HZ,
 	.hdisplay	= PANEL_WIDTH,
 	.hsync_start	= PANEL_WIDTH + HFP,
 	.hsync_end	= PANEL_WIDTH + HFP + HSA,
@@ -396,7 +396,7 @@ static const struct drm_display_mode default_mode = {
 };
 
 static const struct drm_display_mode performance_mode = {
-	.clock		= PANEL_CLOCK_64HZ,
+	.clock		= PANEL_CLOCK_120HZ,
 	.hdisplay	= PANEL_WIDTH,
 	.hsync_start	= PANEL_WIDTH + HFP,
 	.hsync_end	= PANEL_WIDTH + HFP + HSA,
@@ -412,7 +412,7 @@ static int lcm_get_modes(struct drm_panel *panel)
 {
 	struct drm_connector *connector = panel->connector;
 	struct drm_display_mode *mode;
-	struct drm_display_mode *mode_64hz;
+	struct drm_display_mode *mode_120hz;
 
 	mode = drm_mode_duplicate(panel->drm, &default_mode);
 	if (!mode) {
@@ -425,16 +425,16 @@ static int lcm_get_modes(struct drm_panel *panel)
 	drm_mode_set_name(mode);
 	drm_mode_probed_add(connector, mode);
 
-	mode_64hz = drm_mode_duplicate(panel->drm, &performance_mode);
-	if (!mode_64hz) {
+	mode_120hz = drm_mode_duplicate(panel->drm, &performance_mode);
+	if (!mode_120hz) {
 		dev_err(panel->dev, "failed to add mode %dx%d@%d\n",
 			PANEL_WIDTH, PANEL_HEIGHT, MODE_1_FPS);
 		return -ENOMEM;
 	}
-	mode_64hz->vrefresh = MODE_1_FPS;
-	mode_64hz->type = DRM_MODE_TYPE_DRIVER;
-	drm_mode_set_name(mode_64hz);
-	drm_mode_probed_add(connector, mode_64hz);
+	mode_120hz->vrefresh = MODE_1_FPS;
+	mode_120hz->type = DRM_MODE_TYPE_DRIVER;
+	drm_mode_set_name(mode_120hz);
+	drm_mode_probed_add(connector, mode_120hz);
 
 	connector->display_info.width_mm = 166;
 	connector->display_info.height_mm = 266;
