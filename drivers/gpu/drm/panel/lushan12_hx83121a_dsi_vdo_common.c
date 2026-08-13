@@ -65,26 +65,21 @@ extern int tct_get_gesture_en(void);
 #define PHYSICAL_WIDTH_UM	166244
 #define PHYSICAL_HEIGHT_UM	265958
 
-#define HSA			40
-#define HBP			60
+#define HSA			20
+#define HBP			40
 #define HFP			60
 #define VSA			4
 #define VBP			18
 
-/* 120 Hz mode */
-#define MODE_0_FPS		120
-#define MODE_0_VFP		112
-#define PANEL_CLOCK_120HZ	568972
+/* 72 Hz mode */
+#define MODE_0_FPS		72
+#define MODE_0_VFP		3246
+#define PANEL_CLOCK_72HZ	579110
 
-/* 90 Hz mode */
-#define MODE_1_FPS		90
-#define MODE_1_VFP		1000
-#define PANEL_CLOCK_90HZ	567388
-
-/* 60 Hz mode */
-#define MODE_2_FPS		60
-#define MODE_2_VFP		2902
-#define PANEL_CLOCK_60HZ	579110
+/* 64 Hz mode */
+#define MODE_1_FPS		64
+#define MODE_1_VFP		332
+#define PANEL_CLOCK_64HZ	568972
 
 struct lcm {
 	struct device *dev;
@@ -93,8 +88,6 @@ struct lcm {
 	struct gpio_desc *reset_gpio;
 	struct gpio_desc *bias_pos;
 	struct gpio_desc *bias_neg;
-	struct gpio_desc *vddi_18;
-	struct gpio_desc *vdd_12;
 	int esd_te_master;
 	int esd_te_slave;
 	bool prepared;
@@ -110,145 +103,155 @@ static inline struct lcm *panel_to_lcm(struct drm_panel *panel)
 static int lcm_dcs_write(struct lcm *ctx, const void *data, size_t len)
 {
 	struct mipi_dsi_device *dsi = to_mipi_dsi_device(ctx->dev);
+	const u8 *cmd = data;
+
+	/*
+	 * 官核/2024 基驱动一致的分派规则：标准 DCS 命令（首字节 < 0xB0，
+	 * 如 0x11/0x29/0x51/0x53/0x35）必须用 DCS 包类型
+	 * （0x05/0x15/0x39）；厂商扩展命令（首字节 >= 0xB0）用 generic
+	 * 包类型（0x03/0x04/0x29）。此前全部走 generic，Sleep Out /
+	 * Display On 以 0x03 包发送会被 HX83121A 忽略，导致面板未真正
+	 * 退出 sleep/未开启显示，表现为开机花屏。
+	 */
+	if (cmd && len && cmd[0] < 0xb0)
+		return mipi_dsi_dcs_write_buffer(dsi, data, len);
 
 	return mipi_dsi_generic_write(dsi, data, len);
 }
 
 static void lcm_panel_init(struct lcm *ctx)
 {
-	struct mipi_dsi_device *dsi = to_mipi_dsi_device(ctx->dev);
 	const struct hx83121a_init_cmd *cmd;
 	int i, ret;
 
-	/* vddi_18 */
-	ctx->vddi_18 = devm_gpiod_get(ctx->dev, "vddi_18", GPIOD_OUT_HIGH);
-	if (IS_ERR(ctx->vddi_18))
-		dev_err(ctx->dev, "%s: cannot get vddi_18 %ld\n",
-			__func__, PTR_ERR(ctx->vddi_18));
-	else
-		devm_gpiod_put(ctx->dev, ctx->vddi_18);
-	mdelay(2);
-
-	ctx->bias_pos = devm_gpiod_get_index(ctx->dev, "bias", 0,
-					     GPIOD_OUT_HIGH);
-	if (IS_ERR(ctx->bias_pos))
-		dev_err(ctx->dev, "%s: cannot get bias_pos %ld\n",
-			__func__, PTR_ERR(ctx->bias_pos));
-	else
-		devm_gpiod_put(ctx->dev, ctx->bias_pos);
-	mdelay(5);
-
-	ctx->bias_neg = devm_gpiod_get_index(ctx->dev, "bias", 1,
-					     GPIOD_OUT_HIGH);
-	if (IS_ERR(ctx->bias_neg))
-		dev_err(ctx->dev, "%s: cannot get bias_neg %ld\n",
-			__func__, PTR_ERR(ctx->bias_neg));
-	else
-		devm_gpiod_put(ctx->dev, ctx->bias_neg);
-	mdelay(5);
-
+	/*
+	 * 官核 2026 lcm_prepare 反汇编上电时序（__const_udelay 换算：
+	 * 0x8312b0=8.6ms、0x147aeb8=21.5ms、0x418958=4.3ms，
+	 * 复位后 141*4.3ms≈606ms 稳定窗口）。
+	 * 此前沿用 2024 基驱动的 5ms 级短时序，冷启动可能不满足
+	 * HX83121A 电源/复位建立时间，导致初始化不完整。
+	 */
 	ctx->reset_gpio = devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
 	if (IS_ERR(ctx->reset_gpio))
 		dev_err(ctx->dev, "%s: cannot get reset_gpio %ld\n",
 			__func__, PTR_ERR(ctx->reset_gpio));
 	else
 		devm_gpiod_put(ctx->dev, ctx->reset_gpio);
-	mdelay(5);
+	mdelay(9);
+
+	ctx->bias_pos = devm_gpiod_get_index(ctx->dev, "bias", 0,
+					     GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->bias_pos))
+		dev_err(ctx->dev, "%s: cannot get bias_pos %ld\n",
+			__func__, PTR_ERR(ctx->bias_pos));
+	mdelay(21);
+
+	ctx->bias_neg = devm_gpiod_get_index(ctx->dev, "bias", 1,
+					     GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->bias_neg))
+		dev_err(ctx->dev, "%s: cannot get bias_neg %ld\n",
+			__func__, PTR_ERR(ctx->bias_neg));
+
+	ctx->reset_gpio = devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_LOW);
+	if (IS_ERR(ctx->reset_gpio))
+		dev_err(ctx->dev, "%s: cannot get reset_gpio %ld\n",
+			__func__, PTR_ERR(ctx->reset_gpio));
 
 	/* AW3750x LCD bias: 5.6 V positive/negative, 150 mA */
 	tct_aw3750x_ldo_current_set(150000, 150000);
 	tct_aw3750x_volt_outp_set(0x10);
 	tct_aw3750x_volt_outn_set(0x10);
-	mdelay(1);
+	mdelay(4);
 
-	ctx->bias_pos = devm_gpiod_get_index(ctx->dev, "bias", 0,
-					     GPIOD_OUT_HIGH);
 	if (!IS_ERR(ctx->bias_pos)) {
 		gpiod_set_value(ctx->bias_pos, 1);
 		devm_gpiod_put(ctx->dev, ctx->bias_pos);
 	}
-	mdelay(5);
+	mdelay(21);
 
-	ctx->bias_neg = devm_gpiod_get_index(ctx->dev, "bias", 1,
-					     GPIOD_OUT_HIGH);
 	if (!IS_ERR(ctx->bias_neg)) {
 		gpiod_set_value(ctx->bias_neg, 1);
 		devm_gpiod_put(ctx->dev, ctx->bias_neg);
 	}
-	mdelay(1);
+	mdelay(4);
 
-	ctx->reset_gpio = devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
 	if (!IS_ERR(ctx->reset_gpio)) {
 		gpiod_set_value(ctx->reset_gpio, 1);
-		mdelay(5);
+		mdelay(21);
 		gpiod_set_value(ctx->reset_gpio, 0);
-		mdelay(5);
+		mdelay(21);
 		gpiod_set_value(ctx->reset_gpio, 1);
-		mdelay(5);
+		mdelay(21);
 		devm_gpiod_put(ctx->dev, ctx->reset_gpio);
 	}
-	mdelay(141);
+	mdelay(606);
 
-	if (tct_get_panel_resume_flag() && tct_get_touch_dev())
+	if (tct_get_panel_resume_flag() && tct_get_touch_dev()) {
 		himax_common_resume(tct_get_touch_dev());
+		mdelay(9);
+	}
 
 	ctx->error = 0;
 	for (i = 0; i < 7; i++) {
 		cmd = &hx83121a_cdot_csot_init_seq[i];
-		ret = mipi_dsi_generic_write(dsi, cmd->data, cmd->len);
+		ret = lcm_dcs_write(ctx, cmd->data, cmd->len);
 		if (ret < 0) {
 			ctx->error = ret;
 			dev_err(ctx->dev, "%s: init cmd %d failed: %d\n",
 				__func__, i, ret);
-			return;
+			goto init_wait;
 		}
 	}
 
 #if PANEL_HAS_EXTRA_VCOM_CMD
 	cmd = &hx83121a_cdot_csot_with_vcom_extra_seq[0];
-	ret = mipi_dsi_generic_write(dsi, cmd->data, cmd->len);
+	ret = lcm_dcs_write(ctx, cmd->data, cmd->len);
 	if (ret < 0) {
 		ctx->error = ret;
 		dev_err(ctx->dev, "%s: with_vcom extra cmd failed: %d\n",
 			__func__, ret);
-		return;
+		goto init_wait;
 	}
 #endif
 
 	for (; i < HX83121A_CDOT_CSOT_INIT_SEQ_LEN; i++) {
 		cmd = &hx83121a_cdot_csot_init_seq[i];
-		ret = mipi_dsi_generic_write(dsi, cmd->data, cmd->len);
+		ret = lcm_dcs_write(ctx, cmd->data, cmd->len);
 		if (ret < 0) {
 			ctx->error = ret;
 			dev_err(ctx->dev, "%s: init cmd %d failed: %d\n",
 				__func__, i, ret);
-			return;
+			goto init_wait;
 		}
 	}
 
-	if (!ctx->error) {
-		ret = lcm_dcs_write(ctx, hx83121a_cdot_csot_sleep_out_seq,
-				    HX83121A_CDOT_CSOT_SLEEP_OUT_SEQ_LEN);
-		if (ret < 0) {
-			ctx->error = ret;
-			dev_err(ctx->dev, "%s: sleep out failed: %d\n",
-				__func__, ret);
-			return;
-		}
-		mdelay(120);
+	ret = lcm_dcs_write(ctx, hx83121a_cdot_csot_sleep_out_seq,
+			    HX83121A_CDOT_CSOT_SLEEP_OUT_SEQ_LEN);
+	if (ret < 0) {
+		ctx->error = ret;
+		dev_err(ctx->dev, "%s: sleep out failed: %d\n",
+			__func__, ret);
 	}
 
-	if (!ctx->error) {
+init_wait:
+	/*
+	 * 官核 lcm_prepare 出口反汇编（0x867cd88）：无论前面命令是否
+	 * 失败都等待 120*4.295ms≈515ms；error>=0 才发 0x29；再等
+	 * 50*4.295ms≈215ms。失败时 0x11 可能未发出，官核同样只等
+	 * 515ms 后跳过 0x29。
+	 */
+	mdelay(515);
+
+	if (ctx->error >= 0) {
 		ret = lcm_dcs_write(ctx, hx83121a_cdot_csot_display_on_seq,
 				    HX83121A_CDOT_CSOT_DISPLAY_ON_SEQ_LEN);
 		if (ret < 0) {
 			ctx->error = ret;
 			dev_err(ctx->dev, "%s: display on failed: %d\n",
 				__func__, ret);
-			return;
 		}
-		mdelay(50);
 	}
+	mdelay(215);
 }
 
 static int lcm_disable(struct drm_panel *panel)
@@ -280,18 +283,18 @@ static int lcm_unprepare(struct drm_panel *panel)
 	if (ctx->error >= 0) {
 		cmd = 0x28; /* display off */
 		lcm_dcs_write(ctx, &cmd, 1);
-		mdelay(50);
+		/* 官核 lcm_unprepare：0x28 后 1*4.3ms、0x10 后 2*4.3ms */
+		mdelay(4);
 	}
 
 	if (ctx->error >= 0) {
 		cmd = 0x10; /* sleep in */
 		lcm_dcs_write(ctx, &cmd, 1);
-		mdelay(120);
+		mdelay(9);
 	}
 
 	ctx->error = 0;
 	ctx->prepared = false;
-	mdelay(1);
 
 	/*
 	 * TCT: keep the panel powered when single-click wake is enabled so
@@ -310,7 +313,8 @@ static int lcm_unprepare(struct drm_panel *panel)
 		return PTR_ERR(ctx->reset_gpio);
 	}
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
-	mdelay(5);
+	/* 官核 lcm_unprepare 下电步进为 21.5ms（0x147aeb8），保证放电完成 */
+	mdelay(21);
 
 	ctx->bias_neg = devm_gpiod_get_index(ctx->dev, "bias", 1,
 					     GPIOD_OUT_HIGH);
@@ -321,7 +325,7 @@ static int lcm_unprepare(struct drm_panel *panel)
 	}
 	gpiod_set_value(ctx->bias_neg, 0);
 	devm_gpiod_put(ctx->dev, ctx->bias_neg);
-	mdelay(5);
+	mdelay(21);
 
 	ctx->bias_pos = devm_gpiod_get_index(ctx->dev, "bias", 0,
 					     GPIOD_OUT_HIGH);
@@ -332,10 +336,13 @@ static int lcm_unprepare(struct drm_panel *panel)
 	}
 	gpiod_set_value(ctx->bias_pos, 0);
 	devm_gpiod_put(ctx->dev, ctx->bias_pos);
-	mdelay(5);
+	mdelay(21);
 
-	if (tct_get_panel_resume_flag() && tct_get_touch_dev())
+	if (tct_get_panel_resume_flag() && tct_get_touch_dev()) {
 		himax_common_suspend(tct_get_touch_dev());
+		/* 官核 suspend 后 7*4.3ms≈30ms，等待触摸 IC 稳定 */
+		mdelay(30);
+	}
 
 	pr_info("%s-\n", __func__);
 	return 0;
@@ -376,7 +383,7 @@ static int lcm_enable(struct drm_panel *panel)
 }
 
 static const struct drm_display_mode default_mode = {
-	.clock		= PANEL_CLOCK_120HZ,
+	.clock		= PANEL_CLOCK_72HZ,
 	.hdisplay	= PANEL_WIDTH,
 	.hsync_start	= PANEL_WIDTH + HFP,
 	.hsync_end	= PANEL_WIDTH + HFP + HSA,
@@ -388,8 +395,8 @@ static const struct drm_display_mode default_mode = {
 	.vrefresh	= MODE_0_FPS,
 };
 
-static const struct drm_display_mode performance_mode_90hz = {
-	.clock		= PANEL_CLOCK_90HZ,
+static const struct drm_display_mode performance_mode = {
+	.clock		= PANEL_CLOCK_64HZ,
 	.hdisplay	= PANEL_WIDTH,
 	.hsync_start	= PANEL_WIDTH + HFP,
 	.hsync_end	= PANEL_WIDTH + HFP + HSA,
@@ -401,25 +408,11 @@ static const struct drm_display_mode performance_mode_90hz = {
 	.vrefresh	= MODE_1_FPS,
 };
 
-static const struct drm_display_mode performance_mode_60hz = {
-	.clock		= PANEL_CLOCK_60HZ,
-	.hdisplay	= PANEL_WIDTH,
-	.hsync_start	= PANEL_WIDTH + HFP,
-	.hsync_end	= PANEL_WIDTH + HFP + HSA,
-	.htotal		= PANEL_WIDTH + HFP + HSA + HBP,
-	.vdisplay	= PANEL_HEIGHT,
-	.vsync_start	= PANEL_HEIGHT + MODE_2_VFP,
-	.vsync_end	= PANEL_HEIGHT + MODE_2_VFP + VSA,
-	.vtotal		= PANEL_HEIGHT + MODE_2_VFP + VSA + VBP,
-	.vrefresh	= MODE_2_FPS,
-};
-
 static int lcm_get_modes(struct drm_panel *panel)
 {
 	struct drm_connector *connector = panel->connector;
 	struct drm_display_mode *mode;
-	struct drm_display_mode *mode_90hz;
-	struct drm_display_mode *mode_60hz;
+	struct drm_display_mode *mode_64hz;
 
 	mode = drm_mode_duplicate(panel->drm, &default_mode);
 	if (!mode) {
@@ -428,33 +421,24 @@ static int lcm_get_modes(struct drm_panel *panel)
 		return -ENOMEM;
 	}
 	mode->vrefresh = MODE_0_FPS;
-	drm_mode_set_name(mode);
 	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
+	drm_mode_set_name(mode);
 	drm_mode_probed_add(connector, mode);
 
-	mode_90hz = drm_mode_duplicate(panel->drm, &performance_mode_90hz);
-	if (!mode_90hz) {
+	mode_64hz = drm_mode_duplicate(panel->drm, &performance_mode);
+	if (!mode_64hz) {
 		dev_err(panel->dev, "failed to add mode %dx%d@%d\n",
 			PANEL_WIDTH, PANEL_HEIGHT, MODE_1_FPS);
 		return -ENOMEM;
 	}
-	mode_90hz->vrefresh = MODE_1_FPS;
-	drm_mode_set_name(mode_90hz);
-	drm_mode_probed_add(connector, mode_90hz);
-
-	mode_60hz = drm_mode_duplicate(panel->drm, &performance_mode_60hz);
-	if (!mode_60hz) {
-		dev_err(panel->dev, "failed to add mode %dx%d@%d\n",
-			PANEL_WIDTH, PANEL_HEIGHT, MODE_2_FPS);
-		return -ENOMEM;
-	}
-	mode_60hz->vrefresh = MODE_2_FPS;
-	drm_mode_set_name(mode_60hz);
-	drm_mode_probed_add(connector, mode_60hz);
+	mode_64hz->vrefresh = MODE_1_FPS;
+	mode_64hz->type = DRM_MODE_TYPE_DRIVER;
+	drm_mode_set_name(mode_64hz);
+	drm_mode_probed_add(connector, mode_64hz);
 
 	connector->display_info.width_mm = 166;
 	connector->display_info.height_mm = 266;
-	return 3;
+	return 2;
 }
 
 static const struct drm_panel_funcs lcm_drm_funcs = {
@@ -467,8 +451,8 @@ static const struct drm_panel_funcs lcm_drm_funcs = {
 
 #if defined(CONFIG_MTK_PANEL_EXT)
 static struct mtk_panel_params ext_params = {
-	.pll_clk = 490,
-	.data_rate = 980,
+	.pll_clk = 1,
+	.data_rate = 485,
 	.cust_esd_check = 0,
 	.esd_check_enable = 0,
 	.physical_width_um = PHYSICAL_WIDTH_UM,
@@ -589,6 +573,18 @@ static int lcm_probe(struct mipi_dsi_device *dsi)
 	ctx->dev = dev;
 	ctx->esd_te_master = -1;
 	ctx->esd_te_slave = -1;
+
+	/*
+	 * 官核 lcm_probe 反汇编确认（offset 984/992）：
+	 * lanes = 4, mode_flags = 0xE05；format 默认 MIPI_DSI_FMT_RGB888。
+	 * 缺少这些配置会导致 DSI 以 0 lane/错误模式运行，表现为开机花屏。
+	 */
+	dsi->lanes = 4;
+	dsi->format = MIPI_DSI_FMT_RGB888;
+	dsi->mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_SYNC_PULSE
+			| MIPI_DSI_MODE_LPM | MIPI_DSI_MODE_EOT_PACKET
+			| MIPI_DSI_CLOCK_NON_CONTINUOUS;
+
 	mipi_dsi_set_drvdata(dsi, ctx);
 
 	backlight = of_parse_phandle(dev->of_node, "backlight", 0);
@@ -598,14 +594,6 @@ static int lcm_probe(struct mipi_dsi_device *dsi)
 		if (!ctx->backlight)
 			return -EPROBE_DEFER;
 	}
-
-	ctx->vddi_18 = devm_gpiod_get(dev, "vddi_18", GPIOD_OUT_HIGH);
-	if (IS_ERR(ctx->vddi_18)) {
-		dev_err(dev, "%s: cannot get vddi_18 %ld\n",
-			__func__, PTR_ERR(ctx->vddi_18));
-		return PTR_ERR(ctx->vddi_18);
-	}
-	devm_gpiod_put(dev, ctx->vddi_18);
 
 	ctx->bias_pos = devm_gpiod_get_index(dev, "bias", 0, GPIOD_OUT_HIGH);
 	if (IS_ERR(ctx->bias_pos)) {
