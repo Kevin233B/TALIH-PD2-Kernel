@@ -13,6 +13,8 @@
  *  GNU General Public License for more details.
  */
 
+#include <linux/pinctrl/consumer.h>
+
 #include "himax_platform.h"
 #include "himax_common.h"
 #include "himax_ic_core.h"
@@ -22,6 +24,20 @@ bool ic_boot_done;
 struct spi_device *spi;
 
 static uint8_t *g_xfer_data;
+
+/*
+ * 官核 himax_chip_common_probe（0x8b107bc-0x8b108ec）：
+ * devm_pinctrl_get + lookup default_spi_mode/touch_spi_resume/
+ * touch_spi_suspend，suspend/resume 时 pinctrl_select_state。
+ * 手势唤醒开启时跳过 pinctrl 切换（SPI 引脚保持活跃）。
+ */
+static struct pinctrl *hx_touch_pinctrl;
+static struct pinctrl_state *hx_pinctrl_default;
+static struct pinctrl_state *hx_pinctrl_resume;
+static struct pinctrl_state *hx_pinctrl_suspend;
+
+/* TCT touch bridge（定义在本文件后部） */
+int tct_get_gesture_en(void);
 
 #if defined(__HIMAX_MOD__)
 int (*hx_msm_drm_register_client)(struct notifier_block *nb);
@@ -1014,6 +1030,14 @@ int himax_common_suspend(struct device *dev)
 		return -ECANCELED;
 	}
 	himax_chip_common_suspend(ts);
+
+	/* 官核：手势唤醒开启时保留 SPI 引脚，不切 pinctrl */
+	if (tct_get_gesture_en())
+		return 0;
+
+	if (hx_touch_pinctrl && hx_pinctrl_suspend)
+		pinctrl_select_state(hx_touch_pinctrl, hx_pinctrl_suspend);
+
 	return 0;
 }
 EXPORT_SYMBOL(himax_common_suspend);
@@ -1038,6 +1062,14 @@ int himax_common_resume(struct device *dev)
 		return -ECANCELED;
 #endif
 	}
+
+	/* 官核：手势唤醒时先恢复触摸 IC，不切 pinctrl */
+	if (tct_get_gesture_en())
+		return himax_chip_common_resume(ts);
+
+	if (hx_touch_pinctrl && hx_pinctrl_resume)
+		pinctrl_select_state(hx_touch_pinctrl, hx_pinctrl_resume);
+
 	himax_chip_common_resume(ts);
 	return 0;
 }
@@ -1345,6 +1377,34 @@ int himax_chip_common_probe(struct spi_device *spi)
 
 	ts->probe_finish = false;
 	ts->initialized = false;
+
+	/* 官核 pinctrl 初始化：失败仅打印并继续 probe */
+	hx_touch_pinctrl = devm_pinctrl_get(&spi->dev);
+	if (!IS_ERR(hx_touch_pinctrl)) {
+		hx_pinctrl_default = pinctrl_lookup_state(hx_touch_pinctrl,
+							  "default_spi_mode");
+		if (!IS_ERR(hx_pinctrl_default)) {
+			if (pinctrl_select_state(hx_touch_pinctrl,
+						 hx_pinctrl_default))
+				E("%s: select default_spi_mode failed\n",
+				  __func__);
+		} else {
+			hx_pinctrl_default = NULL;
+		}
+
+		hx_pinctrl_resume = pinctrl_lookup_state(hx_touch_pinctrl,
+							 "touch_spi_resume");
+		if (IS_ERR(hx_pinctrl_resume))
+			hx_pinctrl_resume = NULL;
+
+		hx_pinctrl_suspend = pinctrl_lookup_state(hx_touch_pinctrl,
+							  "touch_spi_suspend");
+		if (IS_ERR(hx_pinctrl_suspend))
+			hx_pinctrl_suspend = NULL;
+	} else {
+		hx_touch_pinctrl = NULL;
+	}
+
 	ret = himax_chip_common_init();
 	if (ret < 0)
 		goto err_common_init_failed;
