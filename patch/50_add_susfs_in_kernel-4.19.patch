@@ -2455,16 +2455,6 @@ index ef5d11423..3b95aa607 100755
  #ifdef CONFIG_MTK_TASK_TURBO
  	unsigned short turbo:1;
  	unsigned short render:1;
-@@ -1338,6 +1349,9 @@ struct task_struct {
- 	 * New fields for task_struct should be added above here, so that
- 	 * they are included in the randomized portion of task_struct.
- 	 */
-+#if defined(CONFIG_KSU_SUSFS)
-+	u64 susfs_task_state;
-+#endif
- 	randomized_struct_fields_end
- 
- 	/* CPU-specific state of this task: */
 diff --git a/include/linux/sus_su.h b/include/linux/sus_su.h
 new file mode 100644
 index 000000000..98e8f3b35
