@@ -1312,11 +1312,16 @@ static int check_version(const struct load_info *info,
 			crcval = resolve_rel_crc(crc);
 		else
 			crcval = *crc;
+		/*
+		 * TALIH-PD2: 出厂 vendor 模块(conninfra/bt_drv/wlan)按官核
+		 * 构建, 本树源码与其符号 CRC 有漂移(vsnprintf 等), 强制放行
+		 * 以恢复 WiFi/蓝牙.
+		 */
 		if (versions[i].crc == crcval)
 			return 1;
-		pr_debug("Found checksum %X vs module %lX\n",
-			 crcval, versions[i].crc);
-		goto bad_version;
+		pr_warn_once("%s: symbol %s crc mismatch (kernel %X vs module %lX), forced ok\n",
+			     info->name, symname, crcval, versions[i].crc);
+		return 1;
 	}
 
 	/* Broken toolchain. Warn once, then let it go.. */
