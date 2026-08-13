@@ -452,8 +452,8 @@ static const struct drm_panel_funcs lcm_drm_funcs = {
 
 #if defined(CONFIG_MTK_PANEL_EXT)
 static struct mtk_panel_params ext_params = {
-	.pll_clk = 1,
-	.data_rate = 485,
+	.pll_clk = 485,
+	.data_rate = 970,
 	.cust_esd_check = 0,
 	.esd_check_enable = 0,
 	.physical_width_um = PHYSICAL_WIDTH_UM,
