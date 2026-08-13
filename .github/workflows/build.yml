@@ -5,6 +5,18 @@ on:
     branches: [ main, master ]
     tags: [ '*' ]
   workflow_dispatch:
+    inputs:
+      kernel_variant:
+        description: 'Kernel variant: sukisu+susfs (默认, 完整集成 SukiSU builtin + SUSFS) 或 kernel (原版)'
+        type: choice
+        options:
+          - 'sukisu+susfs'
+          - 'kernel'
+        default: 'sukisu+susfs'
+        required: true
+
+env:
+  KERNEL_VARIANT: ${{ github.event_name == 'workflow_dispatch' && inputs.kernel_variant || 'sukisu+susfs' }}
 
 jobs:
   build:
@@ -15,13 +27,39 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential bc bison flex libssl-dev libelf-dev libc6-dev linux-libc-dev device-tree-compiler cpio gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf git wget xz-utils python3 python3-pip
+          sudo apt-get install -y build-essential bc bison flex libssl-dev libelf-dev libc6-dev linux-libc-dev device-tree-compiler cpio gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf git wget xz-utils python3 python3-pip patch
+
+      - name: Reset to plain kernel (remove committed SukiSU integration)
+        if: ${{ env.KERNEL_VARIANT == 'kernel' }}
+        run: |
+          rm -rf KernelSU drivers/kernelsu
+          # 仓库提交的 drivers/Makefile/Kconfig 已含 SukiSU 集成，需手动移除
+          sed -i '/kernelsu/d' drivers/Makefile
+          sed -i '/drivers\/kernelsu\/Kconfig/d' drivers/Kconfig
+
+      - name: Pull SukiSU builtin (latest) and integrate
+        if: ${{ env.KERNEL_VARIANT == 'sukisu+susfs' }}
+        run: |
+          # 仓库中已提交固定版本 KernelSU/，这里按官方流程拉取最新 builtin 覆盖
+          rm -rf KernelSU drivers/kernelsu
+          git checkout -- drivers/Makefile drivers/Kconfig
+          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s builtin
+          # 移除嵌套 .git（避免 gitlink/子模块问题），源码直接入库构建
+          rm -rf KernelSU/.git
+
+      - name: Apply SukiSU 4.19 NON-KPROBE hooks patch
+        if: ${{ env.KERNEL_VARIANT == 'sukisu+susfs' }}
+        run: |
+          patch -p1 < patch/ksu_hooks_sukisu_4.19.patch
+
+      - name: Apply SUSFS kernel patch
+        if: ${{ env.KERNEL_VARIANT == 'sukisu+susfs' }}
+        run: |
+          patch -p1 < patch/50_add_susfs_in_kernel-4.19.patch
 
       - name: Build kernel
         run: |
           chmod +x build-mt8797.sh
-          chmod +x Integrate_sukisu.sh
-          chmod +x Integrate_SUSFS.sh
           chmod +x download_clang.sh
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
