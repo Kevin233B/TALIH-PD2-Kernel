@@ -477,20 +477,17 @@ static void mtk_dsi_pre_cmd(struct mtk_dsi *dsi,
 		mtk_crtc_pkt_create(&handle, &mtk_crtc->base,
 				mtk_crtc->gce_obj.client[CLIENT_CFG]);
 
-		/* TALIH debug: 跳过帧完成等待(事件641 永不触发) */
-		if (0)
-			cmdq_pkt_wait_no_clear(handle,
+		/* 1. wait frame done & wait DSI not busy */
+		cmdq_pkt_wait_no_clear(handle,
 				mtk_crtc->gce_obj.event[EVENT_STREAM_EOF]);
 		/* Clear stream block to prevent trigger loop start */
 		cmdq_pkt_clear_event(handle,
 				mtk_crtc->gce_obj.event[EVENT_STREAM_BLOCK]);
-		if (0)
-			cmdq_pkt_wfe(handle,
+		cmdq_pkt_wfe(handle,
 				mtk_crtc->gce_obj.event[EVENT_CABC_EOF]);
 		cmdq_pkt_clear_event(handle,
 				mtk_crtc->gce_obj.event[EVENT_STREAM_DIRTY]);
-		if (0)
-			cmdq_pkt_wfe(handle,
+		cmdq_pkt_wfe(handle,
 				mtk_crtc->gce_obj.event[EVENT_STREAM_EOF]);
 		mtk_dsi_poll_for_idle(dsi, handle);
 		cmdq_pkt_flush(handle);
