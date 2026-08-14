@@ -57,7 +57,9 @@ jobs:
       - name: Repack TWRP into boot image
         run: |
           cd ~/twrpsrc
-          mkbootimg --kernel device/talih/pd2/prebuilt/Image.gz \
+          ls -la out/target/product/pd2/ | grep -E "recovery|ramdisk|boot"
+          out/host/linux-x86/bin/mkbootimg \
+            --kernel device/talih/pd2/prebuilt/Image.gz \
             --ramdisk out/target/product/pd2/ramdisk-recovery.img \
             --dtb device/talih/pd2/prebuilt/dtb.img \
             --base 0x40000000 --kernel_offset 0x00080000 \
@@ -66,7 +68,7 @@ jobs:
             --cmdline "bootopt=64S3,32N2,64N2 buildvariant=user" \
             --os_version 12.0.0 --os_patch_level 2023-06 \
             --output $GITHUB_WORKSPACE/boot-twrp.img
-          cp out/target/product/pd2/recovery.img $GITHUB_WORKSPACE/recovery.img
+          cp out/target/product/pd2/recovery.img $GITHUB_WORKSPACE/recovery.img || true
           ls -la $GITHUB_WORKSPACE/boot-twrp.img $GITHUB_WORKSPACE/recovery.img
 
       - name: Upload artifacts
