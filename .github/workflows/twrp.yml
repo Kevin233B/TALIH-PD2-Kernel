@@ -1,0 +1,75 @@
+name: Build TWRP (in boot)
+
+on:
+  push:
+    branches: [ twrp ]
+    paths:
+      - 'twrp/**'
+      - '.github/workflows/twrp.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git-core gnupg flex bison gperf build-essential zip curl \
+            zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev \
+            x11proto-core-dev libx11-dev lib32z-dev libgl1-mesa-dev \
+            libxml2-utils xsltproc unzip python3 libssl-dev rsync
+          git config --global user.email "you@example.com"
+          git config --global user.name "CI"
+          mkdir -p ~/bin
+          curl -sL https://storage.googleapis.com/git-repo-downloads/repo -o ~/bin/repo
+          chmod a+x ~/bin/repo
+          echo "$HOME/bin" >> $GITHUB_PATH
+
+      - name: Sync TWRP source (twrp-12.1)
+        run: |
+          mkdir -p ~/twrpsrc && cd ~/twrpsrc
+          ~/bin/repo init -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_omni.git -b twrp-12.1 --depth=1
+          ~/bin/repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
+        timeout-minutes: 150
+
+      - name: Add TALIH-PD2 device tree
+        run: |
+          cp -r $GITHUB_WORKSPACE/twrp ~/twrpsrc/device/talih/pd2
+          ls -la ~/twrpsrc/device/talih/pd2
+
+      - name: Build recovery image
+        run: |
+          cd ~/twrpsrc
+          export ALLOW_MISSING_DEPENDENCIES=true
+          export LC_ALL=C
+          . build/envsetup.sh
+          lunch omni_pd2-eng
+          mka recoveryimage -j$(nproc --all)
+        timeout-minutes: 150
+
+      - name: Repack TWRP into boot image
+        run: |
+          cd ~/twrpsrc
+          mkbootimg --kernel device/talih/pd2/prebuilt/Image.gz \
+            --ramdisk out/target/product/pd2/ramdisk-recovery.img \
+            --dtb device/talih/pd2/prebuilt/dtb.img \
+            --base 0x40000000 --kernel_offset 0x00080000 \
+            --ramdisk_offset 0x11100000 --tags_offset 0x07c80000 \
+            --header_version 2 --pagesize 2048 \
+            --cmdline "bootopt=64S3,32N2,64N2 buildvariant=user" \
+            --os_version 12.0.0 --os_patch_level 2023-06 \
+            --output $GITHUB_WORKSPACE/boot-twrp.img
+          cp out/target/product/pd2/recovery.img $GITHUB_WORKSPACE/recovery.img
+          ls -la $GITHUB_WORKSPACE/boot-twrp.img $GITHUB_WORKSPACE/recovery.img
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: twrp-images
+          path: |
+            boot-twrp.img
+            recovery.img
+          retention-days: 14
