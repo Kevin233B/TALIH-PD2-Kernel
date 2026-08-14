@@ -651,6 +651,31 @@ static int __init deviceinfo_init(void)
 		}
 	}
 
+	/*
+	 * 官核框架(services.jar)固定读写 /sys/devices/virtual/tct_touch/
+	 * tct_touch_dev/singleclick_wakeup_enable, 与重建驱动的 deviceinfo
+	 * 路径不同, 导致轻触唤醒开关永远写不进内核. 这里按官核路径额外
+	 * 暴露同名节点(与上面节点共享同一 singleclick_set 回调/状态).
+	 */
+	{
+		struct class *tct_touch_class =
+			class_create(THIS_MODULE, "tct_touch");
+		struct device *tct_touch_dev;
+
+		if (!IS_ERR(tct_touch_class)) {
+			tct_touch_dev = device_create(tct_touch_class,
+						      NULL, 0, NULL,
+						      "tct_touch_dev");
+			if (!IS_ERR(tct_touch_dev)) {
+				ret = device_create_file(tct_touch_dev,
+					&dev_attr_singleclick_wakeup_enable);
+				if (ret < 0)
+					pr_err("Failed to create tct_touch node: %d\n",
+					       ret);
+			}
+		}
+	}
+
 	pr_info("TCT deviceinfo nodes created\n");
 	return 0;
 }
