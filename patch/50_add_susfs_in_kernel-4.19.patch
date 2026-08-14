@@ -2695,6 +2695,7 @@ index 000000000..8cfeb0469
 +/* ENUM */
 +/********/
 +/* shared with userspace ksu_susfs tool */
++#define SUSFS_MAGIC 0x55550000
 +#define CMD_SUSFS_ADD_SUS_PATH 0x55550
 +#define CMD_SUSFS_ADD_SUS_PATH_LOOP 0x55551
 +#define CMD_SUSFS_ADD_SUS_MOUNT 0x55560

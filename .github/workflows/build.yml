@@ -57,6 +57,11 @@ jobs:
         run: |
           patch -p1 < patch/50_add_susfs_in_kernel-4.19.patch
 
+      - name: Apply SukiSU 4.19 compatibility fixes
+        if: ${{ env.KERNEL_VARIANT == 'sukisu+susfs' }}
+        run: |
+          patch -p1 < patch/10_fix_sukisu_4.19_compat.patch
+
       - name: Build kernel
         run: |
           chmod +x build-mt8797.sh
