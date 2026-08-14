@@ -298,50 +298,20 @@ static int lcm_unprepare(struct drm_panel *panel)
 	ctx->prepared = false;
 
 	/*
-	 * TCT: keep the panel powered when single-click wake is enabled so
-	 * the touch IC can still wake the system (same as the OEM kernel).
+	 * TCT: 无论双击唤醒是否开启, 面板都保持睡眠(不下电),
+	 * 使电源键唤醒始终走轻量 resume, 消除亮屏高延迟。
 	 */
+	ctx->slept = true;
+
 	if (tct_get_gesture_en()) {
-		pr_info("lcm_unprepare tct_singleclkick_wakeup_en is enable, "
-			"skip power down\n");
-		/* 面板仅睡眠(未下电), 唤醒时走轻量 resume 免重跑完整 init */
-		ctx->slept = true;
+		/* 双击唤醒: 触摸保留 SMWP 手势模式, 不下电不挂起 */
 		return 0;
 	}
-	ctx->slept = false;
 
-	ctx->reset_gpio = devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_LOW);
-	if (IS_ERR(ctx->reset_gpio)) {
-		dev_err(ctx->dev, "%s: cannot get reset_gpio %ld\n",
-			__func__, PTR_ERR(ctx->reset_gpio));
-		return PTR_ERR(ctx->reset_gpio);
-	}
-	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
-	/* 官核 lcm_unprepare 下电步进为 21.5ms（0x147aeb8），保证放电完成 */
-	mdelay(21);
-
-	ctx->bias_neg = devm_gpiod_get_index(ctx->dev, "bias", 1,
-					     GPIOD_OUT_HIGH);
-	if (IS_ERR(ctx->bias_neg)) {
-		dev_err(ctx->dev, "%s: cannot get bias_neg %ld\n",
-			__func__, PTR_ERR(ctx->bias_neg));
-		return PTR_ERR(ctx->bias_neg);
-	}
-	gpiod_set_value(ctx->bias_neg, 0);
-	devm_gpiod_put(ctx->dev, ctx->bias_neg);
-	mdelay(21);
-
-	ctx->bias_pos = devm_gpiod_get_index(ctx->dev, "bias", 0,
-					     GPIOD_OUT_HIGH);
-	if (IS_ERR(ctx->bias_pos)) {
-		dev_err(ctx->dev, "%s: cannot get bias_pos %ld\n",
-			__func__, PTR_ERR(ctx->bias_pos));
-		return PTR_ERR(ctx->bias_pos);
-	}
-	gpiod_set_value(ctx->bias_pos, 0);
-	devm_gpiod_put(ctx->dev, ctx->bias_pos);
-	mdelay(21);
-
+	/*
+	 * 未开双击唤醒: 触摸仍需挂起(否则任意触摸都可能唤醒系统),
+	 * 但面板保持供电, 不再做 reset/bias 下电。
+	 */
 	if (tct_get_panel_resume_flag() && tct_get_touch_dev()) {
 		himax_common_suspend(tct_get_touch_dev());
 		/* 官核 suspend 后 7*4.3ms≈30ms，等待触摸 IC 稳定 */
@@ -362,7 +332,7 @@ static int lcm_prepare(struct drm_panel *panel)
 		return 0;
 
 	/*
-	 * 轻量 resume: 面板在 single-click wake 时仅睡眠未下电,
+	 * 轻量 resume: 面板待机时始终仅睡眠未下电,
 	 * 只需 sleep out + display on, 免重跑 reset/606ms/完整 init,
 	 * 消除电源键点亮的高延迟.
 	 */
@@ -377,15 +347,15 @@ static int lcm_prepare(struct drm_panel *panel)
 		if (ret < 0)
 			dev_err(ctx->dev, "%s: display on failed: %d\n",
 				__func__, ret);
-		/* HX83121A sleep out 典型 120ms，30ms 后面板未稳定会延迟出图 */
-		mdelay(120);
-		/*
-		 * 触摸 IC 息屏时处于 SMWP 手势模式：立即恢复触摸，避免等
-		 * DRM/fb notifier 迟到触发 himax_common_resume 造成
-		 * 0.5-1s 触摸无响应。
-		 */
-		if (tct_get_panel_resume_flag() && tct_get_touch_dev())
+		mdelay(30);
+
+		/* 未开双击唤醒时触摸在 unprepare 已挂起, 这里恢复 */
+		if (!tct_get_gesture_en() && tct_get_panel_resume_flag() &&
+		    tct_get_touch_dev()) {
 			himax_common_resume(tct_get_touch_dev());
+			mdelay(9);
+		}
+
 		ctx->slept = false;
 		ctx->prepared = true;
 		return 0;
