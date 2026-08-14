@@ -28,7 +28,6 @@ TARGET_PREBUILT_DTB := $(DEVICE_PATH)/prebuilt/dtb.img
 # AOSP 构建系统只认目录形式的 BOARD_PREBUILT_DTBIMAGE_DIR 生成 dtb.img
 BOARD_PREBUILT_DTBIMAGE_DIR := $(DEVICE_PATH)/prebuilt/dtb
 BOARD_INCLUDE_DTB_IN_BOOTIMG := true
-BOARD_INCLUDE_RECOVERY_DTBO := false
 
 # MTK boot image 参数（与原厂 boot header 一致）
 BOARD_KERNEL_BASE := 0x40000000
