@@ -181,7 +181,7 @@
 +#endif
 --- ./kernel/sys.c
 +++ ./kernel/sys.c
-@@ -637,6 +637,14 @@ long __sys_setresuid(uid_t ruid, uid_t euid, uid_t suid)
+@@ -637,6 +637,16 @@ long __sys_setresuid(uid_t ruid, uid_t euid, uid_t suid)
  {
 +#ifdef CONFIG_KSU_SUSFS
 +extern int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid);
