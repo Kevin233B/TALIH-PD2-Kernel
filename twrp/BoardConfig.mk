@@ -25,6 +25,8 @@ TARGET_NO_KERNEL := false
 # 预编译内核（resukisu-susfs 分支产物: ReSukiSU + SUSFS）
 TARGET_PREBUILT_KERNEL := $(DEVICE_PATH)/prebuilt/Image.gz
 TARGET_PREBUILT_DTB := $(DEVICE_PATH)/prebuilt/dtb.img
+# AOSP 构建系统只认目录形式的 BOARD_PREBUILT_DTBIMAGE_DIR 生成 dtb.img
+BOARD_PREBUILT_DTBIMAGE_DIR := $(DEVICE_PATH)/prebuilt/dtb
 BOARD_INCLUDE_DTB_IN_BOOTIMG := true
 BOARD_INCLUDE_RECOVERY_DTBO := false
 
