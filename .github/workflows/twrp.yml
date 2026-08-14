@@ -40,6 +40,7 @@ jobs:
 
       - name: Add TALIH-PD2 device tree
         run: |
+          mkdir -p ~/twrpsrc/device/talih
           cp -r $GITHUB_WORKSPACE/twrp ~/twrpsrc/device/talih/pd2
           ls -la ~/twrpsrc/device/talih/pd2
 
