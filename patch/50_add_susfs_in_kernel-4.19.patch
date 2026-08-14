@@ -2276,6 +2276,11 @@ index 000000000..ad8c2aa38
 +	current->susfs_task_state |= TASK_STRUCT_PROC_UMOUNTED;
 +}
 +
++bool susfs_is_current_proc_umounted(void)
++{
++	return (current->susfs_task_state & TASK_STRUCT_PROC_UMOUNTED);
++}
++
 +#ifdef CONFIG_KSU_SUSFS_ENABLE_LOG
 +void susfs_enable_log(void __user *arg)
 +{
@@ -2674,6 +2679,7 @@ index 000000000..7874208fa
 +void susfs_show_variant(void __user *arg);
 +void susfs_show_version(void __user *arg);
 +void susfs_set_current_proc_umounted(void);
++bool susfs_is_current_proc_umounted(void);
 +void susfs_start_sdcard_monitor_fn(void);
 +bool susfs_starts_with(const char *str, const char *prefix);
 +bool susfs_ends_with(const char *str, const char *suffix);
