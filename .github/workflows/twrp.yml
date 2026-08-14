@@ -42,12 +42,12 @@ jobs:
         run: |
           mkdir -p ~/twrpsrc/device/talih
           cp -r $GITHUB_WORKSPACE/twrp ~/twrpsrc/device/talih/pd2
-          # recovery ramdisk 打包时 root/vendor 符号链接与已安装的
-          # recovery/root/vendor 目录冲突（vintf manifest 等模块）；
-          # 加 --keep-dirlinks 保留目录形式（TWRP 挂载 /vendor 时无影响）
-          sed -i 's|rsync -a --exclude=sdcard|rsync -a --keep-dirlinks --exclude=sdcard|' \
+          # recovery ramdisk 打包时 root/{vendor,product,system_ext,odm} 符号链接
+          # 与已安装到 recovery/root 的目录冲突（vintf manifest 等模块）；
+          # 从 rsync 排除这些顶层符号链接，保留目录形式（TWRP 挂载分区无影响）
+          sed -i 's|rsync -a --keep-dirlinks --exclude=sdcard|rsync -a --keep-dirlinks --exclude=sdcard --exclude=/root/vendor --exclude=/root/product --exclude=/root/system_ext --exclude=/root/odm|' \
             ~/twrpsrc/build/make/core/Makefile
-          grep -n "keep-dirlinks" ~/twrpsrc/build/make/core/Makefile | head -2
+          grep -n "rsync -a" ~/twrpsrc/build/make/core/Makefile | head -2
           ls -la ~/twrpsrc/device/talih/pd2
 
       - name: Build recovery image
