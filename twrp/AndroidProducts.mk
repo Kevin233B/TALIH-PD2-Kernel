@@ -1,2 +1,2 @@
 PRODUCT_MAKEFILES := \
-	$(LOCAL_DIR)/omni_pd2.mk
+	$(LOCAL_DIR)/twrp_pd2.mk

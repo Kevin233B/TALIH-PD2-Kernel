@@ -34,7 +34,7 @@ jobs:
       - name: Sync TWRP source (twrp-12.1)
         run: |
           mkdir -p ~/twrpsrc && cd ~/twrpsrc
-          ~/bin/repo init -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_omni.git -b twrp-12.1 --depth=1
+          ~/bin/repo init --depth=1 -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git -b twrp-12.1
           ~/bin/repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
         timeout-minutes: 150
 
@@ -49,8 +49,8 @@ jobs:
           export ALLOW_MISSING_DEPENDENCIES=true
           export LC_ALL=C
           . build/envsetup.sh
-          lunch omni_pd2-eng
-          mka recoveryimage -j$(nproc --all)
+          lunch twrp_pd2-eng
+          mka bootimage recoveryimage -j$(nproc --all)
         timeout-minutes: 150
 
       - name: Repack TWRP into boot image
