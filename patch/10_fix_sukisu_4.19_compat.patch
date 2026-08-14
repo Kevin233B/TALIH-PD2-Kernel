@@ -146,3 +146,30 @@ index c1d3abaf8..4686be753 100644
              return 0;
          default:
              return -EINVAL;
+
+diff --git a/KernelSU/kernel/feature/sucompat.c b/KernelSU/kernel/feature/sucompat.c
+index f40836538..1d7c6bd20 100644
+--- a/KernelSU/kernel/feature/sucompat.c
++++ b/KernelSU/kernel/feature/sucompat.c
+@@ -386,7 +386,7 @@ int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv, voi
+ }
+ 
+ // dead code
+-int __maybe_unused ksu_handle_devpts(struct inode *inode)
++int ksu_handle_devpts(struct inode *inode)
+ {
+     return 0;
+ }
+diff --git a/KernelSU/kernel/runtime/ksud.c b/KernelSU/kernel/runtime/ksud.c
+index c9d11dac3..c6b2165f7 100644
+--- a/KernelSU/kernel/runtime/ksud.c
++++ b/KernelSU/kernel/runtime/ksud.c
+@@ -559,7 +559,7 @@ void ksu_handle_vfs_fstat(int fd, loff_t *kstat_size_ptr)
+ }
+ 
+ // dead code
+-int __maybe_unused ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value)
++int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value)
+ {
+     return 0;
+ }
