@@ -2,7 +2,7 @@ name: Build and Release Kernel
 
 on:
   push:
-    branches: [ main, master, resukisu-susfs ]
+    branches: [ main, master, resukisu-susfs, sukisu-ultra-susfs-v2.2.0 ]
     tags: [ '*' ]
   workflow_dispatch:
 
@@ -17,12 +17,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential bc bison flex libssl-dev libelf-dev libc6-dev linux-libc-dev device-tree-compiler cpio gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf git wget xz-utils python3 python3-pip patch
 
-      - name: Pull ReSukiSU (latest main) and integrate
+      - name: Pull SukiSU-Ultra (builtin) and integrate
         run: |
-          # 仓库中不再内置 KernelSU 源码，按官方流程拉取最新 ReSukiSU（保留 .git，Kbuild 需要）
+          # 仓库中不再内置 KernelSU 源码，按官方流程拉取 SukiSU-Ultra builtin 分支
+          # （builtin 为 SUSFS inline hook 集成目标，保留 .git 供 Kbuild 取版本信息）
           rm -rf KernelSU drivers/kernelsu
           git checkout -- drivers/Makefile drivers/Kconfig
-          curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
+          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s builtin
+
+      - name: Apply SukiSU-Ultra 4.19 compatibility fixes
+        run: |
+          patch -p1 < patch/10_fix_sukisu_4.19_compat.patch
 
       - name: Apply SUSFS kernel patch (4.19, non-GKI)
         run: |
@@ -63,7 +68,7 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: Kernel MT8797 ${{ github.ref_name }}
-          body: Kernel Image.gz for MT8797 (ReSukiSU + SUSFS)
+          body: Kernel Image.gz for MT8797 (SukiSU-Ultra + SUSFS)
           files: Image.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
