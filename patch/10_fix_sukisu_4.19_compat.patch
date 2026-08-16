@@ -74,6 +74,93 @@ index 8b32188..59fbd0e 100644
 +#endif
 +
  #endif // __KSU_H_KERNEL_INCLUDES
+diff --git a/KernelSU/kernel/kpm/kpm.c b/KernelSU/kernel/kpm/kpm.c
+index c96106b..03e3176 100644
+--- a/KernelSU/kernel/kpm/kpm.c
++++ b/KernelSU/kernel/kpm/kpm.c
+@@ -132,14 +132,14 @@ noinline int sukisu_handle_kpm(unsigned long control_code, unsigned long arg1,
+             goto exit;
+         }
+ 
+-        if (!access_ok(arg1, 255)) {
++        if (!ksu_access_ok(arg1, 255)) {
+             goto invalid_arg;
+         }
+ 
+         strncpy_from_user((char *)&kernel_load_path, (const char *)arg1, 255);
+ 
+         if (arg2 != 0) {
+-            if (!access_ok(arg2, 255)) {
++            if (!ksu_access_ok(arg2, 255)) {
+                 goto invalid_arg;
+             }
+ 
+@@ -158,7 +158,7 @@ noinline int sukisu_handle_kpm(unsigned long control_code, unsigned long arg1,
+             goto exit;
+         }
+ 
+-        if (!access_ok(arg1, sizeof(kernel_name_buffer))) {
++        if (!ksu_access_ok(arg1, sizeof(kernel_name_buffer))) {
+             goto invalid_arg;
+         }
+ 
+@@ -178,7 +178,7 @@ noinline int sukisu_handle_kpm(unsigned long control_code, unsigned long arg1,
+             goto exit;
+         }
+ 
+-        if (!access_ok(arg1, sizeof(kernel_name_buffer))) {
++        if (!ksu_access_ok(arg1, sizeof(kernel_name_buffer))) {
+             goto invalid_arg;
+         }
+ 
+@@ -189,7 +189,7 @@ noinline int sukisu_handle_kpm(unsigned long control_code, unsigned long arg1,
+         sukisu_kpm_info((const char *)&kernel_name_buffer, (char *)&buf,
+                         sizeof(buf), &size);
+ 
+-        if (!access_ok(arg2, size)) {
++        if (!ksu_access_ok(arg2, size)) {
+             goto invalid_arg;
+         }
+ 
+@@ -204,7 +204,7 @@ noinline int sukisu_handle_kpm(unsigned long control_code, unsigned long arg1,
+             goto exit;
+         }
+ 
+-        if (!access_ok(arg2, len)) {
++        if (!ksu_access_ok(arg2, len)) {
+             goto invalid_arg;
+         }
+ 
+@@ -222,11 +222,11 @@ noinline int sukisu_handle_kpm(unsigned long control_code, unsigned long arg1,
+         char kpm_name[KPM_NAME_LEN] = { 0 };
+         char kpm_args[KPM_ARGS_LEN] = { 0 };
+ 
+-        if (!access_ok(arg1, sizeof(kpm_name))) {
++        if (!ksu_access_ok(arg1, sizeof(kpm_name))) {
+             goto invalid_arg;
+         }
+ 
+-        if (!access_ok(arg2, sizeof(kpm_args))) {
++        if (!ksu_access_ok(arg2, sizeof(kpm_args))) {
+             goto invalid_arg;
+         }
+ 
+@@ -286,13 +286,13 @@ int do_kpm(void __user *arg)
+         return -EFAULT;
+     }
+ 
+-    if (!access_ok(cmd.control_code, sizeof(int))) {
++    if (!ksu_access_ok(cmd.control_code, sizeof(int))) {
+         pr_err("kpm: invalid control_code pointer %px\n",
+                (void *)cmd.control_code);
+         return -EFAULT;
+     }
+ 
+-    if (!access_ok(cmd.result_code, sizeof(int))) {
++    if (!ksu_access_ok(cmd.result_code, sizeof(int))) {
+         pr_err("kpm: invalid result_code pointer %px\n",
+                (void *)cmd.result_code);
+         return -EFAULT;
 diff --git a/KernelSU/kernel/runtime/ksud.c b/KernelSU/kernel/runtime/ksud.c
 index eed56f9..2379e9c 100644
 --- a/KernelSU/kernel/runtime/ksud.c
