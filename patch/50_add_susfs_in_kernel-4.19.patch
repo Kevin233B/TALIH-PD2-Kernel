@@ -3182,15 +3182,17 @@ index 000000000..6ede62945
 +#endif
 diff --git a/include/linux/susfs_def.h b/include/linux/susfs_def.h
 new file mode 100644
-index 000000000..bb28e454e
+index 000000000..cd237486a
 --- /dev/null
 +++ b/include/linux/susfs_def.h
-@@ -0,0 +1,116 @@
+@@ -0,0 +1,118 @@
 +#ifndef KSU_SUSFS_DEF_H
 +#define KSU_SUSFS_DEF_H
 +
 +#include <linux/bits.h>
 +#include <linux/string.h>
++#include <linux/sched.h>
++#include <linux/cred.h>
 +
 +/********/
 +/* ENUM */
