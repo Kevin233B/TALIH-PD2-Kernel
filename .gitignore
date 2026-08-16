@@ -6,3 +6,7 @@ boot_logs.zip
 .talih_ref/
 prebuilts/clang/host/linux-x86/clang-r383902/bin/
 out/
+
+# SUSFS 回移植笔记（本地专用，含 SSH 凭据，勿提交）
+.susfs-progress.md
+.susfs-backport-spec.md
