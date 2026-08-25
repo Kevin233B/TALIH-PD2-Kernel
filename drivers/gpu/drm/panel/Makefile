@@ -125,3 +125,7 @@ mediatek-drm-panel-drv-y :=  \
 ccflags-$(CONFIG_DRM_MEDIATEK_PANEL) += -I$(srctree)/drivers/leds/
 subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/
 subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/
+
+obj-$(CONFIG_DRM_PANEL_LUSHAN12_HX83121A_CDOT_CSOT_WQXGA_VDO) += lushan12_hx83121a_cdot_csot_wqxga_dsi_vdo.o
+obj-$(CONFIG_DRM_PANEL_LUSHAN12_HX83121A_CDOT_CSOT_WITHOUT_VCOM_WQXGA_VDO) += lushan12_hx83121a_cdot_csot_without_vcom_wqxga_dsi_vdo.o
+obj-$(CONFIG_AW3750X_POWER) += aw3750x_power.o
