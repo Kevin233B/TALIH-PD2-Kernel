@@ -1928,3 +1928,17 @@ config SND_SOC_TPA6130A2
 	depends on I2C
 
 endmenu
+
+#Begin added by lanying.he for es7210 bringup
+config TCT_ES7210
+	tristate "SoC Audio for es7210"
+	depends on I2C
+	help
+	  This option enables support for es7210.
+
+config TCT_ES7210_4MIC
+	tristate "SoC Audio for es7210 4mic"
+	depends on I2C
+	help
+	  This option enables support for es7210 4mic.
+#End added by lanying.he for es7210 bringup
