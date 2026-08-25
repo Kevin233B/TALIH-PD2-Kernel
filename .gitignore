@@ -157,3 +157,8 @@ x509.genkey
 
 # Documentation toolchain
 sphinx_*/
+
+# TALIH-PD2 project-specific (NEVER commit: user-provided artifacts)
+/assets/
+/boot_logs.zip
+/.talih_ref/
