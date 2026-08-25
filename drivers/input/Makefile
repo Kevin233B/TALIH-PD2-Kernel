@@ -28,6 +28,8 @@ obj-$(CONFIG_INPUT_MISC)	+= misc/
 
 obj-$(CONFIG_INPUT_APMPOWER)	+= apm-power.o
 
+obj-$(CONFIG_HALL_KEY_SWITCH)	+= hall_key/
+
 obj-$(CONFIG_RMI4_CORE)		+= rmi4/
 
 #/* wangzhi12@oplus.com, BSP.Biometrics.Fingerprint, 2021-07-29, for fingerprint */

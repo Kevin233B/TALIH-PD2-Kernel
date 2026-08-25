@@ -1,0 +1,5 @@
+config HALL_KEY_SWITCH
+	tristate "Hall Switch driver"
+	default n
+	---help---
+	  Say Y here for supporting Hall Switch.
