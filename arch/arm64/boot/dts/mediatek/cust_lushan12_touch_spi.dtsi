@@ -1,0 +1,52 @@
+&spi1 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	status = "okay";
+	himax_ts@0 {
+		compatible = "tct,lushan12_hx83121a_spi";
+		reg = <0>;
+		spi-max-frequency = <10000000>;
+		spi-cpha;
+		interrupt-parent = <&pio>;
+		himax,panel-coords = <0 1600 0 2560>;
+		himax,display-coords = <0 1600 0 2560>;
+		himax,irq-gpio = <&pio 21 0x2008>;
+		himax,rst-gpio = <&pio 14 0x00>;
+		report_type = <1>;
+		/* 与官核 dtbo fragment@50/51 一致：SPI 引脚 suspend/resume 模式切换 */
+		pinctrl-names = "touch_spi_suspend", "touch_spi_resume",
+				"default_spi_mode";
+		pinctrl-0 = <&tct_touch_spi_suspend>;
+		pinctrl-1 = <&tct_touch_spi_resume>;
+		pinctrl-2 = <&tct_default_spi_mode>;
+   };
+};
+
+&pio {
+	tct_touch_spi_suspend: tct_touch_spi_suspend {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO158__FUNC_GPIO158
+				  PINMUX_GPIO159__FUNC_GPIO159
+				  PINMUX_GPIO156__FUNC_GPIO156
+				  PINMUX_GPIO157__FUNC_GPIO157>;
+			bias-pull-down;
+		};
+	};
+
+	tct_touch_spi_resume: tct_touch_spi_resume {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO158__FUNC_SPI1_A_MI
+				  PINMUX_GPIO159__FUNC_SPI1_A_MO
+				  PINMUX_GPIO156__FUNC_SPI1_A_CLK
+				  PINMUX_GPIO157__FUNC_SPI1_A_CSB>;
+			bias-pull-up;
+		};
+	};
+
+	tct_default_spi_mode: tct_default_spi_mode {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO156__FUNC_SPI1_A_CLK>;
+			drive-strength = <3>;
+		};
+	};
+};

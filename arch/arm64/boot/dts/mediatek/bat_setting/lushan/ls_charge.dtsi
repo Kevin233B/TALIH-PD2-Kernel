@@ -1,0 +1,211 @@
+&lk_charger {
+	enable_anime;
+	power_path_support;
+	fast_charge_voltage = <3200000>;
+	max_charger_voltage = <10500000>;
+
+	/* charging current */
+	usb_charger_current = <500000>;
+	ac_charger_current = <1000000>;
+	ac_charger_input_current = <1000000>;
+	non_std_ac_charger_current = <500000>;
+	charging_host_charger_current = <500000>;
+	ta_ac_charger_current = <500000>;
+	pd_charger_current = <500000>;
+
+	/* battery temperature protection */
+	temp_t4_threshold = <54>;
+	temp_t3_threshold = <45>;
+	temp_t1_threshold = <6>;
+	temp_t0_threshold = <1>;
+};
+
+&pio {
+        i2c6_sda_default: sdadefault {
+                pins_cmd_dat {
+                        pinmux = <PINMUX_GPIO201__FUNC_SDA6>;
+                        drive-strength=<20>;/*MTK_DRIVE_20mA*/
+                        bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
+                };
+        };
+        i2c6_scl_default: scldefault {
+                pins_cmd_dat {
+                        pinmux = <PINMUX_GPIO200__FUNC_SCL6>;
+                        drive-strength=<20>;
+                        bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
+                };
+        };
+};
+
+&i2c6 {
+    #address-cells = <1>;
+    #size-cells = <0>;
+    clock-frequency = <400000>;
+    status = "okay";
+    sc856x@6e{
+        compatible = "sc,sc856x-master";
+        reg = <0x6e>;
+        sc856x,intr_gpio = <&pio 8 0>;
+        sc856x,lpm_gpio = <&pio 20 0>;
+        charger_name = "secondary_dvchg";
+        charger_name_v4_19 = "primary_divider_chg";
+
+        sc,sc856x,vbat-ovp-dis = <0>;
+        sc,sc856x,vbat-ovp = <30>; /*4450 + val * 25*/
+        sc,sc856x,ibat-ocp-dis = <0>;
+        sc,sc856x,ibat-ocp  = <10>; /*8000 + val * 500*/
+        sc,sc856x,vusb-ovp-dis = <0>;
+        sc,sc856x,vusb-ovp = <10>; /*11000 + val * 1000     val=15:6500*/
+        sc,sc856x,vwpc-ovp-dis = <0>;
+        sc,sc856x,vwpc-ovp = <10>; /*11000 + val * 1000     val=15:6500*/
+        sc,sc856x,vbus-ovp-dis = <0>;
+        sc,sc856x,vbus-ovp = <30>; /*3500 * mode + val * 50 * mode      mode:4 2 1*/
+        sc,sc856x,vout-ovp-dis = <0>;
+        sc,sc856x,vout-ovp = <3>; /*4800 + val * 200*/
+        sc,sc856x,ibus-ocp-dis = <0>;
+        sc,sc856x,ibus-ocp  = <30>; /*2500 + val * 125*/
+        sc,sc856x,ibus-ucp-fall-dis = <0>;
+        sc,sc856x,ibus-ucp-fall  = <30>; /*0:8us 1:5ms 2:20ms 3:50ms*/
+        sc,sc856x,pmid2out-ovp-dis = <0>;
+        sc,sc856x,pmid2out-ovp = <7>; /*200 + val * 100*/
+        sc,sc856x,pmid2out-uvp-dis = <0>;
+        sc,sc856x,pmid2out-uvp = <7>; /*-100 - val * 50*/
+        sc,sc856x,fsw-set = <20>; /*300khz + val * 25*/
+        sc,sc856x,ss-timeout = <5>; /*3:320ms 4:1280ms 5:5120ms 6:20.48s 7:81.92s*/
+        sc,sc856x,wd-timeout = <0>; /*0:disable 1:0.2s 2:0.5s 3:1s 4:5s 5:30s*/
+        sc,sc856x,ibat-sns-r = <0>; /*0:1mho 1:2mho*/
+        sc,sc856x,mode = <0>; /*0:4->1 1:2->1 2:1->1 4:1<-4 5:1<-2 6:1<-1*/
+        sc,sc856x,tshut-dis = <1>;
+        status = "okay";
+        pinctrl-names = "default";
+        pinctrl-0 = <&i2c6_sda_default &i2c6_scl_default>;
+    };
+ };
+
+&charger {
+	charger = <&mt6360_chg>; 
+	power_path_support;
+	//enable_dynamic_mivr;
+	disable_dynamic_mivr;
+	gauge = <&bat_gm30>;
+	algorithm_name = "SwitchCharging";
+	enable_hv_charging;
+	enable_pe_plus;
+	enable_pe_2;
+	enable_pe_5;
+
+	/* charging current */
+	usb_charger_current_suspend = <0>;
+	usb_charger_current_unconfigured = <70000>;
+	usb_charger_current_configured = <500000>;
+	usb_charger_current = <500000>;
+	ac_charger_current = <2050000>;
+	ac_charger_input_current = <2050000>;
+	weak_ac_charger_input_current = <1300000>;
+	ta_ac_charger_current = <3000000>;
+	pd_charger_current = <3000000>;
+	non_std_ac_charger_current = <500000>;
+	charging_host_charger_current = <1300000>;
+	chg1_ta_ac_charger_current = <1800000>;
+	chg2_ta_ac_charger_current = <1800000>;
+	battery_cv = <4450000>;
+	max_dmivr_charger_current = <2100000>;
+	dual_polling_ieoc = <750000>;
+	single_polling_ieoc = <200000>;
+
+	/* sw jeita */
+	enable_sw_jeita;
+	jeita_temp_above_t4_cv = <4100000>;
+	jeita_temp_t3_to_t4_cv = <4100000>;
+	jeita_temp_t2_to_t3_cv = <4450000>;
+	jeita_temp_t1_to_t2_cv = <4450000>;
+	jeita_temp_t0_to_t1_cv = <4450000>;
+	jeita_temp_below_t0_cv = <4450000>;
+
+	temp_t4_thres = <550>;
+	temp_t4_thres_minus_x_degree = <510>;
+	temp_t3_thres = <450>;
+	temp_t3_thres_minus_x_degree = <430>;
+	temp_t2_thres = <110>;
+	temp_t2_thres_plus_x_degree = <120>;
+	temp_t1_thres = <60>;
+	temp_t1_thres_plus_x_degree = <70>;
+
+	temp_t0_thres = <0>;
+	temp_t0_thres_plus_x_degree = <10>;
+	temp_neg_10_thres = <20>;
+
+	min_charge_temp = <1>;
+	min_charge_temp_plus_x_degree = <20>;
+	max_charge_temp = <550>;
+	max_charge_temp_minus_x_degree = <510>;
+
+	jeita_temp_above_t4_current = <0>;
+	jeita_temp_t3_to_t4_current = <1500000>;
+	jeita_temp_t2_to_t3_current = <3000000>;
+	jeita_temp_t1_to_t2_current = <1000000>;
+	jeita_temp_t0_to_t1_current = <1000000>;
+	jeita_temp_below_t0_current = <0>;
+
+	enable_step_chg;
+	step_chg_vbat = <4300000>;
+	step_chg_vbat_hysteresis = <100000>;
+	step_chg_current = <3000000>;
+
+	max_charger_voltage = <6500000>;/*<10500000>;*/
+	min_charger_voltage = <4450000>;
+	ovp_restore_voltage = <5500000>;/*<9500000>;*/
+
+	enable_sw_safety_timer;
+	max_charging_time = <86400>;
+
+	/* PE Plus and PE2 */
+	ta_ac_12v_input_current = <1500000>;
+	ta_ac_9v_input_current = <1500000>;
+	ta_ac_7v_input_current = <2300000>;
+	ta_stop_battery_soc = <85>;
+
+	/*PD2.0*/
+	parallel_vbus;
+	pd_vbus_low_bound = <5000000>;
+	pd_vbus_upper_bound = <10000000>;
+	pd_stop_battery_soc = <85>;
+	ibus_err = <14>;
+	vsys_watt = <5000000>;
+
+	vbat_cable_imp_threshold = <0>;
+};
+#if 0
+&mt6360_typec {
+	pd-data {
+		pd,sink-pdo-size = <2>;
+		/*
+		* Fixed 5V, 500 mA <0x00019032>
+		* Fixed 5V, 1A <0x00019064>
+		* Fixed 5V, 2A <0x000190c8>
+		* Fixed 5V, 3A <0x0001912c>
+		* Fixed 9V, 500 mA <0x0002d032>
+		* Fixed 9V, 1A <0x0002d064>
+		* Fixed 9V, 2A <0x0002d0c8>
+		* Fixed 9V, 3A <0x0002d12c>
+		* Variable 5-9V, 1A <0x8642d064>
+		* Variable 5-9V, 2A <0x8642d0c8>
+		* Variable 5-9V, 3A <0x8642d12c>
+		* PPS 3V~5.9V, 3A <0xC0761E3C>
+		*/
+		/*(5V, 2A), (9V, 2A)*/
+ 		pd,sink-pdo-data = <0x000190c8 0x0002d0c8>;
+		pd,source-pdo-size = <1>;
+		pd,source-pdo-data = <0x00019064>;
+	};
+};
+#endif
+
+&mt6360_chg {
+	ieoc = <200000>; /* uA */
+	mivr = <4400000>;/* uV */
+	cv = <4400000>;	/* uA */
+	ircmp_resistor = <0>;
+	ircmp_vclamp = <0>;
+};
+#include "mtk_pe50.dtsi"
