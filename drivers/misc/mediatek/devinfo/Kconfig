@@ -1,0 +1,9 @@
+config TCT_DEVICEINFO
+	bool "TCT deviceinfo nodes for MMI tests"
+	help
+	  Say Y here to create the /sys/class/deviceinfo/device_info nodes
+	  used by TALPAD (TALIH-PD2) factory/MMI tests, including the
+	  aggregate "tct_all_deviceinfo" node. Each node stores a
+	  name/value string pair written by the factory test tooling and
+	  can be read back over sysfs; the aggregate node dumps all pairs
+	  in "name:value;" format.
