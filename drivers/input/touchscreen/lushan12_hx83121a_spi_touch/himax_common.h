@@ -111,8 +111,8 @@
 #endif
 
 #if defined(HX_CONFIG_DRM_MTK)
-#include "mtk_panel_ext.h"
-#include "mtk_disp_notify.h"
+#include <linux/mtk_panel_ext.h>
+#include <linux/mtk_disp_notify.h>
 #undef HX_CONFIG_FB
 #undef HX_CONFIG_DRM
 #elif defined(HX_CONFIG_DRM_PANEL)

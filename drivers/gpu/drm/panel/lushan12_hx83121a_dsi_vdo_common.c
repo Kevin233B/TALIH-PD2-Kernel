@@ -30,7 +30,7 @@
 
 #define CONFIG_MTK_PANEL_EXT
 #if defined(CONFIG_MTK_PANEL_EXT)
-#include "../mediatek/mtk_panel_ext.h"
+#include "../mediatek/mediatek_v2/mtk_panel_ext.h"
 #include "../mediatek/mtk_log.h"
 #include "../mediatek/mtk_drm_graphics_base.h"
 #endif
@@ -467,7 +467,6 @@ static const struct drm_panel_funcs lcm_drm_funcs = {
 #define HX83121A_DSC_PARAMS \
 	.dsc_params = { \
 		.enable = 1, \
-		.bdg_dsc_enable = 0, \
 		.ver = 17, \
 		.slice_mode = 0, \
 		.rgb_swap = 0, \
@@ -500,35 +499,6 @@ static const struct drm_panel_funcs lcm_drm_funcs = {
 		.rc_quant_incr_limit1 = 11, \
 		.rc_tgt_offset_hi = 3, \
 		.rc_tgt_offset_lo = 3, \
-		.rc_buf_thresh[0] = 14, \
-		.rc_buf_thresh[1] = 28, \
-		.rc_buf_thresh[2] = 42, \
-		.rc_buf_thresh[3] = 56, \
-		.rc_buf_thresh[4] = 70, \
-		.rc_buf_thresh[5] = 84, \
-		.rc_buf_thresh[6] = 98, \
-		.rc_buf_thresh[7] = 105, \
-		.rc_buf_thresh[8] = 112, \
-		.rc_buf_thresh[9] = 119, \
-		.rc_buf_thresh[10] = 121, \
-		.rc_buf_thresh[11] = 123, \
-		.rc_buf_thresh[12] = 125, \
-		.rc_buf_thresh[13] = 126, \
-		.rc_range_parameters[0] = { 0, 4, 2 }, \
-		.rc_range_parameters[1] = { 0, 4, 0 }, \
-		.rc_range_parameters[2] = { 1, 5, 0 }, \
-		.rc_range_parameters[3] = { 1, 6, -2 }, \
-		.rc_range_parameters[4] = { 3, 7, -4 }, \
-		.rc_range_parameters[5] = { 3, 7, -6 }, \
-		.rc_range_parameters[6] = { 3, 7, -8 }, \
-		.rc_range_parameters[7] = { 3, 8, -8 }, \
-		.rc_range_parameters[8] = { 3, 9, -8 }, \
-		.rc_range_parameters[9] = { 3, 10, -10 }, \
-		.rc_range_parameters[10] = { 5, 11, -10 }, \
-		.rc_range_parameters[11] = { 5, 12, -12 }, \
-		.rc_range_parameters[12] = { 5, 13, -12 }, \
-		.rc_range_parameters[13] = { 7, 13, -12 }, \
-		.rc_range_parameters[14] = { 13, 13, -12 }, \
 	}
 
 #define HX83121A_DYN_FPS_CMDS(rate_cmd) \
@@ -586,6 +556,7 @@ static struct mtk_panel_params ext_params_120hz = {
 };
 
 static int mtk_panel_ext_param_set(struct drm_panel *panel,
+				   struct drm_connector *connector,
 				   unsigned int mode)
 {
 	struct mtk_panel_ext *ext = find_panel_ext(panel);
