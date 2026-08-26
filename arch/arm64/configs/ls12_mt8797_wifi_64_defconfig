@@ -156,14 +156,16 @@ CONFIG_PINCTRL_MTK_V2=y
 CONFIG_PINCTRL_MT6885=y
 CONFIG_EINT_MTK=y
 # 以下 pinctrl 因 Kconfig 里 "default ARM64 && ARCH_MEDIATEK" 或 "default MFD_MT6397"
-# 会被静默启用。其中 MT2712/MT8167/MT8173/MT8516/MT6397 select PINCTRL_MTK（4.19 旧
-# common 框架），而 5.10 已删除 struct mtk_eint_hw，pinctrl-mtk-common.c 会编译失败；
-# MT6779/MT6797/MT8183/MT8192 select PARIS 但非 ls12(mt6885) 目标，一并显式关闭。
-# ls12 只走 PARIS 框架（CONFIG_PINCTRL_MT6885）。
+# 会被静默启用，且其代码内嵌 5.10 已删除的 struct mtk_eint_hw（4.19 残留），编译必挂：
+#   - 旧 common 框架（select PINCTRL_MTK，头 pinctrl-mtk-common.h 内嵌）：MT2712/MT6397/MT8167/MT8173/MT8516
+#   - driver 自身内嵌 mtk_eint_hw：MT7622(pinctrl-mt7622.c)/MT8183(pinctrl-mt8183.c)/MT8192(pinctrl-mt8192.c)
+#   另有 MT6779/MT6797 走 PARIS 无此残留，但非 ls12(mt6885) 目标，一并关闭。
+# ls12 只用 PARIS 框架的 pinctrl-mt6885.c + mtk-eint.c（5.10 新结构，无 mtk_eint_hw）。
 # CONFIG_PINCTRL_MT2712 is not set
 # CONFIG_PINCTRL_MT6397 is not set
 # CONFIG_PINCTRL_MT6779 is not set
 # CONFIG_PINCTRL_MT6797 is not set
+# CONFIG_PINCTRL_MT7622 is not set
 # CONFIG_PINCTRL_MT8167 is not set
 # CONFIG_PINCTRL_MT8173 is not set
 # CONFIG_PINCTRL_MT8183 is not set
