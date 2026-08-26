@@ -87,7 +87,7 @@
 	power_path_support;
 	//enable_dynamic_mivr;
 	disable_dynamic_mivr;
-	gauge = <&bat_gm30>;
+	gauge = <&mtk_gauge>;
 	algorithm_name = "SwitchCharging";
 	enable_hv_charging;
 	enable_pe_plus;

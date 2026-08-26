@@ -1,0 +1,11 @@
+/* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * Copyright (C) 2019 MediaTek Inc.
+ *
+ * ls12_mt8797_wifi_64 board cust overlay.
+ *
+ * memory node (DDR size) 依 4.19 main 分支 mt6893.dts 规定：
+ *   reg = <0 0x40000000 0 0x3e605000>
+ * 已在 base dtsi（mediatek/mt6893.dtsi）中定义，此处不再覆盖，
+ * 仅满足主 dts 末尾 `#include <ls12_mt8797_wifi_64/cust.dtsi>` 的引用。
+ */

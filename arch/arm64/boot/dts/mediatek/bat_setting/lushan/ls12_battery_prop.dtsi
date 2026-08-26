@@ -3,7 +3,7 @@
  * TALPAD (TALIH-PD2, ls12_mt8797_wifi_64) battery ID ranges,
  * aligned with the OEM dtbo (fragment@49).
  */
-&bat_gm30 {
+&mtk_gauge {
 	bat_id_max0 = <0x38f>;
 	bat_id_min0 = <0x2c7>;
 	battery_name0 = "TLp100A7:VEKEN:10000mAh:CACA100002C7";
