@@ -5873,8 +5873,11 @@ static int regulator_late_cleanup(struct device *dev, void *data)
 		/* ldo1 is enable in lk, kernel enable this ldo1 to protect from unbalanced enable/disable */
 		struct regulator *ldo3;//VCI 3.0V
 		ldo3 = regulator_get(dev, "VMC");
-		if(!IS_ERR(ldo3))
-			regulator_enable(ldo3);
+		if(!IS_ERR(ldo3)) {
+			ret = regulator_enable(ldo3);
+			if (ret)
+				rdev_err(rdev, "failed to enable VMC for LCM: %d\n", ret);
+		}
 		rdev_info(rdev,"LDO3 is used for LCM ,can't clean up.\n");
 		return 0;
 	}
