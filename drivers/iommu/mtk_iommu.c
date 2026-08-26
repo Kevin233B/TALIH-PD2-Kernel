@@ -1095,6 +1095,7 @@ static irqreturn_t mtk_iommu_isr_sec(int irq, struct mtk_iommu_data *data)
 }
 #endif
 
+#if IS_ENABLED(CONFIG_MTK_IOMMU_MISC_DBG)
 static void peri_iommu_read_data(void __iomem *base, enum peri_iommu iommu_id)
 {
 	u32 int_state0, int_state1, fault_id, va34_32, pa34_32, regval;
@@ -1177,6 +1178,7 @@ void mtk_peri_iommu_isr(struct mtk_iommu_data *data, u32 bus_id)
 	mtk_iommu_tlb_flush_all(data);
 	mtk_iommu_isr_record(data);
 }
+#endif /* CONFIG_MTK_IOMMU_MISC_DBG */
 
 #if IS_ENABLED(CONFIG_MTK_IOMMU_MISC_SECURE)
 static void mtk_iommu_mau_init(struct mtk_iommu_data *data);
@@ -1270,10 +1272,9 @@ static irqreturn_t mtk_iommu_isr(int irq, void *dev_id)
 #if IS_ENABLED(CONFIG_MTK_IOMMU_MISC_SECURE)
 	int ret;
 #endif
-#if IS_ENABLED(CONFIG_MTK_IOMMU_MISC_DBG)
 	int id = data->plat_data->iommu_id;
 	enum mtk_iommu_type type = data->plat_data->iommu_type;
-#else
+#if !IS_ENABLED(CONFIG_MTK_IOMMU_MISC_DBG)
 	unsigned int fault_larb, fault_port, sub_comm = 0;
 #endif
 
