@@ -13,6 +13,8 @@
 #define _MTK_DMABUFHEAP_H
 #include <linux/dma-buf.h>
 
+enum TRUSTED_MEM_REQ_TYPE;
+
 extern atomic64_t dma_heap_normal_total;
 
 /* return 0 means error */
@@ -31,5 +33,12 @@ long mtk_dma_buf_set_name(struct dma_buf *dmabuf, const char *buf);
  * returns >0 means valid iomm_sec_id, -1 means error
  */
 int dmabuf_to_sec_id(const struct dma_buf *dmabuf, u32 *sec_hdl);
+
+/*
+ * dmabuf_to_tmem_type() - Get trusted-mem type of a mtk sec heap dma-buf
+ * @dmabuf: the dma-buf
+ * returns >=0 valid TRUSTED_MEM_REQ_TYPE value, -1 means not a mtk sec heap buffer
+ */
+enum TRUSTED_MEM_REQ_TYPE dmabuf_to_tmem_type(const struct dma_buf *dmabuf);
 
 #endif /* _MTK_DMABUFHEAP_DEBUG_H */

@@ -53,11 +53,10 @@
 static DEFINE_MUTEX(ion_config_lock);
 #endif
 
-/* 5.10 移除 mtk_ion：mtk/ion_sec_heap.h 已删除，GPU protected buffer(SVP)
- * 的 trusted-mem 桥接需迁到 dma-buf heap(mtk_sec_heap) 后接入，暂整体禁用。 */
-#if 0
+#if defined(CONFIG_MTK_TRUSTED_MEMORY_SUBSYSTEM) && defined(CONFIG_MTK_GZ_KREE)
 #include <trusted_mem_api.h>
-#include <mtk/ion_sec_heap.h>
+/* 5.10 移除 mtk_ion：ion_get_trust_mem_type 已删，改用 dma-buf heap 导出反查 */
+enum TRUSTED_MEM_REQ_TYPE dmabuf_to_tmem_type(const struct dma_buf *dmabuf);
 #endif
 
 #if ((KERNEL_VERSION(5, 3, 0) <= LINUX_VERSION_CODE) || \
@@ -1239,14 +1238,12 @@ retry:
 		size_t j, pages = PFN_UP(sg_dma_len(s));
 		uint64_t phy_addr = 0;
 
-/* 5.10 移除 mtk_ion：ion_get_trust_mem_type 已删除，GPU protected buffer(SVP)
- * 的 trusted-mem 桥接需迁到 dma-buf heap(mtk_sec_heap) 后接入，暂整体禁用。 */
-#if 0
+#if defined(CONFIG_MTK_TRUSTED_MEMORY_SUBSYSTEM) && defined(CONFIG_MTK_GZ_KREE)
 		if (reg->flags & KBASE_REG_PROTECTED) {
 			u32 sec_handle = sg_dma_address(s);
 			struct dma_buf *dma_buf = reg->gpu_alloc->imported.umm.dma_buf;
 			enum TRUSTED_MEM_REQ_TYPE sec_mem_type =
-				ion_get_trust_mem_type(dma_buf);
+				dmabuf_to_tmem_type(dma_buf);
 
 			trusted_mem_api_query_pa(
 				sec_mem_type, 0, 0, NULL, &sec_handle, NULL, 0, 0, &phy_addr);

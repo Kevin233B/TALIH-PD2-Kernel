@@ -1315,6 +1315,40 @@ u32 dmabuf_to_secure_handle(const struct dma_buf *dmabuf)
 }
 EXPORT_SYMBOL_GPL(dmabuf_to_secure_handle);
 
+enum TRUSTED_MEM_REQ_TYPE dmabuf_to_tmem_type(const struct dma_buf *dmabuf)
+{
+	struct mtk_sec_heap_buffer *buffer;
+	struct secure_heap_region *region;
+	struct secure_heap_page *page;
+	int heap_base;
+
+	if (!is_mtk_sec_heap_dmabuf(dmabuf)) {
+		pr_err("%s err, dmabuf is not secure\n", __func__);
+		return -1;
+	}
+
+	buffer = dmabuf->priv;
+	heap_base = get_heap_base_type(buffer->heap);
+
+	if (heap_base == REGION_BASE) {
+		region = sec_heap_region_get(buffer->heap);
+		if (!region)
+			return -1;
+		return region->tmem_type;
+	}
+
+	if (heap_base == PAGE_BASE) {
+		page = sec_heap_page_get(buffer->heap);
+		if (!page)
+			return -1;
+		return page->tmem_type;
+	}
+
+	pr_err("%s err, unknown heap_base(%d)\n", __func__, heap_base);
+	return -1;
+}
+EXPORT_SYMBOL_GPL(dmabuf_to_tmem_type);
+
 int dmabuf_to_sec_id(const struct dma_buf *dmabuf, u32 *sec_hdl)
 {
 	struct mtk_sec_heap_buffer *buffer = NULL;
