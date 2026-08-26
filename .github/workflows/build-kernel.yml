@@ -9,37 +9,67 @@ on:
 
 jobs:
   build:
-    name: Image + dtb (ls12_mt8797_wifi_64)
+    name: Image + dtb (ls12_mt8797_wifi_64, clang-r416183b)
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 编译链对齐 build.config.common 的 BRANCH=android12-5.10 / clang-r416183b：
-      # 即 clang(LLVM) + ld.lld + aarch64-linux-gnu 交叉 binutils。
+      # 下载 android12-5.10 指定的官方 Clang 工具链 clang-r416183b，
+      # 落地到 prebuilts-master/clang/host/linux-x86/，与 build.config.common 的
+      # CLANG_PREBUILT_BIN=prebuilts-master/clang/host/linux-x86/clang-r416183b/bin 对齐。
+      # 来源锁定 SHA 6e3223f（android-gs-raviole-5.10-android12-d1，Android 12 GKI Dr.No），
+      # 该 tree 含 clang-r416183b；用 SHA 而非分支名，确保工具链可复现、ABI 稳定。
+      - name: Fetch official Clang toolchain (clang-r416183b)
+        run: |
+          set -eo pipefail
+          mkdir -p prebuilts-master/clang/host/linux-x86/clang-r416183b
+          curl -fsSL --retry 3 --retry-delay 5 \
+            "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/6e3223f76384455acde43affde3df0ea9df66c0d/clang-r416183b.tar.gz" \
+            -o /tmp/clang-r416183b.tar.gz
+          # googlesource archive 打包的是 clang-r416183b 目录「内容」（bin/ lib64/ ...，无 clang-r416183b 前缀），
+          # 故 -C 指向 .../clang-r416183b，落成 .../clang-r416183b/bin/clang，匹配 CLANG_PREBUILT_BIN。
+          tar -xzf /tmp/clang-r416183b.tar.gz -C prebuilts-master/clang/host/linux-x86/clang-r416183b
+          rm -f /tmp/clang-r416183b.tar.gz
+
+      # 官方交叉 GNU 汇编器 gas，对齐 build.config.aarch64 的
+      # LINUX_GCC_CROSS_COMPILE_PREBUILTS_BIN=prebuilts/gas/linux-x86。仓库
+      # platform/prebuilts/gas/linux-x86 的 master-kernel-build-2021 分支（SHA b2a189331，
+      # 与 build/、kernel-build-tools 同代）。工具在仓库根：aarch64-linux-gnu-{as,elfedit} /
+      # arm-linux-gnueabi-{as,elfedit} / x86_64-linux-gnu-{as,elfedit}。
+      - name: Fetch official binutils (gas)
+        run: |
+          set -eo pipefail
+          mkdir -p prebuilts/gas/linux-x86
+          curl -fsSL --retry 3 --retry-delay 5 \
+            "https://android.googlesource.com/platform/prebuilts/gas/linux-x86/+archive/b2a189331333e014bfef4c0425b3ef4b74accdd0.tar.gz" \
+            -o /tmp/gas.tar.gz
+          tar -xzf /tmp/gas.tar.gz -C prebuilts/gas/linux-x86
+          rm -f /tmp/gas.tar.gz
+
+      # 内核 host 工具 + 交叉 gcc/binutils（作 LLVM 未覆盖场景的 fallback；as 用官方 gas，
+      # clang/lld/llvm-* 用官方 clang）。不再装 apt clang/lld/llvm 及手写 symlink。
       # 不含 KernelSU / SUSFS —— 不拉取 KernelSU，不运行 Integrate_ReSukiSU.sh，不合并 talih_susfs.config。
-      - name: Install toolchain
+      - name: Install cross binutils + host build tools
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             build-essential bc flex bison libssl-dev libelf-dev libncurses-dev \
-            clang lld llvm \
             gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
             gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi
-          # LLVM=1 需要无版本号的 llvm 工具（ar/nm/objcopy/objdump/readelf/strip）
-          for t in ar nm objcopy objdump readelf strip; do
-            sudo ln -sf "/usr/lib/llvm-14/bin/llvm-${t}" "/usr/local/bin/llvm-${t}"
-          done
 
       - name: Toolchain versions
         run: |
-          clang --version | head -1
-          ld.lld --version | head -1
+          "$PWD/prebuilts-master/clang/host/linux-x86/clang-r416183b/bin/clang" --version
+          "$PWD/prebuilts-master/clang/host/linux-x86/clang-r416183b/bin/ld.lld" --version
+          "$PWD/prebuilts/gas/linux-x86/aarch64-linux-gnu-as" --version | head -1
           aarch64-linux-gnu-gcc --version | head -1
 
-      - name: Build Image + dtbs
+      # 设备单体内核：ls12_mt8797_wifi_64_defconfig（TALPAD/MTK 驱动全内建）。
+      # LLVM=1 + PATH 前置官方 clang bin（clang/ld.lld/llvm-* 从 clang-r416183b 解析）。
+      - name: Build Image + dtbs (official clang)
         run: |
-          export ARCH=arm64
+          export PATH="$PWD/prebuilts-master/clang/host/linux-x86/clang-r416183b/bin:$PWD/prebuilts/gas/linux-x86:$PATH"
           export LLVM=1
           export CLANG_TRIPLE=aarch64-linux-gnu-
           export CROSS_COMPILE=aarch64-linux-gnu-
