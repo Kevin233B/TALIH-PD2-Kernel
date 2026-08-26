@@ -4,7 +4,9 @@ CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
 LLVM=1
 LLVM_IAS=1
 # DEFCONFIG=defconfig
-KERNEL_DIR=kernel-5.10
+# 平铺仓库：内核源码与 build.config.* 均在根目录，KERNEL_DIR 走默认推导为空(=根)，
+# 使下方 android/abi_* 相对路径落到根 android/。MTK 原厂 kernel-5.10 子目录值保留备查：
+# KERNEL_DIR=kernel-5.10
 # CLANG_PREBUILT_BIN=../prebuilts/clang/host/linux-x86/clang-r416183b/bin
 # BUILDTOOLS_PREBUILT_BIN=build/build-tools/path/linux-x86
 # for check scripts
