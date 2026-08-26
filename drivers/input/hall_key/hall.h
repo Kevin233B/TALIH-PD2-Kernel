@@ -12,7 +12,7 @@ struct hall_data {
 	int hall_status;
 	int power_enabled;
 	bool probe_flag;
-	struct wakeup_source hall_wakelock;
+	struct wakeup_source *hall_wakelock;
 };
 #endif
 

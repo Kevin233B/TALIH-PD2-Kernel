@@ -1019,7 +1019,8 @@ int himax_ts_unregister_interrupt(void)
 }
 
 #if defined(HX_CONFIG_DRM) || defined(HX_CONFIG_FB) ||\
-	defined(HX_CONFIG_PM) || defined(HX_CONFIG_DRM_PANEL)
+	defined(HX_CONFIG_PM) || defined(HX_CONFIG_DRM_PANEL) ||\
+	defined(HX_CONFIG_DRM_MTK)
 int himax_common_suspend(struct device *dev)
 {
 	struct himax_ts_data *ts = dev_get_drvdata(dev);
@@ -1319,10 +1320,37 @@ int drm_notifier_callback(struct notifier_block *self,
 
 	return 0;
 }
+#elif defined(HX_CONFIG_DRM_MTK)
+int drm_notifier_callback(struct notifier_block *self,
+		unsigned long event, void *data)
+{
+	int *blank;
+	struct himax_ts_data *ts =
+		container_of(self, struct himax_ts_data, hx_notif);
+
+	if ((ic_boot_done != 1)) {
+		E("%s: IC is booting\n", __func__);
+		return -ECANCELED;
+	}
+
+	if (event == MTK_DISP_EARLY_EVENT_BLANK && data
+		&& ts != NULL && ts->dev != NULL) {
+		blank = (int *)data;
+		if (*blank == MTK_DISP_BLANK_POWERDOWN)
+			himax_common_suspend(ts->dev);
+	} else if (event == MTK_DISP_EVENT_BLANK && data
+		&& ts != NULL && ts->dev != NULL) {
+		blank = (int *)data;
+		if (*blank == MTK_DISP_BLANK_UNBLANK)
+			himax_common_resume(ts->dev);
+	}
+
+	return 0;
+}
 #endif
 
 #if defined(HX_CONFIG_FB) || defined(HX_CONFIG_DRM) \
-	|| defined(HX_CONFIG_DRM_PANEL)
+	|| defined(HX_CONFIG_DRM_PANEL) || defined(HX_CONFIG_DRM_MTK)
 static void himax_notifier_register(struct work_struct *work)
 {
 	int ret = 0;
@@ -1355,6 +1383,9 @@ static void himax_notifier_register(struct work_struct *work)
 	ts->hx_notif.notifier_call = drm_notifier_callback;
 	ret = msm_drm_register_client(&ts->hx_notif);
 #endif
+#elif defined(HX_CONFIG_DRM_MTK)
+	ts->hx_notif.notifier_call = drm_notifier_callback;
+	ret = mtk_disp_notifier_register("HIMAX Touch", &ts->hx_notif);
 #endif
 	if (ret)
 		E("Unable to register fb_notifier: %d\n", ret);
@@ -1434,7 +1465,8 @@ int himax_chip_common_probe(struct spi_device *spi)
 	if (ret < 0)
 		goto err_common_init_failed;
 
-#if defined(HX_CONFIG_FB) || defined(HX_CONFIG_DRM)
+#if defined(HX_CONFIG_FB) || defined(HX_CONFIG_DRM) \
+	|| defined(HX_CONFIG_DRM_MTK)
 	ts->hx_att_wq = create_singlethread_workqueue("HMX_ATT_request");
 	if (!ts->hx_att_wq) {
 		E(" allocate hx_att_wq failed\n");
@@ -1471,7 +1503,8 @@ int himax_chip_common_probe(struct spi_device *spi)
 
 	return ret;
 
-#if defined(HX_CONFIG_FB) || defined(HX_CONFIG_DRM)
+#if defined(HX_CONFIG_FB) || defined(HX_CONFIG_DRM) \
+	|| defined(HX_CONFIG_DRM_MTK)
 err_get_intr_bit_failed:
 #endif
 err_common_init_failed:
@@ -1520,6 +1553,11 @@ else
 		if (msm_drm_unregister_client(&ts->hx_notif))
 			E("Err occurred while unregister drm_notifier.\n");
 #endif
+		cancel_delayed_work_sync(&ts->hx_work_att);
+		destroy_workqueue(ts->hx_att_wq);
+#elif defined(HX_CONFIG_DRM_MTK)
+		if (mtk_disp_notifier_unregister(&ts->hx_notif))
+			E("Err occurred while unregister drm_notifier.\n");
 		cancel_delayed_work_sync(&ts->hx_work_att);
 		destroy_workqueue(ts->hx_att_wq);
 #endif

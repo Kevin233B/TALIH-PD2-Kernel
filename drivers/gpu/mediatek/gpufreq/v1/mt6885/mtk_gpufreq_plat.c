@@ -32,7 +32,7 @@
 #include "clk-fmeter.h"
 
 #include "mtk_pmic_wrap.h"
-#include "mtk_devinfo.h"
+/* #include "mtk_devinfo.h" */
 #include "upmu_common.h"
 #include "upmu_sw.h"
 #include "upmu_hw.h"
@@ -56,6 +56,12 @@
 
 #if MT_GPUFREQ_DFD_ENABLE
 #include "dbgtop.h"
+#endif
+
+/* TODO: porting*/
+#define EFUSE_READY 0
+#if EFUSE_READY
+extern u32 get_devinfo_with_index(u32 index);
 #endif
 
 enum gpu_dvfs_vgpu_step {
@@ -1730,6 +1736,7 @@ void mt_gpufreq_power_limit_notify_registerCB(gpufreq_power_limit_notify pCB)
 
 static unsigned int __mt_gpufreq_get_segment_id(void)
 {
+#if EFUSE_READY
 	static unsigned int segment_id = -1;
 	unsigned int efuse_id;
 
@@ -1761,10 +1768,14 @@ static unsigned int __mt_gpufreq_get_segment_id(void)
 						__func__, efuse_id, segment_id);
 
 	return segment_id;
+#else
+	return MT6885T_SEGMENT;
+#endif
 }
 
 static struct opp_table_info *__mt_gpufreq_get_segment_table(void)
 {
+#if EFUSE_READY
 	unsigned int efuse_id;
 
 	/* [FAB_INFO4 (0x11C107B0) 134] [2:0]*/
@@ -1776,6 +1787,9 @@ static struct opp_table_info *__mt_gpufreq_get_segment_table(void)
 	default:
 		return g_opp_table_segment_1;
 	}
+#else
+	return g_opp_table_segment_1;
+#endif
 }
 
 /**

@@ -12,6 +12,13 @@ ifneq ($(filter y, $(CONFIG_DRM)),)
 	ccflags-y += -DHX_CONFIG_DRM
 endif
 
+ifeq ($(CONFIG_DRM_MEDIATEK),y)
+	ccflags-y += -DHX_MTK_K510
+endif
+ifneq ($(filter m, $(CONFIG_DRM_MEDIATEK)),)
+	ccflags-y += -DHX_MTK_K510
+endif
+
 ifneq ($(filter y, $(CONFIG_PM)),)
 	ccflags-y += -DHX_CONFIG_PM
 endif

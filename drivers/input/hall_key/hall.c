@@ -25,7 +25,7 @@ static void do_hall_work(struct work_struct *work)
         struct hall_data *hall = container_of(work, struct hall_data, hall_work);
         unsigned int gpio_status;
 #ifdef CONFIG_PM_WAKELOCKS
-    __pm_wakeup_event(&hall->hall_wakelock, jiffies_to_msecs(HZ/2));
+    __pm_wakeup_event(hall->hall_wakelock, jiffies_to_msecs(HZ/2));
 #endif
     gpio_status = gpio_get_value(hall->irq_gpio);
     input_event(hall->input, EV_SW, hall->switch_code, !gpio_status);
@@ -124,7 +124,7 @@ static int hall_probe(struct platform_device *pdev)
     if (device_create_file(hall_dev, &dev_attr_hall_status) < 0)
             printk( "Failed to create device(hall_dev)'s node hall_status!\n");
 #ifdef CONFIG_PM_WAKELOCKS
-    wakeup_source_init(&hall->hall_wakelock, pdev->name);
+    hall->hall_wakelock = wakeup_source_register(&pdev->dev, pdev->name);
 #endif
 
     printk("hall probe completed\n");
@@ -141,7 +141,7 @@ static int hall_remove(struct platform_device *pdev)
 
     free_irq(hall->irq, pdev);
 #ifdef CONFIG_PM_WAKELOCKS
-    wakeup_source_trash(&hall->hall_wakelock);
+    wakeup_source_unregister(hall->hall_wakelock);
 #endif
 
     input_unregister_device(hall->input);

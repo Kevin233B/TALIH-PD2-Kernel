@@ -55,7 +55,7 @@ static void do_key_work(struct work_struct *work)
         unsigned int gpio_status;
 	int gpio_status2;
 #ifdef CONFIG_PM_WAKELOCKS
-    __pm_wakeup_event(&key->key_wakelock, jiffies_to_msecs(HZ/2));
+    __pm_wakeup_event(key->key_wakelock, jiffies_to_msecs(HZ/2));
 #endif
     gpio_status = gpio_get_value(key->irq_gpio);
     msleep(50);
@@ -181,7 +181,7 @@ static int key_probe(struct platform_device *pdev)
     if (device_create_file(key_dev, &dev_attr_key_status) < 0)
             printk( "Failed to create device(key_dev)'s node key_status!\n");
 #ifdef CONFIG_PM_WAKELOCKS
-    wakeup_source_init(&key->key_wakelock, pdev->name);
+    key->key_wakelock = wakeup_source_register(&pdev->dev, pdev->name);
 #endif
 
     printk("key probe completed\n");
@@ -196,7 +196,7 @@ static int key_remove(struct platform_device *pdev)
     fb_unregister_client(&key->fb_notif);
     free_irq(key->irq, pdev);
 #ifdef CONFIG_PM_WAKELOCKS
-    wakeup_source_trash(&key->key_wakelock);
+    wakeup_source_unregister(key->key_wakelock);
 #endif
 
     input_unregister_device(key->input);

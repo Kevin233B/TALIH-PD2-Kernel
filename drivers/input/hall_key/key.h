@@ -15,7 +15,7 @@ struct key_data {
 	int power_enabled;
 	bool probe_flag;
 	struct notifier_block fb_notif;
-	struct wakeup_source key_wakelock;
+	struct wakeup_source *key_wakelock;
 };
 #endif
 

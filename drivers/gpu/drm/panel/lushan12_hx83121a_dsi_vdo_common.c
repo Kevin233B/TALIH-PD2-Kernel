@@ -20,9 +20,10 @@
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 
-#include <drm/drmP.h>
 #include <drm/drm_mipi_dsi.h>
 #include <drm/drm_panel.h>
+#include <drm/drm_modes.h>
+#include <drm/drm_connector.h>
 
 #include <video/mipi_display.h>
 #include <video/of_videomode.h>
@@ -31,8 +32,8 @@
 #define CONFIG_MTK_PANEL_EXT
 #if defined(CONFIG_MTK_PANEL_EXT)
 #include "../mediatek/mediatek_v2/mtk_panel_ext.h"
-#include "../mediatek/mtk_log.h"
-#include "../mediatek/mtk_drm_graphics_base.h"
+#include "../mediatek/mediatek_v2/mtk_log.h"
+#include "../mediatek/mediatek_v2/mtk_drm_graphics_base.h"
 #endif
 
 #include "lushan12_hx83121a_dsi_vdo_init.h"
@@ -412,13 +413,13 @@ static const struct drm_display_mode performance_mode = {
 	.vrefresh	= MODE_1_FPS,
 };
 
-static int lcm_get_modes(struct drm_panel *panel)
+static int lcm_get_modes(struct drm_panel *panel,
+			 struct drm_connector *connector)
 {
-	struct drm_connector *connector = panel->connector;
 	struct drm_display_mode *mode;
 	struct drm_display_mode *mode_120hz;
 
-	mode = drm_mode_duplicate(panel->drm, &default_mode);
+	mode = drm_mode_duplicate(connector->dev, &default_mode);
 	if (!mode) {
 		dev_err(panel->dev, "failed to add mode %dx%d@%d\n",
 			PANEL_WIDTH, PANEL_HEIGHT, MODE_0_FPS);
@@ -429,7 +430,7 @@ static int lcm_get_modes(struct drm_panel *panel)
 	drm_mode_set_name(mode);
 	drm_mode_probed_add(connector, mode);
 
-	mode_120hz = drm_mode_duplicate(panel->drm, &performance_mode);
+	mode_120hz = drm_mode_duplicate(connector->dev, &performance_mode);
 	if (!mode_120hz) {
 		dev_err(panel->dev, "failed to add mode %dx%d@%d\n",
 			PANEL_WIDTH, PANEL_HEIGHT, MODE_1_FPS);
@@ -665,9 +666,7 @@ static int lcm_probe(struct mipi_dsi_device *dsi)
 		gpio_request_one(ctx->esd_te_slave, GPIOF_IN,
 				 "lcm_esd_te_slave");
 
-	drm_panel_init(&ctx->panel);
-	ctx->panel.dev = dev;
-	ctx->panel.funcs = &lcm_drm_funcs;
+	drm_panel_init(&ctx->panel, dev, &lcm_drm_funcs, DRM_MODE_CONNECTOR_DSI);
 	ret = drm_panel_add(&ctx->panel);
 	if (ret < 0) {
 		dev_err(dev, "%s: drm_panel_add failed: %d\n", __func__, ret);
