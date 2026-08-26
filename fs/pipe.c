@@ -1340,6 +1340,9 @@ static long pipe_set_size(struct pipe_inode_info *pipe, unsigned long arg)
 			(too_many_pipe_buffers_hard(user_bufs) ||
 			 too_many_pipe_buffers_soft(user_bufs)) &&
 			pipe_is_unprivileged_user()) {
+		ret = -EPERM;
+		goto out_revert_acct;
+	}
 
 	ret = pipe_resize_ring(pipe, nr_slots);
 	if (ret < 0)
