@@ -1,0 +1,57 @@
+name: Build TALIH-PD2 Kernel (ls12)
+
+on:
+  push:
+    branches: [ gki-5.10 ]
+  pull_request:
+    branches: [ gki-5.10 ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Image + dtb (ls12_mt8797_wifi_64)
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 编译链对齐 build.config.common 的 BRANCH=android12-5.10 / clang-r416183b：
+      # 即 clang(LLVM) + ld.lld + aarch64-linux-gnu 交叉 binutils。
+      # 不含 KernelSU / SUSFS —— 不拉取 KernelSU，不运行 Integrate_ReSukiSU.sh，不合并 talih_susfs.config。
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential bc flex bison libssl-dev libelf-dev libncurses-dev \
+            clang lld llvm \
+            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi
+          # LLVM=1 需要无版本号的 llvm 工具（ar/nm/objcopy/objdump/readelf/strip）
+          for t in ar nm objcopy objdump readelf strip; do
+            sudo ln -sf "/usr/lib/llvm-14/bin/llvm-${t}" "/usr/local/bin/llvm-${t}"
+          done
+
+      - name: Toolchain versions
+        run: |
+          clang --version | head -1
+          ld.lld --version | head -1
+          aarch64-linux-gnu-gcc --version | head -1
+
+      - name: Build Image + dtbs
+        run: |
+          export ARCH=arm64
+          export LLVM=1
+          export CLANG_TRIPLE=aarch64-linux-gnu-
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
+          make O=out ls12_mt8797_wifi_64_defconfig
+          make O=out -j"$(nproc)" Image dtbs
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: talih-pd2-ls12-kernel
+          path: |
+            out/arch/arm64/boot/Image
+            out/arch/arm64/boot/dts/mediatek/ls12_mt8797_wifi_64.dtb
+          if-no-files-found: error
