@@ -1942,3 +1942,25 @@ config TCT_ES7210_4MIC
 	help
 	  This option enables support for es7210 4mic.
 #End added by lanying.he for es7210 bringup
+
+#Begin added by lanying.he for aw883xx smartpa bringup
+config TCT_SMARTPA_AW883XX
+	tristate "SoC Audio for awinic aw883xx series"
+	depends on I2C
+	help
+	  This option enables support for aw883xx series
+	  Smart PA. It is a Smart power amplifier
+	  which contain speaker protection, multi-band
+	  DRC, equalizer function. It would be set to
+	  yes if device with aw883xx on it.
+
+config TCT_SMARTPA_4PA
+	tristate "SoC Audio for awinic aw883xx series"
+	depends on I2C
+	help
+	  This option enables support for aw883xx series
+	  Smart PA. It is a Smart power amplifier
+	  which contain speaker protection, multi-band
+	  DRC, equalizer function. It would be set to
+	  yes if device with aw883xx on it.
+#End added by lanying.he for aw883xx smartpa bringup

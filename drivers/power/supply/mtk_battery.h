@@ -128,6 +128,7 @@ struct battery_data {
 	/* Add for Battery Service */
 	int bat_batt_vol;
 	int bat_batt_temp;
+	int bat_batt_id;
 };
 
 struct VersionControl {
@@ -1138,6 +1139,7 @@ extern void set_shutdown_vbat_lt(struct mtk_battery *gm,
 extern void fg_sw_bat_cycle_accu(struct mtk_battery *gm);
 extern void notify_fg_chr_full(struct mtk_battery *gm);
 extern int fgauge_get_profile_id(void);
+extern int battery_get_batt_id(void);
 extern void disable_fg(struct mtk_battery *gm);
 extern int get_shutdown_cond(struct mtk_battery *gm);
 extern int get_shutdown_cond_flag(struct mtk_battery *gm);

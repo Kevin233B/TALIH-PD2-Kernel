@@ -825,6 +825,15 @@ config MTK_CHARGER_TYPE_DETECT
 	  typec attach notify.
 	  Say N to disable.
 
+#Begin added by lanying.he for TALPAD SC856X chargepump fast charge
+config CHARGER_SC856X
+	tristate "SC856X chargepump charger driver"
+	depends on MTK_CHARGER
+	help
+	  Say Y here to enable the Southchip SC856X high-voltage
+	  charge pump (direct charging) driver used on TALPAD (TALIH-PD2).
+#End added by lanying.he for TALPAD SC856X chargepump fast charge
+
 config MTK_CHARGER
 	tristate "MediaTek Charging Driver"
 	help

@@ -173,7 +173,7 @@ static void pcm_pop_work_events(struct work_struct *work)
 	es7210_init_reg = 1;
 }
 
-static int es7210_mute(struct snd_soc_dai *dai, int mute)
+static int es7210_mute(struct snd_soc_dai *dai, int mute, int stream)
 {
 	printk("enter into %s, mute = %d\n", __func__, mute);
 	if (mute) {
@@ -248,7 +248,7 @@ static struct snd_soc_dai_ops es7210_ops = {
 	.hw_params = es7210_pcm_hw_params,
 	.set_fmt = es7210_set_dai_fmt,
 	.set_sysclk = es7210_set_dai_sysclk,
-	.digital_mute = es7210_mute,
+	.mute_stream = es7210_mute,
 };
 
 #if ES7210_CHANNELS_MAX > 0
@@ -338,7 +338,6 @@ static int es7210_resume(struct snd_soc_component *codec)
 	es7210_multi_chips_write(0x4b, 0x00);
 	es7210_multi_chips_update_bits(0x01, 0x14, 0x00);
 	es7210_multi_chips_write(0x4c, 0x00);
-	snd_soc_component_cache_sync(codec);
 	return 0;
 }
 
@@ -347,13 +346,6 @@ static int es7210_probe(struct snd_soc_component *codec)
 	struct es7210_priv *es7210 = snd_soc_component_get_drvdata(codec);
 	int ret = 0;
 	int index;
-#if !ES7210_CODEC_RW_TEST_EN
-	//ret = snd_soc_component_set_cache_io(codec, 8, 8, SND_SOC_I2C);//8,8
-#else
-	codec->control_data = devm_regmap_init_i2c(es7210->i2c,
-						   &es7210_regmap_config);
-	ret = PTR_RET(codec->control_data);
-#endif
 
 	if (ret < 0) {
 		printk("Failed to set cache I/O: %d\n", ret);
@@ -613,7 +605,6 @@ static int es7210_i2c_probe(struct i2c_client *i2c,
 					     1);
 		if (ret < 0) {
 			printk("%s failed to snd_soc_register_component\n",__func__);
-			kfree(es7210);
 			return ret;
 		}
 	}
@@ -626,8 +617,7 @@ static int es7210_i2c_probe(struct i2c_client *i2c,
 
 static int __exit es7210_i2c_remove(struct i2c_client *i2c)
 {
-	//snd_soc_unregister_codec(&i2c->dev);
-	kfree(i2c_get_clientdata(i2c));
+	snd_soc_unregister_component(&i2c->dev);
 	return 0;
 }
 

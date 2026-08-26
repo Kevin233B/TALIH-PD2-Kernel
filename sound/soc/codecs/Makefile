@@ -549,10 +549,7 @@ obj-$(CONFIG_SND_SOC_TAS5720)	+= snd-soc-tas5720.o
 obj-$(CONFIG_SND_SOC_TAS6424)	+= snd-soc-tas6424.o
 obj-$(CONFIG_SND_SOC_TDA7419)	+= snd-soc-tda7419.o
 obj-$(CONFIG_SND_SOC_TAS2770) += snd-soc-tas2770.o
-#ifdef OPLUS_ARCH_EXTENDS
 #obj-$(CONFIG_SND_SOC_TFA9874)	+= tfa98xx/
-obj-m	+= audio/
-#endif /* OPLUS_ARCH_EXTENDS */
 obj-$(CONFIG_SND_SOC_AA006)	+= aa006/
 obj-$(CONFIG_SND_SOC_BB007)	+= bb007/
 obj-$(CONFIG_SND_SOC_TFA9879)	+= snd-soc-tfa9879.o
@@ -647,3 +644,7 @@ obj-$(CONFIG_SND_SOC_TPA6130A2)	+= snd-soc-tpa6130a2.o
 #Begin added by lanying.he for es7210 bringup
 obj-$(CONFIG_TCT_ES7210)	+= es7210/
 #End added by lanying.he for es7210 bringup
+
+#Begin added by lanying.he for aw883xx smartpa bringup
+obj-$(CONFIG_TCT_SMARTPA_AW883XX)	+= aw883xx_v1.3/
+#End added by lanying.he for aw883xx smartpa bringup

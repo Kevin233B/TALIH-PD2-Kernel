@@ -1,0 +1,38 @@
+/* AWINIC AW883XX Smart PA mono*/
+&i2c_x {
+	aw883xx_smartpa@34 {
+		compatible = "awinic,aw883xx_smartpa";
+		reg = <0x34>;
+		reset-gpio = <&pio 84 0>;
+		irq-gpio = <&pio 136 0>;
+		re-min = <1000>;
+		re-max= <40000>;
+		status = "okay";
+	};
+};
+/* AWINIC AW883XX Smart PA mono End*/
+
+/* AWINIC AW883XX Smart PA stereo*/
+&i2c_x {
+	aw883xx_smartpa@34 {
+		compatible = "awinic,aw883xx_smartpa";
+		reg = <0x34>;
+		reset-gpio = <&pio 84 0>;
+		irq-gpio = <&pio 136 0>;
+		sound-channel = <0>;
+		re-min = <1000>;
+		re-max= <40000>;
+		status = "okay";
+	};
+	aw883xx_smartpa@35 {
+		compatible = "awinic,aw883xx_smartpa";
+		reg = <0x35>;
+		reset-gpio = <&pio 65 0>;
+		irq-gpio = <&pio 134 0>;
+		sound-channel = <1>;
+		re-min = <1000>;
+		re-max= <40000>;
+		status = "okay";
+	};
+};
+/* AWINIC AW883XX Smart PA stereo End */

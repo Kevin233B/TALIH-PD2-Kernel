@@ -65,3 +65,12 @@ config TYPEC_MUX_ALPHA_FSA4480
 	  Support DP aux channel switch function.
 	  Support typec analog audio switch.
 	  Support turn on source vbus function.
+
+#Begin added by lanying.he for TALPAD fsa4480 headset switch
+config TCT_MT6359_FSA4480
+	tristate "TCT MT6359 FSA4480 headset switch IC"
+	depends on I2C
+	help
+	  Say Y or M if your system has a FSA4480 (or HL5280) switch IC
+	  for headset jack detection / usbc analog audio switching.
+#End added by lanying.he for TALPAD fsa4480 headset switch

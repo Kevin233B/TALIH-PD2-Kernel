@@ -17,6 +17,7 @@
 #include <linux/netlink.h>	/* netlink */
 #include <linux/of_fdt.h>	/*of_dt API*/
 #include <linux/of.h>
+#include <linux/of_platform.h>	/* of_find_device_by_node */
 #include <linux/platform_device.h>	/* platform device */
 #include <linux/proc_fs.h>
 #include <linux/reboot.h>	/*kernel_power_off*/
@@ -243,8 +244,94 @@ bool is_algo_active(struct mtk_battery *gm)
 
 int fgauge_get_profile_id(void)
 {
+	struct device_node *node;
+	const char *name = NULL;
+	char prop[32];
+	u32 id_max = 0, id_min = 0;
+	int batt_id = battery_get_batt_id();
+	int i;
+
+	node = of_find_compatible_node(NULL, NULL, "mediatek,bat_gm30");
+	if (!node) {
+		bm_err("[%s] mediatek,bat_gm30 node not found, batt_id=%d\n",
+			__func__, batt_id);
+		return 0;
+	}
+
+	for (i = 0; i < TOTAL_BATTERY_NUMBER; i++) {
+		sprintf(prop, "bat_id_max%d", i);
+		if (of_property_read_u32(node, prop, &id_max))
+			break;
+		sprintf(prop, "bat_id_min%d", i);
+		if (of_property_read_u32(node, prop, &id_min))
+			break;
+		if (id_max == 0 || id_min == 0)
+			break;
+		if (batt_id <= id_max && batt_id >= id_min) {
+			sprintf(prop, "battery_name%d", i);
+			if (!of_property_read_string(node, prop, &name))
+				bm_err("[%s] battery profile %d: %s\n",
+					__func__, i, name);
+			bm_err("[%s] battery id %d matched, index %d\n",
+				__func__, batt_id, i);
+			of_node_put(node);
+			return i;
+		}
+	}
+
+	bm_err("[%s] no battery profile matched batt_id=%d\n",
+		__func__, batt_id);
+	of_node_put(node);
 	return 0;
 }
+
+/*
+ * TALPAD (TALIH-PD2) 从官核 4.19.191 重建：读取电池 ID ADC 通道并返回
+ * processed 值（mV）。无参，直接返回 batteryID-channel 的 processed 值；
+ * DT 节点/设备缺失返回 0（官核行为），通道/读取失败返回负 errno。
+ */
+int battery_get_batt_id(void)
+{
+	struct device_node *node;
+	struct platform_device *battery_dev;
+	struct iio_channel *channel;
+	int id = 0;
+	int ret;
+
+	node = of_find_node_by_name(NULL, "battery");
+	if (!node) {
+		bm_err("[%s] of_find_node_by_name fail\n", __func__);
+		return 0;
+	}
+
+	battery_dev = of_find_device_by_node(node);
+	if (!battery_dev) {
+		bm_err("[%s] of_find_device_by_node fail\n", __func__);
+		of_node_put(node);
+		return 0;
+	}
+
+	channel = iio_channel_get(&battery_dev->dev, "batteryID-channel");
+	if (IS_ERR(channel)) {
+		ret = PTR_ERR(channel);
+		bm_err("[%s] iio channel not found %d\n", __func__, ret);
+		put_device(&battery_dev->dev);
+		of_node_put(node);
+		return ret;
+	}
+
+	ret = iio_read_channel_processed(channel, &id);
+	iio_channel_release(channel);
+	put_device(&battery_dev->dev);
+	of_node_put(node);
+	if (ret <= 0) {
+		bm_err("[%s] iio_read_channel_processed failed\n", __func__);
+		return ret;
+	}
+
+	return id;
+}
+EXPORT_SYMBOL(battery_get_batt_id);
 
 int wakeup_fg_algo_cmd(
 	struct mtk_battery *gm, unsigned int flow_state, int cmd, int para1)
@@ -2221,6 +2308,7 @@ void battery_update_psd(struct mtk_battery *gm)
 			&bat_data->bat_batt_vol);
 
 	bat_data->bat_batt_temp = force_get_tbat(gm, true);
+	bat_data->bat_batt_id = battery_get_batt_id();
 }
 void battery_update(struct mtk_battery *gm)
 {

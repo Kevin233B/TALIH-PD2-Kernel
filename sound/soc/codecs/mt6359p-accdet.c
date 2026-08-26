@@ -152,6 +152,16 @@ static atomic_t accdet_first;
 #define ACCDET_INIT_WAIT_TIMER (10 * HZ)
 static struct timer_list accdet_init_timer;
 static void delay_init_timerhandler(struct timer_list *t);
+
+/*Begin added by lanying.he for fsa4480 on 2023/7/11 */
+#ifdef CONFIG_TCT_MT6359_FSA4480
+static atomic_t accdet_init_flag;
+static u32 fsa4480_eint_state = EINT_PLUG_OUT;
+#define ACCDET_CALLBACK_WAIT_TIMER   (HZ/2)
+static struct timer_list  accdet_fsa4480_timer;
+static void delay_fsa4480_timerhandler(struct timer_list *t);
+#endif
+/*End added by lanying.he for fsa4480 on 2023/7/11 */
 /* micbias_timer: disable micbias if no accdet irq after eint,
  * timeout: 6 seconds
  * timerHandler: dis_micbias_timerhandler()
@@ -1905,6 +1915,56 @@ static void accdet_queue_work(void)
 		pr_notice("Error: %s (%d)\n", __func__, ret);
 }
 
+/*Begin added by lanying.he for fsa4480 on 2023/7/11 */
+#ifdef CONFIG_TCT_MT6359_FSA4480
+void accdet_eint_callback_wrapper(unsigned int plug_status)
+{
+	int ret = 0;
+
+	pr_info("%s: call ex eint handler\n", __func__);
+
+	accdet->cur_eint_state = plug_status;
+
+	if (atomic_read(&accdet_init_flag) == 0) {
+		pr_info("%s: wait for accdet init !\n", __func__);
+		fsa4480_eint_state = plug_status;
+		mod_timer(&accdet_fsa4480_timer,
+				(jiffies + ACCDET_CALLBACK_WAIT_TIMER));
+		return;
+	}
+
+	pr_info("accdet %s(), cur_eint_state=%d\n", __func__,
+			accdet->cur_eint_state);
+
+	ret = queue_work(accdet->eint_workqueue, &accdet->eint_work);
+
+	pr_info("%s: exit queue work\n", __func__);
+}
+EXPORT_SYMBOL(accdet_eint_callback_wrapper);
+
+static void delay_fsa4480_timerhandler(struct timer_list *t)
+{
+	int ret = 0;
+
+	pr_info("%s: fsa4480_timer \n", __func__);
+	if (atomic_read(&accdet_init_flag) == 0) {
+		pr_info("%s: wait for accdet init !\n", __func__);
+		mod_timer(&accdet_fsa4480_timer,
+				(jiffies + ACCDET_CALLBACK_WAIT_TIMER));
+		return;
+	}
+	accdet->cur_eint_state = fsa4480_eint_state;
+
+	pr_info("accdet %s(), cur_eint_state=%d\n", __func__,
+			accdet->cur_eint_state);
+
+	ret = queue_work(accdet->eint_workqueue, &accdet->eint_work);
+
+	pr_info("%s: exit queue work\n", __func__);
+}
+#endif
+/*End added by lanying.he for fsa4480 on 2023/7/11 */
+
 static int pmic_eint_queue_work(int eintID)
 {
 	int ret = 0, mode = 0;
@@ -2854,6 +2914,11 @@ void accdet_late_init(unsigned long data)
 		accdet_init();
 		accdet_init_debounce();
 		accdet_init_once();
+		/*Begin added by lanying.he for fsa4480 on 2023/7/11 */
+#ifdef CONFIG_TCT_MT6359_FSA4480
+		atomic_set(&accdet_init_flag, 1);
+#endif
+		/*End added by lanying.he for fsa4480 on 2023/7/11 */
 	} else
 		pr_info("%s inited dts fail\n", __func__);
 }
@@ -3149,6 +3214,14 @@ static int accdet_probe(struct platform_device *pdev)
 	micbias_timer.expires = jiffies + MICBIAS_DISABLE_TIMER;
 	timer_setup(&accdet_init_timer, delay_init_timerhandler, 0);
 	accdet_init_timer.expires = jiffies + ACCDET_INIT_WAIT_TIMER;
+
+	/*Begin added by lanying.he for fsa4480 on 2023/7/11 */
+#ifdef CONFIG_TCT_MT6359_FSA4480
+	timer_setup(&accdet_fsa4480_timer, delay_fsa4480_timerhandler, 0);
+	accdet_fsa4480_timer.expires = jiffies + ACCDET_CALLBACK_WAIT_TIMER;
+	atomic_set(&accdet_init_flag, 0);
+#endif
+	/*End added by lanying.he for fsa4480 on 2023/7/11 */
 
 	/* Create workqueue */
 	accdet->delay_init_workqueue =
