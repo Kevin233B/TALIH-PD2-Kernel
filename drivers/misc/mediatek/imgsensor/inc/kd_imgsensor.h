@@ -324,6 +324,8 @@
 #define GC02M1_SENSOR_ID                        0x2E0
 #define GC02M1_SENSOR_ID_21641                  0xC021
 #define GC02M1_SENSOR_ID_21143                  0xC023/* C021+2 */
+#define GC08A3_SENSOR_ID                        0x08a3
+#define GC13A0_SENSOR_ID                        0x13a0
 /*SP*/
 #define SP0A19_YUV_SENSOR_ID                    0xA6
 #define SP2518_YUV_SENSOR_ID                    0x53
