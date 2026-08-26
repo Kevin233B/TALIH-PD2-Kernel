@@ -992,6 +992,7 @@ static void mtk_iommu_tlb_flush_range_sync(unsigned long iova, size_t size,
 		mtk_iommu_tlb_flush_all(orig_data);
 }
 
+#if IS_ENABLED(CONFIG_MTK_IOMMU_MISC_DBG) || IS_ENABLED(CONFIG_MTK_IOMMU_MISC_SECURE)
 static void mtk_iommu_dump_tf_iova(struct mtk_iommu_data *data,
 		enum iommu_bank bank, u64 fault_iova)
 {
@@ -1023,6 +1024,8 @@ static void mtk_iommu_dump_tf_iova(struct mtk_iommu_data *data,
 		mtk_iova_map_dump(fault_iova, data->plat_data->tab_id);
 #endif
 }
+
+#endif /* IS_ENABLED(CONFIG_MTK_IOMMU_MISC_DBG) || IS_ENABLED(CONFIG_MTK_IOMMU_MISC_SECURE) */
 
 #if IS_ENABLED(CONFIG_MTK_IOMMU_MISC_SECURE)
 static irqreturn_t mtk_iommu_dump_sec_bank(struct mtk_iommu_data *data,
