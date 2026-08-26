@@ -397,7 +397,6 @@ static const struct drm_display_mode default_mode = {
 	.vsync_start	= PANEL_HEIGHT + MODE_0_VFP,
 	.vsync_end	= PANEL_HEIGHT + MODE_0_VFP + VSA,
 	.vtotal		= PANEL_HEIGHT + MODE_0_VFP + VSA + VBP,
-	.vrefresh	= MODE_0_FPS,
 };
 
 static const struct drm_display_mode performance_mode = {
@@ -410,7 +409,6 @@ static const struct drm_display_mode performance_mode = {
 	.vsync_start	= PANEL_HEIGHT + MODE_1_VFP,
 	.vsync_end	= PANEL_HEIGHT + MODE_1_VFP + VSA,
 	.vtotal		= PANEL_HEIGHT + MODE_1_VFP + VSA + VBP,
-	.vrefresh	= MODE_1_FPS,
 };
 
 static int lcm_get_modes(struct drm_panel *panel,
@@ -425,7 +423,6 @@ static int lcm_get_modes(struct drm_panel *panel,
 			PANEL_WIDTH, PANEL_HEIGHT, MODE_0_FPS);
 		return -ENOMEM;
 	}
-	mode->vrefresh = MODE_0_FPS;
 	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
 	drm_mode_set_name(mode);
 	drm_mode_probed_add(connector, mode);
@@ -436,7 +433,6 @@ static int lcm_get_modes(struct drm_panel *panel,
 			PANEL_WIDTH, PANEL_HEIGHT, MODE_1_FPS);
 		return -ENOMEM;
 	}
-	mode_120hz->vrefresh = MODE_1_FPS;
 	mode_120hz->type = DRM_MODE_TYPE_DRIVER;
 	drm_mode_set_name(mode_120hz);
 	drm_mode_probed_add(connector, mode_120hz);
@@ -667,11 +663,7 @@ static int lcm_probe(struct mipi_dsi_device *dsi)
 				 "lcm_esd_te_slave");
 
 	drm_panel_init(&ctx->panel, dev, &lcm_drm_funcs, DRM_MODE_CONNECTOR_DSI);
-	ret = drm_panel_add(&ctx->panel);
-	if (ret < 0) {
-		dev_err(dev, "%s: drm_panel_add failed: %d\n", __func__, ret);
-		return ret;
-	}
+	drm_panel_add(&ctx->panel);
 
 	ret = mipi_dsi_attach(dsi);
 	if (ret < 0) {
