@@ -41,6 +41,7 @@ enum FPSGO_NOTIFIER_PUSH_TYPE {
 	FPSGO_NOTIFIER_VSYNC				= 0x05,
 	FPSGO_NOTIFIER_SWAP_BUFFER          = 0x06,
 	FPSGO_NOTIFIER_SBE_RESCUE           = 0x07,
+	FPSGO_NOTIFIER_GPU_BLOCK			= 0x08,
 };
 
 /* TODO: use union*/
@@ -64,6 +65,9 @@ struct FPSGO_NOTIFIER_PUSH_TAG {
 	int dfrc_fps;
 
 	int enhance;
+
+	int tid;
+	int start;
 
 	struct list_head queue_list;
 };
@@ -152,6 +156,18 @@ static void fpsgo_notifier_wq_cb_bqid(int pid, unsigned long long bufID,
 		pid, bufID, queue_SF, id, create);
 
 	fpsgo_ctrl2comp_bqid(pid, bufID, queue_SF, id, create);
+}
+
+static void fpsgo_notifier_wq_cb_gblock(int tid, int start)
+{
+	FPSGO_LOGI(
+		"[FPSGO_CB] gblock: tid %d, start %d\n",
+		tid, start);
+
+	if (!fpsgo_is_enable())
+		return;
+
+	fpsgo_ctrl2fstb_gblock(tid, start);
 }
 
 static void fpsgo_notifier_wq_cb_qudeq(int qudeq,
@@ -291,6 +307,9 @@ static void fpsgo_notifier_wq_cb(void)
 	case FPSGO_NOTIFIER_SBE_RESCUE:
 		fpsgo_notifier_wq_cb_sbe_rescue(vpPush->pid, vpPush->enable, vpPush->enhance);
 		break;
+	case FPSGO_NOTIFIER_GPU_BLOCK:
+		fpsgo_notifier_wq_cb_gblock(vpPush->tid, vpPush->start);
+		break;
 	default:
 		FPSGO_LOGE("[FPSGO_CTRL] unhandled push type = %d\n",
 				vpPush->ePushType);
@@ -421,6 +440,88 @@ void fpsgo_notify_bqid(int pid, unsigned long long bufID,
 	vpPush->create = create;
 
 	fpsgo_queue_work(vpPush);
+}
+
+int fpsgo_is_gpu_block_boost_enable(void)
+{
+	int enable;
+
+	mutex_lock(&notify_lock);
+	enable = max(gpu_boost_enable_camera,
+		gpu_boost_enable_perf);
+	mutex_unlock(&notify_lock);
+
+	return enable;
+}
+
+int fpsgo_is_gpu_block_boost_perf_enable(void)
+{
+	int enable;
+
+	mutex_lock(&notify_lock);
+	enable = gpu_boost_enable_perf;
+	mutex_unlock(&notify_lock);
+
+	return enable;
+}
+
+int fpsgo_is_gpu_block_boost_camera_enable(void)
+{
+	int enable;
+
+	mutex_lock(&notify_lock);
+	enable = gpu_boost_enable_camera;
+	mutex_unlock(&notify_lock);
+
+	return enable;
+}
+
+void fpsgo_gpu_block_boost_enable_perf(int enable)
+{
+	mutex_lock(&notify_lock);
+	gpu_boost_enable_perf = enable;
+	mutex_unlock(&notify_lock);
+}
+
+void fpsgo_gpu_block_boost_enable_camera(int enable)
+{
+	mutex_lock(&notify_lock);
+	gpu_boost_enable_camera = enable;
+	mutex_unlock(&notify_lock);
+}
+
+int fpsgo_notify_gpu_block(int tid, unsigned long long mid, int start)
+{
+	struct FPSGO_NOTIFIER_PUSH_TAG *vpPush;
+	int g_enable;
+
+	FPSGO_LOGI("[FPSGO_CTRL] gblock pid %d, start %d\n",
+		tid, start);
+
+	g_enable = fpsgo_is_gpu_block_boost_enable();
+	if (g_enable < 0 || g_enable > 100)
+		return -1;
+
+	vpPush = (struct FPSGO_NOTIFIER_PUSH_TAG *)
+		fpsgo_alloc_atomic(sizeof(struct FPSGO_NOTIFIER_PUSH_TAG));
+
+	if (!vpPush) {
+		FPSGO_LOGE("[FPSGO_CTRL] OOM\n");
+		return -1;
+	}
+
+	if (!kfpsgo_tsk) {
+		FPSGO_LOGE("[FPSGO_CTRL] NULL WorkQueue\n");
+		fpsgo_free(vpPush, sizeof(struct FPSGO_NOTIFIER_PUSH_TAG));
+		return -1;
+	}
+
+	vpPush->ePushType = FPSGO_NOTIFIER_GPU_BLOCK;
+	vpPush->tid = tid;
+	vpPush->start = start;
+
+	fpsgo_queue_work(vpPush);
+	return g_enable;
 }
 
 int fpsgo_perfserv_ta_value(void)

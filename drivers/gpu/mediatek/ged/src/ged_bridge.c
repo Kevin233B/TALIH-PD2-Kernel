@@ -6,6 +6,10 @@
 #include <linux/kernel.h>
 #include <mt-plat/mtk_gpu_utility.h>
 
+#ifdef CONFIG_MTK_FPSGO_V3
+#include <mt-plat/fpsgo_common.h>
+#endif
+
 #include "ged_base.h"
 #include "ged_bridge.h"
 #include "ged_log.h"
@@ -167,14 +171,12 @@ int ged_bridge_gpu_hint_to_cpu(
 		struct GED_BRIDGE_IN_GPU_HINT_TO_CPU *in,
 		struct GED_BRIDGE_OUT_GPU_HINT_TO_CPU *out)
 {
-	/*
-	 * 5.10 fpsgo_v3（oneplus ColorOS 12.1 同步版）已裁剪 GPU block boost，
-	 * fpsgo_notify_gpu_block 无声明/定义（4.19 遗留调用），不再把 GPU hint
-	 * 转发给 fpsgo；boost_flag 恒 0，仅保留 ged 自身 DVFS boost 值。
-	 */
-	(void)in;
+	int ret = 0;
+#ifdef CONFIG_MTK_FPSGO_V3
+	ret = fpsgo_notify_gpu_block(in->tid, in->i32BridgeFD, in->hint);
+#endif
 	out->eError = GED_OK;
-	out->boost_flag = 0;
+	out->boost_flag = ret;
 	out->boost_value = ged_dvfs_boost_value();
 
 	return 0;

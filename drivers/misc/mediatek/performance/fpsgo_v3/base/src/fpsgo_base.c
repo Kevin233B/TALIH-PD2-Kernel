@@ -1308,6 +1308,43 @@ static ssize_t BQid_show(struct kobject *kobj,
 
 static KOBJ_ATTR_RO(BQid);
 
+static ssize_t gpu_block_boost_show(struct kobject *kobj,
+		struct kobj_attribute *attr,
+		char *buf)
+{
+	return scnprintf(buf, PAGE_SIZE, "%d %d %d\n",
+		fpsgo_is_gpu_block_boost_enable(),
+		fpsgo_is_gpu_block_boost_perf_enable(),
+		fpsgo_is_gpu_block_boost_camera_enable());
+}
+
+static ssize_t gpu_block_boost_store(struct kobject *kobj,
+		struct kobj_attribute *attr,
+		const char *buf, size_t count)
+{
+	int val = -1;
+	char acBuffer[FPSGO_SYSFS_MAX_BUFF_SIZE];
+	int arg;
+
+	if ((count > 0) && (count < FPSGO_SYSFS_MAX_BUFF_SIZE)) {
+		if (scnprintf(acBuffer, FPSGO_SYSFS_MAX_BUFF_SIZE, "%s", buf)) {
+			if (kstrtoint(acBuffer, 0, &arg) == 0)
+				val = arg;
+			else
+				return count;
+		}
+	}
+
+	if (val > 101 || val < -1)
+		return count;
+
+	fpsgo_gpu_block_boost_enable_perf(val);
+
+	return count;
+}
+
+static KOBJ_ATTR_RW(gpu_block_boost);
+
 static ssize_t perfserv_ta_show(struct kobject *kobj,
 		struct kobj_attribute *attr,
 		char *buf)
@@ -1391,6 +1428,7 @@ int init_fpsgo_common(void)
 		fpsgo_sysfs_create_file(base_kobj, &kobj_attr_force_onoff);
 		fpsgo_sysfs_create_file(base_kobj, &kobj_attr_render_info);
 		fpsgo_sysfs_create_file(base_kobj, &kobj_attr_BQid);
+		fpsgo_sysfs_create_file(base_kobj, &kobj_attr_gpu_block_boost);
 		fpsgo_sysfs_create_file(base_kobj, &kobj_attr_perfserv_ta);
 		fpsgo_sysfs_create_file(base_kobj, &kobj_attr_stop_boost);
 	}

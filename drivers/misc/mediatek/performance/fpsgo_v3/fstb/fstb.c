@@ -281,6 +281,40 @@ int fpsgo_ctrl2fstb_switch_fstb(int enable)
 	return 0;
 }
 
+int fpsgo_ctrl2fstb_gblock(int tid, int start)
+{
+	struct FSTB_FRAME_INFO *iter;
+	ktime_t cur_time;
+	unsigned long long cur_time_ns;
+
+	cur_time = ktime_get();
+	cur_time_ns = ktime_to_ns(cur_time);
+
+	mutex_lock(&fstb_lock);
+	if (!fstb_enable) {
+		mutex_unlock(&fstb_lock);
+		return 0;
+	}
+
+	hlist_for_each_entry(iter, &fstb_frame_infos, hlist) {
+		if (iter->pid != tid)
+			continue;
+
+		fpsgo_systrace_c_fstb(tid, 0, start, "gblock");
+		/* end */
+		if (!start && iter->gblock_b)
+			iter->gblock_time += cur_time_ns - iter->gblock_b;
+		/* start */
+		if (start)
+			iter->gblock_b = cur_time_ns;
+		break;
+	}
+
+	mutex_unlock(&fstb_lock);
+
+	return 0;
+}
+
 static void switch_fstb_active(void)
 {
 	fpsgo_systrace_c_fstb(-200, 0,
@@ -1393,6 +1427,7 @@ static void fstb_set_cam_active(int active)
 
 	fstb_is_cam_active = active;
 	fpsgo_fstb2xgf_set_camera_flag(fstb_is_cam_active);
+	fpsgo_gpu_block_boost_enable_camera(active ? 0 : -1);
 out:
 	mutex_unlock(&fstb_cam_active_time);
 }
