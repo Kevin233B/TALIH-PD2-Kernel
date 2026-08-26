@@ -24,9 +24,7 @@
 #include "mtk_log.h"
 #include "mtk_dump.h"
 #include "mtk_drm_helper.h"
-//#ifdef OPLUS_BUG_STABILITY
 #include "mtk_drm_trace.h"
-// #endif OPLUS_BUG_STABILITY
 #include "platform/mtk_drm_6789.h"
 
 #ifdef CONFIG_LEDS_MTK_MODULE
@@ -60,9 +58,6 @@
 #define CCORR_CLIP(val, min, max) ((val >= max) ? \
 	max : ((val <= min) ? min : val))
 
-//#ifdef OPLUS_BUG_STABILITY
-extern unsigned int oplus_display_brightness;
-//#endif /*OPLUS_BUG_STABILITY*/
 static unsigned int g_ccorr_8bit_switch[DISP_CCORR_TOTAL];
 static unsigned int g_ccorr_relay_value[DISP_CCORR_TOTAL];
 
@@ -166,15 +161,9 @@ static atomic_t g_ccorr_get_irq = ATOMIC_INIT(0);
 
 /* FOR TRANSITION */
 static DEFINE_SPINLOCK(g_pq_bl_change_lock);
-#ifdef OPLUS_SILKY_ON_START_FRAME
-static int g_old_pq_backlight = 0;
-static int g_pq_backlight = 0;
-static int g_pq_backlight_db = 0;
-#else
 static int g_old_pq_backlight;
 static int g_pq_backlight;
 static int g_pq_backlight_db;
-#endif
 static atomic_t g_ccorr_is_init_valid = ATOMIC_INIT(0);
 
 static DEFINE_MUTEX(g_ccorr_global_lock);
@@ -450,18 +439,6 @@ ccorr_write_coef_unlock:
 	return ret;
 }
 
-void disp_ccorr_on_start_of_frame(void) {
-#ifdef OPLUS_SILKY_ON_START_FRAME
-	if (flag_silky_panel
-		&& g_old_pq_backlight != g_pq_backlight) {
-		DDPINFO("disp_ccorr_on_start_of_frame %d->%d\n", g_old_pq_backlight, g_pq_backlight);
-		g_old_pq_backlight = g_pq_backlight;
-		atomic_set(&g_ccorr_get_irq, 1);
-		wake_up_interruptible(&g_ccorr_get_irq_wq);
-	}
-#endif //OPLUS_SILKY_ON_START_FRAME
-}
-
 void disp_ccorr_on_end_of_frame(struct mtk_ddp_comp *comp)
 {
 	unsigned int intsta;
@@ -496,13 +473,6 @@ void disp_ccorr_on_end_of_frame(struct mtk_ddp_comp *comp)
 static void disp_ccorr_set_interrupt(struct mtk_ddp_comp *comp,
 					int enabled)
 {
-#ifdef OPLUS_SILKY_ON_START_FRAME
-	if (flag_silky_panel) {
-		DDPINFO("%s: use mutex sof irq instead ccorr irq", __func__);
-		return;
-	}
-#endif //OPLUS_SILKY_ON_START_FRAME
-
 	if (default_comp == NULL)
 		default_comp = comp;
 
@@ -643,19 +613,11 @@ void disp_pq_notify_backlight_changed(int bl_1024)
 
 	if (atomic_read(&g_ccorr_is_init_valid) != 1)
 		return;
-	/*#ifdef OPLUS_BUG_STABILITY*/
 	mtk_drm_trace_begin("disp_pq_notify_backlight_changed-%d", bl_1024);
-	/*#endif OPLUS_BUG_STABILITY*/
 	DDPINFO("%s: %d\n", __func__, bl_1024);
 
 	if (m_new_pq_persist_property[DISP_PQ_CCORR_SILKY_BRIGHTNESS]) {
-		/*#ifdef OPLUS_BUG_STABILITY*/
-		/* to keep value of backlight for FOD while screen is turning */
 		if (default_comp != NULL) {
-		/* #else */
-		/* if (default_comp != NULL &&
-			g_ccorr_relay_value[index_of_ccorr(default_comp->id)] != 1) { */
-		/*#endif OPLUS_BUG_STABILITY*/
 			disp_ccorr_set_interrupt(default_comp, 1);
 
 			if (default_comp != NULL &&
@@ -679,9 +641,7 @@ void disp_pq_notify_backlight_changed(int bl_1024)
 			DDPINFO("%s: trigger refresh when backlight ON/Off", __func__);
 		}
 	}
-	/*#ifdef OPLUS_BUG_STABILITY*/
 	mtk_drm_trace_end();
-	/*#endif OPLUS_BUG_STABILITY*/
 }
 EXPORT_SYMBOL(disp_pq_notify_backlight_changed);
 
@@ -997,9 +957,7 @@ int mtk_drm_ioctl_set_ccorr(struct drm_device *dev, void *data,
 	}
 
 	if (m_new_pq_persist_property[DISP_PQ_CCORR_SILKY_BRIGHTNESS]) {
-		/*#ifdef OPLUS_BUG_STABILITY*/
 		mtk_drm_trace_begin("mtk_drm_ioctl_set_ccorr-%d", ccorr_config->FinalBacklight);
-		/*#endif OPLUS_BUG_STABILITY*/
 
 		ret = mtk_crtc_user_cmd(crtc, comp, SET_CCORR, data);
 
@@ -1008,17 +966,12 @@ int mtk_drm_ioctl_set_ccorr(struct drm_device *dev, void *data,
 			DDPINFO("brightness = %d, silky_bright_flag = %d",
 				ccorr_config->FinalBacklight,
 				ccorr_config->silky_bright_flag);
-//#ifdef OPLUS_BUG_STABILITY
-			oplus_display_brightness = ccorr_config->FinalBacklight;
-//#endif /*OPLUS_BUG_STABILITY*/
 			mtk_leds_brightness_set("lcd-backlight",
 				ccorr_config->FinalBacklight);
 		}
 
 		mtk_crtc_check_trigger(comp->mtk_crtc, false, true);
-		/*#ifdef OPLUS_BUG_STABILITY*/
 		mtk_drm_trace_end();
-		/*#endif OPLUS_BUG_STABILITY*/
 		return ret;
 	} else {
 		return mtk_crtc_user_cmd(crtc, comp, SET_CCORR, data);
@@ -1065,15 +1018,6 @@ int mtk_drm_ioctl_ccorr_eventctl(struct drm_device *dev, void *data,
 	int ret = 0;
 	/* TODO: dual pipe */
 	int *enabled = data;
-#ifdef OPLUS_SILKY_ON_START_FRAME
-	if (flag_silky_panel) {
-		if (*enabled && g_old_pq_backlight == g_pq_backlight) {
-			DDPINFO("to flush PQ ccorr-delayed FIFO\n");
-			g_old_pq_backlight = -1;
-		}
-		return ret;
-	}
-#endif //OPLUS_SILKY_ON_START_FRAMEY
 
 	if (enabled || g_old_pq_backlight != g_pq_backlight)
 		mtk_crtc_check_trigger(comp->mtk_crtc, false, true);
@@ -1090,11 +1034,6 @@ int mtk_drm_ioctl_ccorr_get_irq(struct drm_device *dev, void *data,
 		struct drm_file *file_priv)
 {
 	int ret = 0;
-	/* #ifdef OPLUS_BUG_STABILITY */
-	struct mtk_drm_private *private;
-	struct drm_crtc *crtc = 0;
-	int *pData = (int *) data;
-	/* #endif OPLUS_BUG_STABILITY*/
 
 	atomic_set(&g_ccorr_is_init_valid, 1);
 
@@ -1104,18 +1043,6 @@ int mtk_drm_ioctl_ccorr_get_irq(struct drm_device *dev, void *data,
 		DDPPR_ERR("%s: failed", __func__);
 		ret = -EFAULT;
 	}
-    /* #ifdef OPLUS_BUG_STABILITY */
-	if (flag_silky_panel && dev && dev->dev_private){
-		private = dev->dev_private;
-		crtc = private->crtc[0];
-	}
-	if (flag_silky_panel & FRAME_SYNC_DELAY_60HZ_120HZ) {
-		if (g_cur_fps == 60)
-			*pData |= (1 << 16);
-		else if (g_cur_fps == 120)
-			*pData |= (2 << 16);
-	}
-	/* #endif OPLUS_BUG_STABILITY*/
 
 	return ret;
 }

@@ -23,9 +23,6 @@
 #include <sound/soc.h>
 #include <sound/core.h>
 
-#ifndef OPLUS_ARCH_EXTENDS
-#define OPLUS_ARCH_EXTENDS
-#endif
 
 #include "mt6338.h"
 #if IS_ENABLED(CONFIG_SND_SOC_MT6338_ACCDET)

@@ -1845,15 +1845,7 @@ int iris_parse_param(void *dev)
 
 	IRIS_LOGI("%s(%d), enter.", __func__, __LINE__);
 
-	if (pcfg->panel_name && (!strcmp(pcfg->panel_name, "oplus21641_boe_nt37701_fhd_dsi_cmd"))) {
-		lightup_node = of_find_node_by_name(chosen_node, "pxlw,iris-lightup-config");
-	}
-	else if (pcfg->panel_name && (!strcmp(pcfg->panel_name, "oplus21641_boe_nt37701a_fhd_dsi_cmd")
-                       ||!strcmp(pcfg->panel_name, "oplus21641_tianma_ili7838a_fhd_dsi_cmd")
-                       ||!strcmp(pcfg->panel_name, "oplus21861_boe_nt37701a_fhd_dsi_cmd")
-                       ||!strcmp(pcfg->panel_name, "oplus21861_tianma_ili7838a_fhd_dsi_cmd"))) {
-		lightup_node = of_find_node_by_name(chosen_node, "pxlw,iris-lightup-config-1");
-	}
+	lightup_node = of_find_node_by_name(chosen_node, "pxlw,iris-lightup-config");
 
 	if (!lightup_node) {
 		IRIS_LOGE("%s(), failed to find lightup node", __func__);

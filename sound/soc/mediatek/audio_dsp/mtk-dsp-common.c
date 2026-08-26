@@ -18,9 +18,6 @@
 #include "mtk-base-dsp.h"
 #include "mtk-dsp-common.h"
 
-#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_FEEDBACK)
-#include "../feedback/oplus_audio_kernel_fb.h"
-#endif
 
 #if IS_ENABLED(CONFIG_MTK_AUDIODSP_SUPPORT)
 #include <adsp_helper.h>

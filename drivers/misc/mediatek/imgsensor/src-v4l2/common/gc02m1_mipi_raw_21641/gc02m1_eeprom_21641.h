@@ -10,7 +10,6 @@
 
 #include "adaptor-subdrv.h"
 
-#include "kd_eeprom_oplus.h"
 
 void gc02m1_read_SPC_21641(struct subdrv_ctx *ctx, u8 *data);
 void gc02m1_read_DCC_21641(struct subdrv_ctx *ctx,

@@ -21,7 +21,6 @@
 #include <linux/bits.h>
 #include <linux/string.h>
 #include <linux/iopoll.h>
-#include <soc/oplus/system/oplus_project.h>
 #include "soc_temp_lvts.h"
 #include "../thermal_core.h"
 

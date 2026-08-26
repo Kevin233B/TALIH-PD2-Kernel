@@ -29,8 +29,6 @@
 #include <scsi/scsi.h>
 #include <scsi/scsi_ioctl.h>
 #include <scsi/scsi_cmnd.h>
-//bsp.storage.ufs 2021.10.14 add for /proc/devinfo/ufs
-#include <soc/oplus/device_info.h>
 #include <linux/async.h>
 
 #include "mtk_blocktag.h"

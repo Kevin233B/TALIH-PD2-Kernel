@@ -21,9 +21,6 @@
 #include <mt-plat/aee.h>
 #endif
 
-#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_FEEDBACK)
-#include "../feedback/oplus_audio_kernel_fb.h"
-#endif
 
 #if IS_ENABLED(CONFIG_MTK_AEE_FEATURE)
 

@@ -10,9 +10,6 @@
 
 #define SENSOR_CLOCK_POLARITY_HIGH     0
 #define SENSOR_CLOCK_POLARITY_LOW      1
-#ifndef OPLUS_FEATURE_CAMERA_COMMON
-#define OPLUS_FEATURE_CAMERA_COMMON
-#endif
 #if IS_ENABLED(CONFIG_COMPAT)
 /* 64 bit */
 #include <linux/fs.h>
@@ -61,9 +58,6 @@
 #define KDIMGSENSOR_INVOKE_DRIVER_1     (1)
 #endif
 
-#ifndef OPLUS_FEATURE_CAMERA_COMMON
-#define OPLUS_FEATURE_CAMERA_COMMON
-#endif
 
 enum {
 	BINNING_NONE = 0,

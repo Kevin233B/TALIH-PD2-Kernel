@@ -7,7 +7,6 @@
 #define __IMX355_21121_EEPROM_H__
 
 #include "kd_camera_typedef.h"
-#include "kd_eeprom_oplus.h"
 #include "adaptor-subdrv.h"
 
 void imx355_read_SPC_21121(struct subdrv_ctx *ctx, u8 *data);

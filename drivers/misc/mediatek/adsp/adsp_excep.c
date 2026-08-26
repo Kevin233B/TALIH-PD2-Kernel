@@ -28,9 +28,6 @@
 #include "adsp_excep.h"
 #include "adsp_logger.h"
 
-#ifndef OPLUS_ARCH_EXTENDS
-#define OPLUS_ARCH_EXTENDS
-#endif
 
 #if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_FEEDBACK)
 #include <soc/oplus/system/oplus_mm_kevent_fb.h>

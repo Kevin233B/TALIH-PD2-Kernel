@@ -94,10 +94,6 @@ static atomic_t g_aal_interrupt_enabled = ATOMIC_INIT(1);
 static struct workqueue_struct *aal_flip_wq;
 static struct workqueue_struct *aal_refresh_wq;
 
-//#ifdef OPLUS_BUG_STABILITY
-extern unsigned int oplus_display_brightness;
-//#endif /*OPLUS_BUG_STABILITY*/
-
 enum AAL_UPDATE_HIST {
 	UPDATE_NONE = 0,
 	UPDATE_SINGLE,
@@ -478,9 +474,6 @@ void disp_aal_notify_backlight_changed(int trans_backlight, int max_backlight)
 		service_flags = AAL_SERVICE_FORCE_UPDATE;
 
 	if (trans_backlight == 0) {
-//#ifdef OPLUS_BUG_STABILITY
-		oplus_display_brightness = 0;
-//#endif /*OPLUS_BUG_STABILITY*/
 		mtk_leds_brightness_set("lcd-backlight", 0);
 		/* set backlight = 0 may be not from AAL, */
 		/* we have to let AALService can turn on backlight */
@@ -1532,9 +1525,6 @@ int mtk_drm_ioctl_aal_set_param(struct drm_device *dev, void *data,
 		if (g_aal_param.silky_bright_flag == 0) {
 			AALAPI_LOG("backlight_value = %d, silky_bright_flag = %d",
 				backlight_value, g_aal_param.silky_bright_flag);
-//#ifdef OPLUS_BUG_STABILITY
-			oplus_display_brightness = g_aal_param.FinalBacklight;
-//#endif /*OPLUS_BUG_STABILITY*/
 			mtk_leds_brightness_set("lcd-backlight", backlight_value);
 		}
 	} else if (m_new_pq_persist_property[DISP_PQ_GAMMA_SILKY_BRIGHTNESS]) {

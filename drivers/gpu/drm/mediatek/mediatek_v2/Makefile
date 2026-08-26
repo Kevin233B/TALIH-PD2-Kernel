@@ -1,5 +1,4 @@
 subdir-ccflags-y += -Werror
-ccflags-y += -I$(srctree)/drivers/gpu/drm/oplus
 ccflags-y += -I$(srctree)/drivers/gpu/drm/mediatek/mediatek_v2
 
 mediatek-drm-y := mtk_drm_drv.o \
@@ -94,17 +93,6 @@ mediatek-drm-y += iris_cmds.o \
 endif
 
 mediatek-drm-$(CONFIG_DRM_FBDEV_EMULATION) += mtk_drm_fbdev.o
-
-#build oplus file into mediatek_drm.ko
-mediatek-drm-y += ../../oplus/oplus_display_private_api.o \
-         ../../oplus/oplus_display_panel_power.o \
-         ../../oplus/oplus_display_common.o \
-         ../../oplus/oplus_display_dc.o \
-         ../../oplus/oplus_display_onscreenfingerprint.o \
-         ../../oplus/oplus_display_mtk_debug.o \
-         ../../oplus/oplus_display_mtk_debug.o \
-         ../../oplus/oplus_display_panel.o \
-         ../../oplus/oplus_adfr.o
 
 obj-$(CONFIG_DRM_MEDIATEK) += mediatek-drm.o
 obj-$(CONFIG_DRM_MEDIATEK) += mtk_sync.o

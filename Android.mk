@@ -36,13 +36,11 @@ $(KERNEL_ZIMAGE_OUT): PRIVATE_CC_WRAPPER := $(CCACHE_EXEC)
 $(KERNEL_ZIMAGE_OUT): PRIVATE_KERNEL_BUILD_CONFIG := $(REL_GEN_KERNEL_BUILD_CONFIG)
 ifeq (user,$(strip $(TARGET_BUILD_VARIANT)))
 ifneq (,$(strip $(shell grep "^CONFIG_ABI_MONITOR\s*=\s*y" $(KERNEL_CONFIG_FILE))))
-#ifdef OPLUS_BUG_STABILITY
 ifeq ($(AGING_DEBUG_MASK), 2)
 $(KERNEL_ZIMAGE_OUT): PRIVATE_KERNEL_BUILD_SCRIPT := ./build/build.sh
 else
 $(KERNEL_ZIMAGE_OUT): PRIVATE_KERNEL_BUILD_SCRIPT := ./build/build_abi.sh
 endif
-#endif
 else
 $(KERNEL_ZIMAGE_OUT): PRIVATE_KERNEL_BUILD_SCRIPT := ./build/build.sh
 endif
@@ -99,7 +97,6 @@ clean-kernel:
 
 ifeq ($(wildcard $(TARGET)), k6893v1_64_swrgo)
 $(info TARGET is k6893v1_64_swrgo)
-#ifdef OPLUS_BUG_STABILITY
 CUSTOMER_DTB_PLATFORM := $(subst $\",,$(shell grep DTB_IMAGE_NAMES $(KERNEL_CONFIG_FILE) | sed 's/.*=//' ))
 MTK_DTBIMAGE_DTS := $(addsuffix .dts,$(addprefix $(KERNEL_DIR)/arch/$(KERNEL_TARGET_ARCH)/boot/dts/,$(CUSTOMER_DTB_PLATFORM)))
 include device/mediatek/build/core/build_dtbimage.mk
@@ -107,7 +104,6 @@ include device/mediatek/build/core/build_dtbimage.mk
 CUSTOMER_DTBO_PROJECT := $(subst $\",,$(shell grep DTB_OVERLAY_IMAGE_NAMES $(KERNEL_CONFIG_FILE) | sed 's/.*=//' ))
 MTK_DTBOIMAGE_DTS := $(addsuffix .dts,$(addprefix $(KERNEL_DIR)/arch/$(KERNEL_TARGET_ARCH)/boot/dts/,$(CUSTOMER_DTBO_PROJECT)))
 include device/mediatek/build/core/build_dtboimage.mk
-#endif
 else
 $(info TARGET is k6983v1_64)
 .PHONY: kernel-outputmakefile

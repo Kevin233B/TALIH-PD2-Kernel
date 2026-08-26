@@ -56,27 +56,12 @@
 #include "platform/mtk_drm_6789.h"
 
 #include "mtk_drm_mmp.h"
-//#ifdef OPLUS_BUG_STABILITY
-#include <mt-plat/mtk_boot_common.h>
-extern unsigned long silence_mode;
-//#endif
 /* *******Panel Master******** */
 #include "mtk_fbconfig_kdebug.h"
 #include "mtk_dp_api.h"
 //#include "swpm_me.h"
 //#include "include/pmic_api_buck.h"
 #include <../drivers/gpu/drm/mediatek/mml/mtk-mml.h>
-//#ifdef OPLUS_ADFR
-#include "oplus_adfr.h"
-//#include "../../oplus/oplus_display_private_api.h"
-//#include "../../oplus/oplus_display_panel.h"
-#include "oplus_display_private_api.h"
-#include "oplus/oplus_display_panel.h"
-//#endif
-/* #ifdef OPLUS_FEATURE_ONSCREENFINGERPRINT */
-/* add for ofp init */
-#include "oplus_display_onscreenfingerprint.h"
-/* #endif */ /* OPLUS_FEATURE_ONSCREENFINGERPRINT */
 
 #include "../mml/mtk-mml.h"
 #include "../mml/mtk-mml-drm-adaptor.h"
@@ -1479,12 +1464,6 @@ static void mtk_atomic_complete(struct mtk_drm_private *private,
 	mtk_set_first_config(drm, state);
 
 	mtk_drm_enable_trig(drm, state);
-
-	//#ifdef OPLUS_ADFR
-	if (oplus_adfr_is_support()) {
-		oplus_adfr_dsi_display_auto_mode_update(drm);
-	}
-	//#endif
 
 	mtk_atomic_disp_rsz_roi(drm, state);
 
@@ -4692,17 +4671,6 @@ static int mtk_drm_kms_init(struct drm_device *drm)
 	disp_dbg_init(drm);
 	PanelMaster_Init(drm);
 
-//#ifdef OPLUS_ADFR
-	if (oplus_adfr_is_support()) {
-		oplus_adfr_init(drm, private);
-	}
-//#endif
-
-/* #ifdef OPLUS_FEATURE_ONSCREENFINGERPRINT */
-	/* add for ofp */
-	oplus_ofp_init(private);
-/* #endif */ /* OPLUS_FEATURE_ONSCREENFINGERPRINT */
-
 	if (mtk_drm_helper_get_opt(private->helper_opt,
 			MTK_DRM_OPT_MMDVFS_SUPPORT))
 		mtk_drm_mmdvfs_init(drm->dev);
@@ -5804,14 +5772,6 @@ SKIP_SIDE_DISP:
 	mtk_fence_init();
 
 	disp_dts_gpio_init(dev, private);
-//#ifdef OPLUS_BUG_STABILITY
-	pr_err("get_boot_mode() is %d\n", get_boot_mode());
-	if ((get_boot_mode() == SILENCE_BOOT)
-			||(get_boot_mode() == OPLUS_SAU_BOOT)) {
-		pr_err("%s OPLUS_SILENCE_BOOT set silence_mode to 1\n", __func__);
-		silence_mode = 1;
-	}
-//#endif
 	memcpy(&mydev, pdev, sizeof(mydev));
 
 	ret = component_master_add_with_match(dev, &mtk_drm_ops, match);
@@ -6027,8 +5987,6 @@ static int __init mtk_drm_init(void)
 		}
 	}
 
-	oplus_display_private_api_init();
-	oplus_display_panel_init();
 	DDPINFO("%s-\n", __func__);
 
 	return 0;
@@ -6046,8 +6004,6 @@ static void __exit mtk_drm_exit(void)
 
 	for (i = ARRAY_SIZE(mtk_drm_drivers) - 1; i >= 0; i--)
 		platform_driver_unregister(mtk_drm_drivers[i]);
-	oplus_display_private_api_exit();
-	oplus_display_panel_exit();
 }
 module_init(mtk_drm_init);
 module_exit(mtk_drm_exit);

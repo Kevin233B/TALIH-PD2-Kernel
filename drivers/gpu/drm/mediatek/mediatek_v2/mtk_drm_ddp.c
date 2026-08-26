@@ -16,10 +16,6 @@
 #include "mtk-cmdq-ext.h"
 #endif
 
-/*#ifdef OPLUS_BUG_STABILITY*/
-#include <soc/oplus/system/oplus_mm_kevent_fb.h>
-/*#endif*/
-
 #include "mtk_drm_ddp.h"
 #include "mtk_drm_crtc.h"
 #include "mtk_drm_drv.h"
@@ -28,9 +24,7 @@
 #include "mtk_drm_mmp.h"
 #include "mtk_disp_aal.h"
 #include "mtk_disp_c3d.h"
-// #ifdef OPLUS_BUG_STABILITY
 #include "mtk_disp_ccorr.h"
-// #endif OPLUS_BUG_STABILITY
 #include "mtk_disp_gamma.h"
 #include "platform/mtk_drm_6789.h"
 #ifdef CONFIG_MTK_SMI_EXT
@@ -12246,9 +12240,6 @@ static irqreturn_t mtk_disp_mutex_irq_handler(int irq, void *dev_id)
 			irq_debug[8] = sched_clock();
 #endif
 
-#ifdef OPLUS_SILKY_ON_START_FRAME
-			disp_ccorr_on_start_of_frame();
-#endif //OPLUS_SILKY_ON_START_FRAME
 		}
 	}
 
@@ -14391,9 +14382,6 @@ SKIP_SIDE_DISP:
 		DDPAEE("%s:%d, failed to request irq:%d ret:%d\n",
 				__func__, __LINE__,
 				irq, ret);
-		/*#ifdef OPLUS_BUG_STABILITY*/
-		mm_fb_display_kevent("DisplayDriverID@@504$$", MM_FB_KEY_RATELIMIT_1H, "mtk_ddp_probe failed to request irq:%d ret:%d", irq, ret);
-		/*#endif*/
 		return ret;
 	}
 

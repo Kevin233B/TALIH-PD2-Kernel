@@ -35,7 +35,5 @@ ccci_fsm_all-y := ccci_fsm.o \
 			mdee_dumper_v1.o \
 			mdee_dumper_v2.o \
 			mdee_dumper_v3.o \
-			mdee_dumper_v5.o \
-			oplus_criticallog.o \
-			criticallog_class.o
+			mdee_dumper_v5.o
 endif

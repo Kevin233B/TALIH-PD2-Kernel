@@ -13,9 +13,6 @@
 #include <linux/module.h>
 #include <mt-plat/aee.h>
 #include "../../common/mtk-base-afe.h"
-#if IS_ENABLED(CONFIG_OPLUS_FEATURE_MM_FEEDBACK)
-#include "../feedback/oplus_audio_kernel_fb.h"
-#endif
 
 #ifdef scp_ultra_debug
 #undef scp_ultra_debug

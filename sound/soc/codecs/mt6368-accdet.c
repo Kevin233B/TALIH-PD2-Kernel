@@ -64,9 +64,6 @@
 #define EINT_PLUG_IN			(1)
 #define EINT_MOISTURE_DETECTED	(2)
 
-#ifndef OPLUS_ARCH_EXTENDS
-#define OPLUS_ARCH_EXTENDS
-#endif
 
 struct mt63xx_accdet_data {
 	struct snd_soc_jack jack;

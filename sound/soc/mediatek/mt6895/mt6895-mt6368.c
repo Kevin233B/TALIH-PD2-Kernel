@@ -27,9 +27,6 @@
  */
 #define EXT_SPK_AMP_W_NAME "Ext_Speaker_Amp"
 
-#ifndef OPLUS_ARCH_EXTENDS
-#define OPLUS_ARCH_EXTENDS
-#endif
 
 #ifdef OPLUS_ARCH_EXTENDS
 extern void extend_codec_i2s_be_dailinks(struct snd_soc_dai_link *dailink, size_t size);

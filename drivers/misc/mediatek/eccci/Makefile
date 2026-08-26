@@ -82,9 +82,7 @@ ccci_md_all-$(CCCI_OBJ) += fsm/ccci_fsm.o \
 			fsm/mdee_dumper_v1.o \
 			fsm/mdee_dumper_v2.o \
 			fsm/mdee_dumper_v3.o \
-			fsm/mdee_dumper_v5.o \
-			fsm/oplus_criticallog.o \
-			fsm/criticallog_class.o
+			fsm/mdee_dumper_v5.o
 # fsm end
 
 # plat start

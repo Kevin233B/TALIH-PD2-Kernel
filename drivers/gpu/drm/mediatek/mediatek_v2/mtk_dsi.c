@@ -56,22 +56,10 @@
 /* ************ Panel Master ********** */
 #include "mtk_fbconfig_kdebug.h"
 /* ********* end Panel Master *********** */
-/*#ifdef OPLUS_BUG_STABILITY*/
-#include <soc/oplus/system/oplus_mm_kevent_fb.h>
-#include <soc/oplus/system/oplus_project.h>
-/*#endif*/
 
 //#define DSI_SELF_PATTERN
 
-//#ifdef OPLUS_ADFR
 #include "mtk_drm_trace.h"
-#include "oplus_adfr.h"
-#include "../../oplus/oplus_display_mtk_debug.h"
-//#endif
-/* #ifdef OPLUS_FEATURE_ONSCREENFINGERPRINT */
-/* add for ofp */
-#include "oplus_display_onscreenfingerprint.h"
-/* #endif */ /* OPLUS_FEATURE_ONSCREENFINGERPRINT */
 
 #define DSI_START 0x00
 #define SLEEPOUT_START BIT(2)
@@ -380,9 +368,6 @@ struct DSI_T0_INS {
 enum dsi_porch_type { DECLARE_DSI_PORCH(DECLARE_NUM) };
 
 //#ifdef OPLUS_FEATURE_SILENCEMODE
-static int silence_flag = 0;
-extern unsigned int silence_mode;
-extern unsigned int oplus_display_brightness;
 extern unsigned long esd_flag;
 unsigned long long last_te_time = 0;
 //#ifdef OPLUS_BUG_STABILITY
@@ -393,7 +378,6 @@ void mipi_dsi_dcs_write_gce(struct mtk_dsi *dsi, struct cmdq_pkt *handle,
 //#ifdef OPLUS_ADFR
 extern int dsi_cmd_log_enable;
 extern int trig_db_enable;
-extern void oplus_kill_surfaceflinger(void);
 static void print_cmd_desc(const struct mipi_dsi_msg *msg);
 //#endif
 
@@ -2011,14 +1995,6 @@ irqreturn_t mtk_dsi_irq_status(int irq, void *dev_id)
 				mtk_drm_crtc_dump(dsi->encoder.crtc);
 				dsi_underrun_trigger = 0;
 				g_mobile_log = 0;
-				//#ifdef OPLUS_BUG_STABILITY
-				if ((get_eng_version() == AGING) || trig_db_enable) {
-					oplus_kill_surfaceflinger();
-				}
-				//#endif
-				/*#ifdef OPLUS_BUG_STABILITY*/
-				mm_fb_display_kevent("DisplayDriverID@@506$$", MM_FB_KEY_RATELIMIT_1H, "underrun");
-				/*#endif*/
 			}
 
 			mtk_dprec_logger_pr(DPREC_LOGGER_ERROR,
@@ -2074,28 +2050,11 @@ irqreturn_t mtk_dsi_irq_status(int irq, void *dev_id)
 							   MTK_DRM_OPT_HBM))
 				wakeup_dsi_wq(&dsi->te_rdy);
 
-			//#ifdef OPLUS_ADFR
-			if (oplus_adfr_is_support()) {
-				if (oplus_adfr_auto_on_cmd_filter_get()) {
-					/* when the rd_ptr_irq comes there is no need to filter auto on cmd anymore */
-					oplus_adfr_auto_on_cmd_filter_set(false);
-				}
-
-				/* add for mux switch control */
-				if (priv->vsync_switch_pending) {
-					complete_all(&priv->switch_te_gate);
-					priv->vsync_switch_pending = false;
-				}
+			/* add for mux switch control */
+			if (priv->vsync_switch_pending) {
+				complete_all(&priv->switch_te_gate);
+				priv->vsync_switch_pending = false;
 			}
-			//#endif
-
-/* #ifdef OPLUS_FEATURE_ONSCREENFINGERPRINT */
-			if (oplus_ofp_is_support()) {
-				oplus_ofp_pressed_icon_status_update(OPLUS_OFP_TE_RDY);
-				/* send ui ready */
-				oplus_ofp_notify_uiready(mtk_crtc);
-			}
-/* #endif */ /* OPLUS_FEATURE_ONSCREENFINGERPRINT */
 
 			if (mtk_dsi_is_cmd_mode(&dsi->ddp_comp) &&
 				mtk_crtc && mtk_crtc->vblank_en) {
@@ -2360,17 +2319,8 @@ static void mtk_output_en_doze_switch(struct mtk_dsi *dsi)
 		panel_funcs->doze_enable_start(dsi->panel, dsi,
 			mipi_dsi_dcs_write_gce2, NULL);
 	else if (!doze_enabled && panel_funcs->doze_disable) {
-/* #ifdef OPLUS_FEATURE_ONSCREENFINGERPRINT */
-		if (oplus_ofp_get_aod_state() == true) {
-			/* aod status handle */
-			oplus_ofp_doze_status_handle(dsi->encoder.crtc, dsi->ext, dsi->panel, dsi, mipi_dsi_dcs_write_gce2);
-			panel_funcs->doze_disable(dsi->panel, dsi,
-				mipi_dsi_dcs_write_gce2, NULL);
-		}
-/* #else */
-		/* panel_funcs->doze_disable(dsi->panel, dsi,
-			mipi_dsi_dcs_write_gce2, NULL); */
-/* #endif */ /* OPLUS_FEATURE_ONSCREENFINGERPRINT */
+		panel_funcs->doze_disable(dsi->panel, dsi,
+			mipi_dsi_dcs_write_gce2, NULL);
 	}
 	/* Display mode switch */
 	if (panel_funcs->doze_get_mode_flags) {
@@ -2425,11 +2375,6 @@ static void mtk_output_en_doze_switch(struct mtk_dsi *dsi)
 	}
 
 	if (doze_enabled && panel_funcs->doze_enable) {
-/* #ifdef OPLUS_FEATURE_ONSCREENFINGERPRINT */
-		/* aod status handle */
-		oplus_ofp_doze_status_handle(dsi->encoder.crtc, dsi->ext, dsi->panel, dsi, mipi_dsi_dcs_write_gce2);
-/* #endif */ /* OPLUS_FEATURE_ONSCREENFINGERPRINT */
-
 		panel_funcs->doze_enable(dsi->panel, dsi,
 			mipi_dsi_dcs_write_gce2, NULL);
 	}
@@ -2653,11 +2598,6 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi,
 					mipi_dsi_dcs_write_gce2, NULL);
 			if (ext && ext->funcs
 				&& ext->funcs->doze_enable) {
-/* #ifdef OPLUS_FEATURE_ONSCREENFINGERPRINT */
-				/* aod status handle */
-				oplus_ofp_doze_status_handle(crtc, ext, dsi->panel, dsi, mipi_dsi_dcs_write_gce2);
-/* #endif */ /* OPLUS_FEATURE_ONSCREENFINGERPRINT */
-
 				ext->funcs->doze_enable(dsi->panel, dsi,
 					mipi_dsi_dcs_write_gce2, NULL);
 			}
@@ -2669,17 +2609,8 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi,
 		if (!new_doze_state && dsi->doze_enabled) {
 			if (ext && ext->funcs
 				&& ext->funcs->doze_disable) {
-/* #ifdef OPLUS_FEATURE_ONSCREENFINGERPRINT */
-				if (oplus_ofp_get_aod_state() == true) {
-					/* aod status handle */
-					oplus_ofp_doze_status_handle(crtc, ext, dsi->panel, dsi, mipi_dsi_dcs_write_gce2);
-					ext->funcs->doze_disable(dsi->panel, dsi,
-						mipi_dsi_dcs_write_gce2, NULL);
-				}
-/* #else */
-				/* ext->funcs->doze_disable(dsi->panel, dsi,
-					mipi_dsi_dcs_write_gce2, NULL); */
-/* #endif */ /* OPLUS_FEATURE_ONSCREENFINGERPRINT */
+				ext->funcs->doze_disable(dsi->panel, dsi,
+					mipi_dsi_dcs_write_gce2, NULL);
 			}
 		}
 	}
@@ -2850,12 +2781,6 @@ static void mtk_output_dsi_disable(struct mtk_dsi *dsi, struct cmdq_pkt *cmdq_ha
 		if (!new_doze_state || force_lcm_update) {
 			if (drm_panel_unprepare(dsi->panel))
 				DRM_ERROR("failed to unprepare the panel\n");
-//#ifdef OPLUS_ADFR
-			/* switch to tp vsync when power mode is 0 */
-			if (oplus_adfr_is_support() && (oplus_adfr_get_vsync_mode() == OPLUS_EXTERNAL_TE_TP_VSYNC)) {
-				oplus_adfr_aod_fod_vsync_switch(mtk_crtc, false);
-			}
-//#endif
 		} else if (new_doze_state && !dsi->doze_enabled) {
 			mtk_output_en_doze_switch(dsi);
 		}
@@ -3744,7 +3669,6 @@ int mtk_dsi_esd_cmp(struct mtk_ddp_comp *comp, void *handle, void *ptr)
 					cnt += scnprintf(payload + cnt, sizeof(payload) - cnt, "%02x = %02x",
 						lcm_esd_tb->cmd,lcm_esd_tb->para_list[0]);
 					DDPPR_ERR("ESD check failed: %s\n", payload);
-					mm_fb_display_kevent(payload, MM_FB_KEY_RATELIMIT_1H, "ESD check failed");
 				}
 				/*#endif*/
 
@@ -3767,7 +3691,6 @@ int mtk_dsi_esd_cmp(struct mtk_ddp_comp *comp, void *handle, void *ptr)
 					cnt += scnprintf(payload + cnt, sizeof(payload) - cnt, "%02x = %02x",
 						lcm_esd_tb->cmd,lcm_esd_tb->para_list[0]);
 					DDPPR_ERR("ESD check failed: %s\n", payload);
-					mm_fb_display_kevent(payload, MM_FB_KEY_RATELIMIT_1H, "ESD check failed");
 				}
 				/*#endif*/
 
@@ -3795,7 +3718,6 @@ int mtk_dsi_esd_cmp(struct mtk_ddp_comp *comp, void *handle, void *ptr)
 				cnt += scnprintf(payload + cnt, sizeof(payload) - cnt, "%02x = %02x",
 					lcm_esd_tb->cmd,lcm_esd_tb->para_list[0]);
 				DDPPR_ERR("ESD check failed: %s\n", payload);
-				mm_fb_display_kevent(payload, MM_FB_KEY_RATELIMIT_1H, "ESD check failed");
 			}
 			/*#endif*/
 
@@ -7295,8 +7217,7 @@ static void mtk_dsi_cmd_timing_change(struct mtk_dsi *dsi,
 	/*  send lcm cmd before DSI power down if needed */
 
 	//#ifdef OPLUS_BUG_STABILITY
-	if (dsi->ext && dsi->ext->funcs && dsi->ext->funcs->mode_switch_hs &&
-		(dsi->ext->params->oplus_mode_switch_hs == 1)) {
+	if (dsi->ext && dsi->ext->funcs && dsi->ext->funcs->mode_switch_hs) {
 		need_mipi_change = dsi->ext->funcs->mode_switch_hs(dsi->panel, &dsi->conn, dsi, src_mode, dst_mode, BEFORE_DSI_POWERDOWN,
 			mtk_dsi_cmdq_pack_gce);
 	//#endif
@@ -7307,12 +7228,6 @@ static void mtk_dsi_cmd_timing_change(struct mtk_dsi *dsi,
 			dst_mode, BEFORE_DSI_POWERDOWN);
 
 	//#ifdef OPLUS_ADFR
-	/* add for mux switch control */
-	if (oplus_adfr_is_support() && (oplus_adfr_get_vsync_mode() == OPLUS_EXTERNAL_TE_TP_VSYNC)) {
-		oplus_adfr_resolution_vsync_switch(mtk_crtc, &dsi->conn, src_mode, dst_mode);
-	}
-	//#endif
-
 	if (need_mipi_change == 0)
 		goto skip_change_mipi;
 
@@ -7344,8 +7259,7 @@ skip_change_mipi:
 	/*  send lcm cmd after DSI power on if needed */
 
 	//#ifdef OPLUS_BUG_STABILITY
-	if (dsi->ext && dsi->ext->funcs && dsi->ext->funcs->mode_switch_hs &&
-		(dsi->ext->params->oplus_mode_switch_hs == 1)) {
+	if (dsi->ext && dsi->ext->funcs && dsi->ext->funcs->mode_switch_hs) {
 		dsi->ext->funcs->mode_switch_hs(dsi->panel, &dsi->conn, dsi, src_mode, dst_mode, AFTER_DSI_POWERON,
 			mtk_dsi_cmdq_pack_gce);
 	//#endif
@@ -8064,58 +7978,15 @@ static int mtk_dsi_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 		break;
 	case DSI_SET_BL:
 	{
-		//#ifdef OPLUS_FEATURE_HBM
-		int backlight = *(int *)params;
-		bool hbm_en = false;
-		//#endif
 		struct mtk_dsi *dsi =
 			container_of(comp, struct mtk_dsi, ddp_comp);
 
 		panel_ext = mtk_dsi_get_panel_ext(comp);
-		//#ifndef OPLUS_FEATURE_SILENCEMODE
-		/*if (panel_ext && panel_ext->funcs
-			&& panel_ext->funcs->set_backlight_cmdq)
-			panel_ext->funcs->set_backlight_cmdq(dsi,
-					mipi_dsi_dcs_write_gce,
-					handle, *(int *)params);*/
-		//else
 		if (panel_ext && panel_ext->funcs
 			&& panel_ext->funcs->set_backlight_cmdq) {
-/* #ifdef OPLUS_FEATURE_ONSCREENFINGERPRINT */
-			if (oplus_ofp_is_support()) {
-				hbm_en = oplus_ofp_get_hbm_state();
-			}
-/* #endif */ /* OPLUS_FEATURE_ONSCREENFINGERPRINT */
-
-			pr_err("[lh]DSI_SET_BL: hbm_en=%d, backlight=%d\n", hbm_en, backlight);
-			oplus_display_brightness = *(int *)params;
-			//make sure it could not set backlight when fp works
-			if (hbm_en == false) {
-				if (silence_mode) {
-					silence_flag = 1;
-					DISP_INFO("silence_mode is %d, set backlight to 0\n", silence_mode);
-					panel_ext->funcs->set_backlight_cmdq(dsi, mipi_dsi_dcs_write_gce,
-						handle, 0);
-				} else {
-					silence_flag = 0;
-					panel_ext->funcs->set_backlight_cmdq(dsi,
-						mipi_dsi_dcs_write_gce, handle, *(int *)params);
-					oplus_display_brightness = *(int *)params;
-					DISP_DEBUG("oplus_display_brightness=%d\n",oplus_display_brightness);
-				}
-			} else {
-/* #ifdef OPLUS_FEATURE_ONSCREENFINGERPRINT */
-				if (oplus_ofp_is_support()) {
-					if (backlight == 0) {
-						oplus_ofp_set_hbm_state(false);
-						OFP_DEBUG("backlight is 0, set hbm state to false\n");
-					}
-				}
-				OFP_INFO("hbm state is true, filter backlight setting\n");
-/* #endif */ /* OPLUS_FEATURE_ONSCREENFINGERPRINT */
-			}
+			panel_ext->funcs->set_backlight_cmdq(dsi,
+				mipi_dsi_dcs_write_gce, handle, *(int *)params);
 		}
-		//#endif
 	}
 		break;
 	case DSI_SET_BL_AOD:
@@ -8168,14 +8039,12 @@ static int mtk_dsi_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 		struct mtk_dsi *dsi =
 			container_of(comp, struct mtk_dsi, ddp_comp);
 
-		if (oplus_adfr_is_support()) {
-			panel_ext = mtk_dsi_get_panel_ext(comp);
-			if (panel_ext && panel_ext->funcs
-				&& panel_ext->funcs->send_fake_fakeframe)
-				panel_ext->funcs->send_fake_fakeframe(dsi,
-						mtk_dsi_cmdq_pack_gce,
-						handle);
-		}
+		panel_ext = mtk_dsi_get_panel_ext(comp);
+		if (panel_ext && panel_ext->funcs
+			&& panel_ext->funcs->send_fake_fakeframe)
+			panel_ext->funcs->send_fake_fakeframe(dsi,
+					mtk_dsi_cmdq_pack_gce,
+					handle);
 		break;
 	}
 	case SET_AUTO_MODE:
@@ -8199,7 +8068,7 @@ static int mtk_dsi_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 		struct mtk_dsi *dsi =
 			container_of(comp, struct mtk_dsi, ddp_comp);
 		struct drm_crtc *crtc = &(comp->mtk_crtc->base);
-		struct oplus_minfps *minfps = (struct oplus_minfps *)params;
+		void *minfps = (void *)params;
 		struct drm_display_mode *m = &(crtc->state->mode);
 
 		panel_ext = mtk_dsi_get_panel_ext(comp);
@@ -8217,12 +8086,10 @@ static int mtk_dsi_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 		struct mtk_dsi *dsi =
 			container_of(comp, struct mtk_dsi, ddp_comp);
 
-		if (oplus_adfr_is_support()) {
-			panel_ext = mtk_dsi_get_panel_ext(comp);
-			if (panel_ext && panel_ext->funcs
-				&& panel_ext->funcs->set_vsync_switch)
-				panel_ext->funcs->set_vsync_switch(dsi->panel, *(int *)params);
-		}
+		panel_ext = mtk_dsi_get_panel_ext(comp);
+		if (panel_ext && panel_ext->funcs
+			&& panel_ext->funcs->set_vsync_switch)
+			panel_ext->funcs->set_vsync_switch(dsi->panel, *(int *)params);
 		break;
 	}
 	//#endif
@@ -8232,20 +8099,6 @@ static int mtk_dsi_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 		if (!(panel_ext && panel_ext->funcs &&
 		      panel_ext->funcs->hbm_set_cmdq))
 			break;
-
-		//#ifdef OPLUS_FEATURE_SILENCEMODE
-		if (silence_mode || silence_flag) {
-		      printk("%s silence_mode is %d, don not set hbm\n",__func__, silence_mode);
-		      break;
-		}
-		//#endif
-
-/* #ifdef OPLUS_FEATURE_ONSCREENFINGERPRINT */
-		if (oplus_ofp_is_support()) {
-			/* send aod off before hbm on if need */
-			oplus_ofp_aod_off_set_cmdq(dsi->encoder.crtc, panel_ext, dsi->panel, dsi, mipi_dsi_dcs_write_gce2);
-		}
-/* #endif */ /* OPLUS_FEATURE_ONSCREENFINGERPRINT */
 
 		panel_ext->funcs->hbm_set_cmdq(dsi->panel, dsi,
 					       mipi_dsi_dcs_write_gce, handle,

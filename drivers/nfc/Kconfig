@@ -63,5 +63,4 @@ endmenu
 
 source "drivers/nfc/pn553-i2c/Kconfig"
 source "drivers/nfc/p73-spi/Kconfig"
-source "drivers/nfc/oplus_nfc/Kconfig"
 

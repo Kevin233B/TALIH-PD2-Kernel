@@ -20,10 +20,8 @@
 #include "ccci_swtp.h"
 #include "ccci_fsm.h"
 
-//#ifdef OPLUS_FEATURE_SWTP
 #include <linux/proc_fs.h>
 static unsigned int swtp_status_value = SWTP_EINT_PIN_PLUG_OUT;
-//#endif  /*OPLUS_FEATURE_SWTP*/
 
 /* must keep ARRAY_SIZE(swtp_of_match) = ARRAY_SIZE(irq_name) */
 const struct of_device_id swtp_of_match[] = {
@@ -115,14 +113,10 @@ static int swtp_switch_state(int irq, struct swtp_t *swtp)
 			break;
 		}
 	}
-    //#ifdef OPLUS_FEATURE_SWTP
     CCCI_LEGACY_ERR_LOG(swtp->md_id, SYS,
         "[swtp_swtich_state] tx_power_mode after change: %d\n", swtp->tx_power_mode);
-    //#endif  /*OPLUS_FEATURE_SWTP*/
 	spin_unlock_irqrestore(&swtp->spinlock, flags);
-    //#ifdef OPLUS_FEATURE_SWTP
     swtp_status_value = !swtp->tx_power_mode;
-    //#endif  /*OPLUS_FEATURE_SWTP*/
 
 	return swtp->tx_power_mode;
 }
@@ -200,7 +194,6 @@ int swtp_md_tx_power_req_hdlr(int md_id, int data)
 	return 0;
 }
 
-//#ifdef OPLUS_FEATURE_SWTP
 static int swtp_gpio_show(struct seq_file *m, void *v)
 {
     seq_printf(m, "%d\n", swtp_status_value);
@@ -223,7 +216,6 @@ static void swtp_gpio_create_proc(void)
 {
     proc_create("swtp_status_value", 0444, NULL, &swtp_gpio_fops);
 }
-//#endif  /*OPLUS_FEATURE_SWTP*/
 
 static void swtp_init_delayed_work(struct work_struct *work)
 {
@@ -297,7 +289,6 @@ static void swtp_init_delayed_work(struct work_struct *work)
 			swtp_data[md_id].eint_type[i] = ints1[1];
 			swtp_data[md_id].irq[i] = irq_of_parse_and_map(node, 0);
 
-            //#ifdef OPLUS_FEATURE_SWTP
             CCCI_LEGACY_ERR_LOG(md_id, SYS,
                 "swtp-eint original gpio=%d, of gpio=%d, setdebounce=%d, eint_type=%d, gpio_state=%d, txpower_mode=%d\n",
                 ints1[0],
@@ -306,7 +297,6 @@ static void swtp_init_delayed_work(struct work_struct *work)
                 swtp_data[md_id].eint_type[i],
                 swtp_data[md_id].gpio_state[i],
                 swtp_data[md_id].tx_power_mode);
-            //#endif  /*OPLUS_FEATURE_SWTP*/
 			ret = request_irq(swtp_data[md_id].irq[i],
 				swtp_irq_handler, IRQF_TRIGGER_NONE,
 				irq_name[i], &swtp_data[md_id]);
@@ -358,8 +348,6 @@ int swtp_init(int md_id)
 
 	CCCI_BOOTUP_LOG(md_id, SYS, "%s end, init_delayed_work scheduled\n",
 		__func__);
-    //#ifdef OPLUS_FEATURE_SWTP
     swtp_gpio_create_proc();
-    //#endif  /*OPLUS_FEATURE_SWTP*/
 	return 0;
 }

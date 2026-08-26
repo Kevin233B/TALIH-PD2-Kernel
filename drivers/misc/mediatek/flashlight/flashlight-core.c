@@ -61,9 +61,6 @@ static int pt_strict; /* always be zero in C standard */
 static int pt_is_low(int pt_low_vol, int pt_low_bat, int pt_over_cur);
 #endif
 
-#ifndef OPLUS_FEATURE_CAMERA_COMMON
-#define OPLUS_FEATURE_CAMERA_COMMON
-#endif
 
 /******************************************************************************
  * Flashlight operations

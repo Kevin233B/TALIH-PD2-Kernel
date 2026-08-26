@@ -193,7 +193,6 @@ void mtk_ddp_write(struct mtk_ddp_comp *comp, unsigned int value,
 #endif
 }
 
-//#ifdef OPLUS_ADFR
 void mtk_ddp_write_relaxed(struct mtk_ddp_comp *comp, unsigned int value,
 			   unsigned int offset, void *handle)
 {
@@ -207,7 +206,6 @@ void mtk_ddp_write_relaxed(struct mtk_ddp_comp *comp, unsigned int value,
 	writel_relaxed(value, comp->regs + offset);
 
 }
-//#endif
 
 void mtk_ddp_write_mask(struct mtk_ddp_comp *comp, unsigned int value,
 			unsigned int offset, unsigned int mask, void *handle)

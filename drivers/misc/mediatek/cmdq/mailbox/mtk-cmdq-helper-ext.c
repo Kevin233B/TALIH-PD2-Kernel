@@ -12,9 +12,6 @@
 #include <linux/dmapool.h>
 #include <linux/sched/clock.h>
 
-/*#ifdef OPLUS_BUG_STABILITY*/
-#include <soc/oplus/system/oplus_mm_kevent_fb.h>
-/*#endif*/
 
 #include <linux/timer.h>
 #include <linux/delay.h>
@@ -2414,11 +2411,6 @@ void cmdq_pkt_err_dump_cb(struct cmdq_cb_data data)
 		cmdq_util_helper->error_enable();
 
 	cmdq_util_user_err(client->chan, "Begin of Error %u", err_num);
-	/*#ifdef OPLUS_BUG_STABILITY*/
-	if (err_num < 5) {
-		mm_fb_display_kevent("DisplayDriverID@@508$$", MM_FB_KEY_RATELIMIT_1H, "cmdq timeout Begin of Error %u", err_num);
-	}
-	/*#endif*/
 
 	cmdq_dump_core(client->chan);
 

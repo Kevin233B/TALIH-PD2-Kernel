@@ -134,9 +134,6 @@ KASAN_SANITIZE_stackleak.o := n
 KCSAN_SANITIZE_stackleak.o := n
 KCOV_INSTRUMENT_stackleak.o := n
 
-#ifdef OPLUS_FEATURE_PERFORMANCE_SCHED
-obj-$(CONFIG_OPLUS_FEATURE_PERFORMANCE_SCHED) += oplus_perf_sched/
-#endif /* OPLUS_FEATURE_PERFORMANCE_SCHED */
 
 obj-$(CONFIG_SCF_TORTURE_TEST) += scftorture.o
 

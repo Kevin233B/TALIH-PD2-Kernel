@@ -20,12 +20,9 @@
 #include <linux/pm_wakeup.h>
 #include <linux/regmap.h>
 
-//#ifdef OPLUS_BUG_STABILITY
 #include <linux/proc_fs.h>
 #include <asm/uaccess.h>
 #include <linux/of_gpio.h>
-#include <soc/oplus/system/oplus_project.h>
-//#endif /*OPLUS_BUG_STABILITY*/
 #define KPD_NAME	"mtk-kpd"
 
 #define KP_STA			(0x0000)

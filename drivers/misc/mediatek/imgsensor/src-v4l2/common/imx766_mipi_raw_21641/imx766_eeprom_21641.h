@@ -22,7 +22,6 @@
 
 #include "adaptor-subdrv.h"
 
-#include "kd_eeprom_oplus.h"
 
 /*
  * LRC
