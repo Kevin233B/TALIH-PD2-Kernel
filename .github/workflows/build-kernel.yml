@@ -2,6 +2,7 @@ name: Build TALIH-PD2 Kernel (ls12)
 
 on:
   workflow_dispatch:
+  
   push:
     branches: [ gki-5.10 ]
   pull_request:
