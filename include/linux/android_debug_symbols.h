@@ -6,6 +6,8 @@
 #ifndef _ANDROID_DEBUG_SYMBOLS_H
 #define _ANDROID_DEBUG_SYMBOLS_H
 
+#include <linux/stddef.h>
+
 enum android_debug_symbol {
 	ADS_SDATA = 0,
 	ADS_BSS_END,
