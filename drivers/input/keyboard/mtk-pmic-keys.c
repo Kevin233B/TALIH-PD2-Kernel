@@ -46,10 +46,6 @@
 #define RST_PWRKEY_HOME_HOME2_MODE		3
 #define INVALID_VALUE				0
 
-//#ifdef OPLUS_BUG_STABILITY
-extern int aee_kpd_enable;
-extern void kpd_aee_handler(u32 keycode, u16 pressed);
-//#endif /*OPLUS_BUG_STABILITY*/
 struct mtk_pmic_keys_regs {
 	u32 deb_reg;
 	u32 deb_mask;
@@ -261,13 +257,6 @@ static irqreturn_t mtk_pmic_keys_irq_handler_thread(int irq, void *data)
 		__pm_relax(info->suspend_lock);
 	dev_info(info->keys->dev, "(%s) key =%d using PMIC\n",
 		 pressed ? "pressed" : "released", info->keycode);
-
-	//#ifdef OPLUS_BUG_STABILITY
-	if (aee_kpd_enable && info->keycode == KEY_VOLUMEUP) {
-		pr_err("pmic volup key triggered, pressed is %u\n", pressed);
-		kpd_aee_handler(KEY_VOLUMEUP, pressed);
-	}
-	//#endif /*OPLUS_BUG_STABILITY*/
 
 	return IRQ_HANDLED;
 }
