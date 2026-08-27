@@ -22,7 +22,9 @@
 const struct apupwr_plat_data *pwr_data;
 
 struct platform_device *this_pdev;
+#if IS_ENABLED(CONFIG_DEBUG_FS)
 static struct apupwr_dbg aputop_dbg;
+#endif
 static int aputop_func_sel;
 static DEFINE_MUTEX(aputop_func_mtx);
 #if IS_ENABLED(CONFIG_PM_SLEEP)
