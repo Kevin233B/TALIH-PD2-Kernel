@@ -397,7 +397,7 @@ static inline void snd_soc_component_set_drvdata(struct snd_soc_component *c,
 	dev_set_drvdata(c->dev, data);
 }
 
-static inline void *snd_soc_component_get_drvdata(struct snd_soc_component *c)
+static inline void *snd_soc_component_get_drvdata(const struct snd_soc_component *c)
 {
 	return dev_get_drvdata(c->dev);
 }
