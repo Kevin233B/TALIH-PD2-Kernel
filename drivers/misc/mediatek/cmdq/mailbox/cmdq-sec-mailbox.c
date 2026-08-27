@@ -28,7 +28,7 @@
 static atomic_t m4u_init = ATOMIC_INIT(0);
 #endif
 
-#if IS_ENABLED(CONFIG_MMPROFILE)
+#if IS_ENABLED(CMDQ_MMPROFILE_SUPPORT)
 #include <mmprofile.h>
 #endif
 
@@ -116,7 +116,7 @@ struct cmdq_sec_shared_mem {
 	u32		size;
 };
 
-#if IS_ENABLED(CONFIG_MMPROFILE)
+#if IS_ENABLED(CMDQ_MMPROFILE_SUPPORT)
 struct cmdq_mmp_event {
 	mmp_event cmdq_root;
 	mmp_event cmdq;
@@ -162,7 +162,9 @@ struct cmdq_sec {
 	struct cmdq_sec_shared_mem	*shared_mem;
 	struct cmdq_sec_context		*context;
 	struct iwcCmdqCancelTask_t	cancel;
+#if IS_ENABLED(CMDQ_MMPROFILE_SUPPORT)
 	struct cmdq_mmp_event		mmp;
+#endif
 	bool			unprepare_in_idle;
 };
 static atomic_t cmdq_path_res = ATOMIC_INIT(0);
@@ -220,7 +222,7 @@ cmdq_sec_init_context_base(struct cmdq_sec_context *context)
 
 static inline void cmdq_mmp_init(struct cmdq_sec *cmdq)
 {
-#if IS_ENABLED(CONFIG_MMPROFILE)
+#if IS_ENABLED(CMDQ_MMPROFILE_SUPPORT)
 	char name[32];
 	int len;
 
@@ -518,7 +520,7 @@ static bool cmdq_sec_irq_handler(
 		if (!done)
 			break;
 
-#if IS_ENABLED(CONFIG_MMPROFILE)
+#if IS_ENABLED(CMDQ_MMPROFILE_SUPPORT)
 		mmprofile_log_ex(cmdq->mmp.irq, MMPROFILE_FLAG_PULSE,
 			thread->idx, (unsigned long)task->pkt);
 #endif
@@ -539,7 +541,7 @@ static bool cmdq_sec_irq_handler(
 	if (err && cur_task) {
 		struct cmdq_cb_data cb_data;
 
-#if IS_ENABLED(CONFIG_MMPROFILE)
+#if IS_ENABLED(CMDQ_MMPROFILE_SUPPORT)
 		mmprofile_log_ex(cmdq->mmp.irq, MMPROFILE_FLAG_PULSE,
 			thread->idx, (unsigned long)cur_task->pkt);
 #endif
@@ -634,7 +636,7 @@ static void cmdq_sec_irq_notify_work(struct work_struct *work_item)
 
 	mutex_lock(&cmdq->exec_lock);
 
-#if IS_ENABLED(CONFIG_MMPROFILE)
+#if IS_ENABLED(CMDQ_MMPROFILE_SUPPORT)
 	mmprofile_log_ex(cmdq->mmp.notify, MMPROFILE_FLAG_START,
 		cmdq->hwid, cmdq->notify_run);
 #endif
@@ -692,7 +694,7 @@ static void cmdq_sec_irq_notify_work(struct work_struct *work_item)
 			(unsigned long)cmdq->base_pa);
 	}
 
-#if IS_ENABLED(CONFIG_MMPROFILE)
+#if IS_ENABLED(CMDQ_MMPROFILE_SUPPORT)
 	mmprofile_log_ex(cmdq->mmp.notify, MMPROFILE_FLAG_END,
 		cmdq->hwid, cmdq->notify_run);
 #endif
@@ -707,7 +709,7 @@ static void cmdq_sec_irq_notify_callback(struct cmdq_cb_data cb_data)
 	if (!work_pending(&cmdq->irq_notify_work)) {
 		queue_work(cmdq->notify_wq, &cmdq->irq_notify_work);
 
-#if IS_ENABLED(CONFIG_MMPROFILE)
+#if IS_ENABLED(CMDQ_MMPROFILE_SUPPORT)
 		mmprofile_log_ex(cmdq->mmp.queue_notify, MMPROFILE_FLAG_PULSE,
 			cmdq->hwid, 1);
 #endif
@@ -715,7 +717,7 @@ static void cmdq_sec_irq_notify_callback(struct cmdq_cb_data cb_data)
 	} else {
 		cmdq_msg("last notify callback working");
 
-#if IS_ENABLED(CONFIG_MMPROFILE)
+#if IS_ENABLED(CMDQ_MMPROFILE_SUPPORT)
 		mmprofile_log_ex(cmdq->mmp.queue_notify, MMPROFILE_FLAG_PULSE,
 			cmdq->hwid, 0);
 #endif
@@ -1029,7 +1031,7 @@ static s32 cmdq_sec_session_send(struct cmdq_sec_context *context,
 	mem_ex1 = iwc_msg->iwcex_available & (1 << CMDQ_IWC_MSG1);
 	mem_ex2 = iwc_msg->iwcex_available & (1 << CMDQ_IWC_MSG2);
 
-#if IS_ENABLED(CONFIG_MMPROFILE)
+#if IS_ENABLED(CMDQ_MMPROFILE_SUPPORT)
 	mmprofile_log_ex(cmdq->mmp.invoke, MMPROFILE_FLAG_START,
 		thrd_idx, task ? (unsigned long)task->pkt : 0);
 #endif
@@ -1062,7 +1064,7 @@ static s32 cmdq_sec_session_send(struct cmdq_sec_context *context,
 		cmdq_log("%s execute done cmdq:%p task:%lx cost:%lluus",
 			__func__, cmdq, (unsigned long)task, cost);
 
-#if IS_ENABLED(CONFIG_MMPROFILE)
+#if IS_ENABLED(CMDQ_MMPROFILE_SUPPORT)
 	mmprofile_log_ex(cmdq->mmp.invoke, MMPROFILE_FLAG_END,
 		thrd_idx, task ? (unsigned long)task->pkt : 0);
 #endif
@@ -1186,7 +1188,7 @@ cmdq_sec_task_submit(struct cmdq_sec *cmdq, struct cmdq_sec_task *task,
 	cmdq_log("task:%p iwc_cmd:%u cmdq:%p thrd-idx:%u tgid:%u",
 		task, iwc_cmd, cmdq, thrd_idx, current->tgid);
 
-#if IS_ENABLED(CONFIG_MMPROFILE)
+#if IS_ENABLED(CMDQ_MMPROFILE_SUPPORT)
 	mmprofile_log_ex(cmdq->mmp.submit, MMPROFILE_FLAG_PULSE,
 		thrd_idx, (unsigned long)pkt);
 #endif
@@ -1520,7 +1522,7 @@ static int cmdq_sec_mbox_send_data(struct mbox_chan *chan, void *data)
 		return -ENOMEM;
 	pkt->task_alloc = true;
 
-#if IS_ENABLED(CONFIG_MMPROFILE)
+#if IS_ENABLED(CMDQ_MMPROFILE_SUPPORT)
 	mmprofile_log_ex(cmdq->mmp.queue, MMPROFILE_FLAG_PULSE,
 		thread->idx, (unsigned long)pkt);
 #endif
@@ -1618,7 +1620,7 @@ static void cmdq_sec_mbox_shutdown(struct mbox_chan *chan)
 #endif
 }
 
-#if IS_ENABLED(CONFIG_MMPROFILE)
+#if IS_ENABLED(CMDQ_MMPROFILE_SUPPORT)
 void cmdq_sec_mmp_wait(struct mbox_chan *chan, void *pkt)
 {
 	struct cmdq_sec_thread *thread = chan->con_priv;
