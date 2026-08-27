@@ -361,7 +361,6 @@ static int atf_time_sync_resume(struct device *dev)
 
 static const struct proc_ops atf_log_proc_fops = {
 	.proc_ioctl = atf_log_ioctl,
-	.proc_compat_ioctl = atf_log_ioctl,
 	.proc_poll       = atf_log_poll,
 	.proc_open       = atf_log_open,
 	.proc_release    = atf_log_release,
