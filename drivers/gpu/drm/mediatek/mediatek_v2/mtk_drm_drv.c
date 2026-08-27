@@ -1050,30 +1050,6 @@ static bool mtk_atomic_skip_plane_update(struct mtk_drm_private *private,
 #endif
 }
 
-bool mtk_drm_lcm_is_connect(void)
-{
-	struct device_node *chosen_node;
-
-	chosen_node = of_find_node_by_path("/chosen");
-	if (chosen_node) {
-		struct tag_videolfb *videolfb_tag = NULL;
-		unsigned long size = 0;
-
-		videolfb_tag = (struct tag_videolfb *)of_get_property(
-			chosen_node,
-			"atag,videolfb",
-			(int *)&size);
-		if (videolfb_tag)
-			return videolfb_tag->islcmfound;
-
-		DDPINFO("[DT][videolfb] videolfb_tag not found\n");
-	} else {
-		DDPINFO("[DT][videolfb] of_chosen not found\n");
-	}
-
-	return false;
-}
-
 static void drm_atomic_esd_chk_first_enable(struct drm_device *dev,
 				     struct drm_atomic_state *old_state)
 {
@@ -4198,50 +4174,6 @@ int mtk_drm_disp_test_show(struct drm_crtc *crtc, bool enable)
 	return 0;
 }
 #endif
-
-int _parse_tag_videolfb(unsigned int *vramsize, phys_addr_t *fb_base,
-			unsigned int *fps)
-{
-#ifndef CONFIG_MTK_DISP_NO_LK
-	struct device_node *chosen_node;
-
-	*fps = 6000;
-	chosen_node = of_find_node_by_path("/chosen");
-
-	if (chosen_node) {
-		struct tag_videolfb *videolfb_tag = NULL;
-		unsigned long size = 0;
-
-		videolfb_tag = (struct tag_videolfb *)of_get_property(
-			chosen_node, "atag,videolfb",
-			(int *)&size);
-		if (videolfb_tag) {
-			*vramsize = videolfb_tag->vram;
-			*fb_base = videolfb_tag->fb_base;
-			*fps = videolfb_tag->fps;
-			if (*fps == 0)
-				*fps = 6000;
-			goto found;
-		} else {
-			DDPINFO("[DT][videolfb] videolfb_tag not found\n");
-			return -1;
-		}
-	} else {
-		DDPINFO("[DT][videolfb] of_chosen not found\n");
-		return -1;
-	}
-
-found:
-	DDPINFO("[DT][videolfb] fb_base    = 0x%lx\n", (unsigned long)*fb_base);
-	DDPINFO("[DT][videolfb] vram       = 0x%x (%d)\n", *vramsize,
-		*vramsize);
-	DDPINFO("[DT][videolfb] fps	   = %d\n", *fps);
-
-	return 0;
-#else
-	return -1;
-#endif
-}
 
 int mtk_drm_get_panel_info(struct drm_device *dev,
 			     struct drm_mtk_session_info *info, unsigned int crtc_id)

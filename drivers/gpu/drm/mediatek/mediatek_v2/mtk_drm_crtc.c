@@ -46,6 +46,7 @@
 #include "mtk_drm_session.h"
 #include "mtk_dump.h"
 #include "mtk_drm_fb.h"
+#include "mtk_drm_fbdev.h"
 #include "mtk_rect.h"
 #include "mtk_drm_ddp_addon.h"
 #include "mtk_drm_helper.h"
@@ -3275,23 +3276,6 @@ static int free_reserved_buf(phys_addr_t start_phys, phys_addr_t end_phys)
 
 	for (pos = start_phys; pos < end_phys; pos += PAGE_SIZE)
 		free_reserved_page(phys_to_page(pos));
-
-	return 0;
-}
-
-int free_fb_buf(void)
-{
-	phys_addr_t fb_base;
-	unsigned int vramsize, fps;
-
-	_parse_tag_videolfb(&vramsize, &fb_base, &fps);
-
-	if (fb_base)
-		free_reserved_buf(fb_base, fb_base + vramsize);
-	else {
-		DDPINFO("%s:get fb pa error\n", __func__);
-		return -1;
-	}
 
 	return 0;
 }
