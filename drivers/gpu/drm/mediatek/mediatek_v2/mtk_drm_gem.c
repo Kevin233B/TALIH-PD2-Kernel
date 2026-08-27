@@ -762,7 +762,11 @@ int mtk_drm_ioctl_mml_gem_submit(struct drm_device *dev, void *data,
 	submit_kernel->job = kzalloc(sizeof(struct mml_job), GFP_KERNEL);
 
 	if (submit_user->job) {
-		copy_from_user(submit_kernel->job, submit_user->job, sizeof(struct mml_job));
+		if (copy_from_user(submit_kernel->job, submit_user->job,
+				   sizeof(struct mml_job))) {
+			ret = -EFAULT;
+			goto out;
+		}
 	} else {
 		DDPMSG("mtk_drm_ioctl_mml_gem_submit submit_user->job is null\n");
 	}
@@ -771,8 +775,11 @@ int mtk_drm_ioctl_mml_gem_submit(struct drm_device *dev, void *data,
 	{
 		if (submit_user->pq_param[i]) {
 			submit_kernel->pq_param[i] = kzalloc(sizeof(struct mml_pq_param), GFP_KERNEL);
-			copy_from_user(submit_kernel->pq_param[i], submit_user->pq_param[i],
-				sizeof(struct mml_pq_param));
+			if (copy_from_user(submit_kernel->pq_param[i], submit_user->pq_param[i],
+					   sizeof(struct mml_pq_param))) {
+				ret = -EFAULT;
+				goto out;
+			}
 			//copy_from_user(submit_kernel->pq_param[i]->gralloc_extra_handle,
 			//	submit_user->pq_param[i]->gralloc_extra_handle, sizeof(void *));
 		} else {
@@ -802,9 +809,13 @@ int mtk_drm_ioctl_mml_gem_submit(struct drm_device *dev, void *data,
 	}
 
 	if (submit_user && submit_user->job) {
-		copy_to_user(submit_user->job, submit_kernel->job, sizeof(struct mml_job));
+		if (copy_to_user(submit_user->job, submit_kernel->job,
+				 sizeof(struct mml_job))) {
+			ret = -EFAULT;
+		}
 	}
 
+out:
 	for (i = 0; i < MML_MAX_OUTPUTS; i++)
 	{
 		if (submit_user->pq_param[i]) {
