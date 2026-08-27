@@ -102,7 +102,11 @@ CONFIG_MTK_FLASHLIGHT_DLPT=y
 CONFIG_MTK_IMGSENSOR=y
 CONFIG_MTK_LENS=y
 CONFIG_MTK_CAM_CAL=y
-CONFIG_MTK_CMDQ=y
+# 主线 cmdq helper（drivers/soc/mediatek/mtk-cmdq-helper.o，两参数 cmdq_pkt_create(client,size)）
+# 与 MTK ext helper（cmdq/mailbox/mtk-cmdq-helper-ext.o，单参数 cmdq_pkt_create(client)）
+# 同名符号冲突。mt6885 显示走 mediatek_v2 + ext cmdq，legacy GKI DRM（唯一用主线 helper
+# 的调用者 mtk_drm_crtc/mtk_drm_ddp_comp）不编译，故禁用主线 MTK_CMDQ，仅保留 ext。
+# CONFIG_MTK_CMDQ is not set
 CONFIG_MTK_CMDQ_MBOX_EXT=y
 CONFIG_MTK_VPU_SUPPORT=y
 CONFIG_MTK_JPEG=y
@@ -136,7 +140,9 @@ CONFIG_MTK_APUSYS_VPU=y
 CONFIG_MTK_ATF_LOGGER=y
 CONFIG_MTK_AUDIO_IPI=y
 CONFIG_MTK_CACHE_PARITY_CHECK=y
-CONFIG_MTK_CMDQ_MBOX=y
+# 主线 cmdq mailbox（drivers/mailbox/mtk-cmdq-mailbox.o）只服务 legacy DRM 与主线 helper，
+# 随 MTK_CMDQ 一并禁用；mt6885 的 mailbox 由 CONFIG_MTK_CMDQ_MBOX_EXT 提供，独立无冲突。
+# CONFIG_MTK_CMDQ_MBOX is not set
 CONFIG_MTK_COMBO_PLAT_PATH=""
 CONFIG_MTK_DBGTOP=y
 CONFIG_MTK_DEVAPC=y
@@ -335,6 +341,10 @@ CONFIG_DRM_PANEL=y
 CONFIG_DRM_PANEL_ORIENTATION_QUIRKS=y
 #CONFIG_DRM_PANEL_RAYDIUM_RM692H0=y
 CONFIG_DRM_MEDIATEK=y
+# mt6885 显示驱动是 MTK 完整版（4.19 主线的 40+ 文件集，5.10 移入 mediatek_v2/），需显式开
+# V2 走 mediatek_v2/mml 分支；否则 Makefile 落入 legacy 精简 DRM（mt8173/8183 系），该 legacy
+# 分支 include 主线 mtk-cmdq.h（两参数 API）与 ext cmdq 撞名，且并非本 SoC 的显示驱动。
+CONFIG_DRM_MEDIATEK_V2=y
 CONFIG_DRM_BRIDGE=y
 CONFIG_DRM_PANEL_BRIDGE=y
 CONFIG_MTK_GPU_SUPPORT=y
