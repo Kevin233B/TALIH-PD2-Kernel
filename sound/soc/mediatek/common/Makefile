@@ -20,7 +20,10 @@ snd-soc-mtk-common-$(CONFIG_SND_SOC_MTK_SMART_PHONE) += mtk-sp-pcm-ops.o mtk-afe
 obj-y += mtk-afe-external.o
 
 # speaker dynamic detect
-obj-m += mtk-sp-spk-amp.o
+# 内建机器驱动 mt6885/mt6853/mt6895/mt6833 及 audio_dsp 无条件引用
+# mtk_spk_get_type/mtk_spk_get_i2s_*_type/mtk_spk_update_info（4.19 main 里本文件
+# 是并入 snd-soc-mtk-sp-common 内建的），若走 obj-m 则 vmlinux 链接 undefined。
+obj-y += mtk-sp-spk-amp.o
 
 # BT CVSD driver
 obj-$(CONFIG_SND_SOC_MTK_BTCVSD) += mtk-btcvsd.o
