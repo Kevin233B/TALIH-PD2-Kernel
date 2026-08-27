@@ -62,6 +62,11 @@ CONFIG_BLK_INLINE_ENCRYPTION_FALLBACK=y
 # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
 CONFIG_ZSMALLOC=y
 CONFIG_XFRM_MIGRATE=y
+# mtk_charger.c 的 sc_nl_send_to_user/netlink_kernel_create 无条件用 netlink/skb
+# （__alloc_skb/__nlmsg_put/netlink_unicast/init_net/__netlink_kernel_create），
+# 且下面 SYN_COOKIES/VLAN/BT/CFG80211/PPP 全都 depends on NET。4.19 main 的
+# defconfig 与 gki_defconfig 均显式 CONFIG_NET=y，缺它导致整块 net 符号被静默关闭。
+CONFIG_NET=y
 CONFIG_SYN_COOKIES=y
 CONFIG_VLAN_8021Q=y
 CONFIG_CLS_U32_PERF=y
@@ -378,6 +383,14 @@ CONFIG_FB_MODE_HELPERS=y
 CONFIG_FB_TILEBLITTING=y
 CONFIG_BACKLIGHT_CLASS_DEVICE=y
 CONFIG_LOGO=y
+# register_3way_semaphore_notifier 定义在 sound/soc/mediatek/common/mtk-afe-external.c，
+# 该目录由 CONFIG_SND_SOC_MEDIATEK（被 SND_SOC_MT6885 select）管，而 SND_SOC 在
+# "if SND" 块、SND 在 "if SOUND" 块内。defconfig 缺 SOUND/SND，导致整条 ALSA/ASoC
+# 链被静默关闭、mtk-afe-external.o 不编译，adsp/scp/ultrasound 引用的
+# register/unregister_3way_semaphore_notifier 未定义。4.19 main 的 defconfig 与
+# gki_defconfig 均显式 CONFIG_SOUND=y + CONFIG_SND=y。
+CONFIG_SOUND=y
+CONFIG_SND=y
 CONFIG_SND_HRTIMER=y
 CONFIG_SND_DYNAMIC_MINORS=y
 CONFIG_SND_VERBOSE_PRINTK=y
