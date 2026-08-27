@@ -700,9 +700,6 @@ static void mtk_charger_parse_dt(struct mtk_charger *info,
 	/* fast charging algo support indicator */
 	info->enable_fast_charging_indicator =
 			of_property_read_bool(np, "enable_fast_charging_indicator");
-
-	info->support_ntc_01c_precision = of_property_read_bool(np, "qcom,support_ntc_01c_precision");
-	chr_debug("%s: support_ntc_01c_precision: %d\n", __func__, info->support_ntc_01c_precision);
 }
 
 static void mtk_charger_start_timer(struct mtk_charger *info)
@@ -2688,23 +2685,6 @@ static bool mtk_is_charger_on(struct mtk_charger *info)
 }
 
 #ifndef OPLUS_FEATURE_CHG_BASIC
-static void charger_send_kpoc_uevent(struct mtk_charger *info)
-{
-	static bool first_time = true;
-	ktime_t ktime_now;
-
-	if (first_time) {
-		info->uevent_time_check = ktime_get();
-		first_time = false;
-	} else {
-		ktime_now = ktime_get();
-		if ((ktime_ms_delta(ktime_now, info->uevent_time_check) / 1000) >= 60) {
-			mtk_chgstat_notify(info);
-			info->uevent_time_check = ktime_now;
-		}
-	}
-}
-
 static void kpoc_power_off_check(struct mtk_charger *info)
 {
 	unsigned int boot_mode = info->bootmode;
@@ -2726,7 +2706,6 @@ static void kpoc_power_off_check(struct mtk_charger *info)
 				}
 			}
 		}
-		charger_send_kpoc_uevent(info);
 	}
 }
 #endif
@@ -2781,22 +2760,6 @@ static char *dump_charger_type(int chg_type, int usb_type)
 	default:
 		return "unknown";
 	}
-}
-
-void oplus_usbtemp_set_cc_open(void)
-{
-	if (pinfo == NULL || pinfo->tcpc == NULL)
-		return;
-
-	tcpm_typec_disable_function(pinfo->tcpc, true);
-}
-
-void oplus_usbtemp_recover_cc_open(void)
-{
-	if (pinfo == NULL || pinfo->tcpc == NULL)
-		return;
-
-	tcpm_typec_disable_function(pinfo->tcpc, false);
 }
 
 static int charger_routine_thread(void *arg)
@@ -3406,8 +3369,6 @@ static void mtk_charger_external_power_changed(struct power_supply *psy)
 	struct oplus_chg_chip *chip = g_oplus_chip;
 #endif
 	int ret;
-	int pps_level;
-
 #ifdef OPLUS_FEATURE_CHG_BASIC
 	if (!chip) {
 		chg_err("g_oplus_chip is NULL!\n");
@@ -3467,12 +3428,6 @@ static void mtk_charger_external_power_changed(struct power_supply *psy)
 		if (oplus_vooc_get_fastchg_started() == false) {
 			oplus_chg_set_chargerid_switch_val(0);
 			oplus_chg_clear_chargerid_info();
-		}
-
-		pps_level = oplus_pps_get_value();
-		if (pps_level == 1) {
-			chg_err("need reset pps ctrl gpio!\n");
-			oplus_start_svooc_reset();
 		}
 
 		oplus_pps_cancel_update_work_sync();
