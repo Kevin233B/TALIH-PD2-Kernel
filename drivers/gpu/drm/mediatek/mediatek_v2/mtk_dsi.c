@@ -2031,8 +2031,6 @@ irqreturn_t mtk_dsi_irq_status(int irq, void *dev_id)
 				lcm_fps_ctx_update(ext_te_time, 0, 0);
 			}
 
-			mtk_drm_trace_c("%d|TE RDY|%d", g_commit_pid, 1);
-			mtk_drm_trace_c("%d|TE RDY|%d", g_commit_pid, 0);
 
 			if (dsi->ddp_comp.id == DDP_COMPONENT_DSI0 &&
 				mtk_dsi_is_cmd_mode(&dsi->ddp_comp) && mtk_crtc) {
@@ -2860,13 +2858,13 @@ static void mtk_dsi_encoder_disable(struct drm_encoder *encoder)
 	CRTC_MMP_EVENT_START(index, dsi_suspend,
 			(unsigned long)crtc, index);
 
-	DISP_DEBUG("doze status=%d+\n",mtk_dsi_doze_state(dsi));
+	DDPINFO("doze status=%d+\n",mtk_dsi_doze_state(dsi));
 
 	mtk_drm_idlemgr_kick(__func__, crtc, 0);
 
 //#ifdef OPLUS_FEATURE_AOD
 	if ((index == 0) && (mtk_dsi_doze_state(dsi))) {
-		DISP_DEBUG("doze suspend set  powerdown,data =%d\n",data);
+		DDPINFO("doze suspend set  powerdown,data =%d\n",data);
 		data = MTK_DISP_BLANK_POWERDOWN;
 		mtk_disp_notifier_call_chain(MTK_DISP_EVENT_BLANK,
 					&data);
@@ -2876,7 +2874,7 @@ static void mtk_dsi_encoder_disable(struct drm_encoder *encoder)
 
 //#ifdef OPLUS_FEATURE_AOD
 	if ((index == 0) && (!mtk_dsi_doze_state(dsi))) {
-		DISP_DEBUG("MTK_DISP_EARLY_EVENT_BLANK,data =%d\n",data);
+		DDPINFO("MTK_DISP_EARLY_EVENT_BLANK,data =%d\n",data);
 //#endif
 		mtk_disp_notifier_call_chain(MTK_DISP_EARLY_EVENT_BLANK,
 					&data);
@@ -2885,7 +2883,7 @@ static void mtk_dsi_encoder_disable(struct drm_encoder *encoder)
 
 //#ifdef OPLUS_FEATURE_AOD
 	if ((index == 0) && (!mtk_dsi_doze_state(dsi))) {
-		DISP_DEBUG("MTK_DISP_EVENT_BLANK power down,data =%d\n",data);
+		DDPINFO("MTK_DISP_EVENT_BLANK power down,data =%d\n",data);
 //#endif
 		mtk_disp_notifier_call_chain(MTK_DISP_EVENT_BLANK,
 			&data);
@@ -2905,10 +2903,10 @@ static void mtk_dsi_encoder_enable(struct drm_encoder *encoder)
 	CRTC_MMP_EVENT_START(index, dsi_resume,
 			(unsigned long)crtc, index);
 
-	DISP_DEBUG("doze status=%d+\n",mtk_dsi_doze_state(dsi));
+	DDPINFO("doze status=%d+\n",mtk_dsi_doze_state(dsi));
 //#ifdef OPLUS_FEATURE_AOD
 	if ((index == 0) && (mtk_dsi_doze_state(dsi))) {
-		DISP_DEBUG("doze set  powerdown,data =%d\n",data);
+		DDPINFO("doze set  powerdown,data =%d\n",data);
 		data = MTK_DISP_BLANK_POWERDOWN;
 		mtk_disp_notifier_call_chain(MTK_DISP_EVENT_BLANK,
 					&data);
@@ -2917,7 +2915,7 @@ static void mtk_dsi_encoder_enable(struct drm_encoder *encoder)
 
 //#ifdef OPLUS_FEATURE_AOD
 	if ((index == 0) && (!mtk_dsi_doze_state(dsi))) {
-		DISP_DEBUG("MTK_DISP_EVENT_BLANK early unblank,data=%d\n",data);
+		DDPINFO("MTK_DISP_EVENT_BLANK early unblank,data=%d\n",data);
 //#endif
 		mtk_disp_notifier_call_chain(MTK_DISP_EARLY_EVENT_BLANK,
 					&data);
@@ -2927,7 +2925,7 @@ static void mtk_dsi_encoder_enable(struct drm_encoder *encoder)
 //#ifdef OPLUS_FEATURE_AOD
 	if ((index == 0) && (!mtk_dsi_doze_state(dsi))) {
 //#endif
-		DISP_DEBUG("MTK_DISP_EVENT_BLANK unblank,data=%d\n",data);
+		DDPINFO("MTK_DISP_EVENT_BLANK unblank,data=%d\n",data);
 		mtk_disp_notifier_call_chain(MTK_DISP_EVENT_BLANK,
 					&data);
 	}
