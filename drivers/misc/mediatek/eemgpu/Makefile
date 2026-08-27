@@ -11,7 +11,7 @@
 # GNU General Public License for more details.
 #
 
-ccflags-y += -I$(srctree)/drivers/gpu/mediatek/gpufreq/include/
+ccflags-y += -I$(srctree)/drivers/gpu/mediatek/gpufreq/
 ccflags-y += -I$(srctree)/include/linux/
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/eemgpu/common/inc/
