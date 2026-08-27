@@ -79,17 +79,21 @@ jobs:
           make O=out -j"$(nproc)" Image dtbs
 
       # DIAGNOSTIC（临时，查出 GOT/PLT 符号后删除）：ASSERT 已临时关闭使链接能
-      # 写出 vmlinux，这里 dump 动态重定位与动态符号，命名产生 .plt/.got.plt 的符号。
+      # 写出 vmlinux。这里从「普通符号表 .symtab」（未被 linker script DISCARD，
+      # kallsyms 亦依赖它）枚举未定义/弱符号——--no-undefined 下能留下的未定义符号
+      # 只能是 __weak 未解析，正是 .plt/.got.plt 的触发者。
       - name: DIAG dump GOT/PLT relocations
         continue-on-error: true
         run: |
           export PATH="$PWD/prebuilts-master/clang/host/linux-x86/clang-r416183b/bin:$PATH"
-          echo "===== 动态符号（llvm-nm -D，命名 preemptible 符号）====="
-          llvm-nm -D out/vmlinux 2>&1 | grep -vE ' [UwW] ' | head -60 || echo "(no dyn syms)"
-          echo "===== 全部动态重定位（llvm-readelf -r 完整）====="
-          llvm-readelf -r --wide out/vmlinux 2>&1 | head -40 || echo "(no reloc)"
-          echo "===== 动态符号表全文（--dyn-syms --wide）====="
-          llvm-readelf --dyn-syms --wide out/vmlinux 2>&1 | head -40 || echo "(no dyn symtab)"
+          echo "===== 未定义符号 llvm-nm -u（= 触发 GOT/PLT 的 __weak 未解析）====="
+          llvm-nm -u out/vmlinux 2>&1 | sort | head -120 || echo "(none)"
+          echo "===== 弱符号 llvm-nm（小写 w=弱未定义，大写 W=弱已定义）====="
+          llvm-nm out/vmlinux 2>&1 | grep -E ' [wW] ' | head -120 || echo "(none)"
+          echo "===== 符号表里 UND/WEAK 行（llvm-readelf --syms）====="
+          llvm-readelf --syms --wide out/vmlinux 2>&1 | grep -iE ' UND |WEAK' | head -120 || echo "(none)"
+          echo "===== 全部动态重定位 llvm-readelf -r --wide ====="
+          llvm-readelf -r --wide out/vmlinux 2>&1 | head -60 || echo "(none)"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
