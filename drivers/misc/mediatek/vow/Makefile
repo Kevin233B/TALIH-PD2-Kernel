@@ -14,5 +14,6 @@
 DSP_VERSION := $(subst ",,$(CONFIG_MTK_VOW_DSP_VERSION))
 
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/vow/$(DSP_VERSION)
+subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/
 
 obj-$(CONFIG_MTK_VOW_SUPPORT) += $(DSP_VERSION)/
