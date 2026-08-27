@@ -133,6 +133,11 @@ enum {
 
 
 struct cmdq_pkt;
+struct mbox_chan;
+
+#if IS_ENABLED(CMDQ_MMPROFILE_SUPPORT)
+void cmdq_mmp_wait(struct mbox_chan *chan, void *pkt);
+#endif
 
 typedef const char *(*platform_thread_module_dispatch)(phys_addr_t gce_pa, s32 thread);
 typedef const char *(*platform_event_module_dispatch)(phys_addr_t gce_pa, const u16 event,
