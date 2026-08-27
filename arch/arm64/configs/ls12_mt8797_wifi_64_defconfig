@@ -498,6 +498,10 @@ CONFIG_SCHEDSTATS=y
 CONFIG_RCU_CPU_STALL_TIMEOUT=60
 CONFIG_FAULT_INJECTION=y
 CONFIG_ENABLE_DEFAULT_TRACERS=y
+# GKI 2.0 vendor hooks 前置：显式开 TRACEPOINTS。ENABLE_DEFAULT_TRACERS 的 select 链
+# 在本 defconfig 未成立，导致 ANDROID_VENDOR_HOOKS 因 depends on TRACEPOINTS 被静默重置 n，
+# vendor_hooks.h 走 DECLARE_EVENT_NOP 分支，register_trace_android_vh_* 不生成。
+CONFIG_TRACEPOINTS=y
 # MTK sched/perf/task_turbo 等 15 文件无条件 register_trace_android_vh_*（GKI 2.0 vendor hooks）
 CONFIG_ANDROID_VENDOR_HOOKS=y
 # 补齐 4 项 AND-depends 父符号（音频 ipi / 调度 core_ctl / 频控 nonlinear / USB dp mux，2026-08-26）
