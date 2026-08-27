@@ -685,7 +685,7 @@ static void lookup_tracepoints(struct tracepoint *tp, void *ignore)
 	}
 }
 
-void tracepoint_cleanup(void)
+static void tracepoint_cleanup(void)
 {
 	int i;
 

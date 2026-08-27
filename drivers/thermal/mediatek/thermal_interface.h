@@ -126,13 +126,7 @@ extern int get_jatm_suspend(void);
 extern int get_catm_ttj(void);
 extern int get_catm_min_ttj(void);
 
-#if IS_ENABLED(CONFIG_MTK_THERMAL_INTERFACE)
 extern void __iomem *thermal_csram_base;
 extern void __iomem *thermal_apu_mbox_base;
 extern struct frs_info frs_data;
-#else
-void __iomem *thermal_csram_base;
-void __iomem *thermal_apu_mbox_base;
-struct frs_info frs_data;
-#endif
 #endif

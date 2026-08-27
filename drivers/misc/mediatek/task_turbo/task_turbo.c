@@ -101,7 +101,6 @@ struct static_key sched_feat_keys[__SCHED_FEAT_NR] = {
 #define RWSEM_WRITER_MASK	RWSEM_WRITER_LOCKED
 
 DEFINE_PER_CPU(struct hmp_domain *, hmp_cpu_domain);
-DEFINE_PER_CPU(unsigned long, cpu_scale) = SCHED_CAPACITY_SCALE;
 
 static uint32_t latency_turbo = SUB_FEAT_LOCK | SUB_FEAT_BINDER |
 				SUB_FEAT_SCHED;
@@ -597,24 +596,6 @@ static void set_load_weight(struct task_struct *p, bool update_load)
 		load->weight = scale_load(sched_prio_to_weight[prio]);
 		load->inv_weight = sched_prio_to_wmult[prio];
 	}
-}
-
-int idle_cpu(int cpu)
-{
-	struct rq *rq = cpu_rq(cpu);
-
-	if (rq->curr != rq->idle)
-		return 0;
-
-	if (rq->nr_running)
-		return 0;
-
-#if IS_ENABLED(CONFIG_SMP)
-	if (rq->ttwu_pending)
-		return 0;
-#endif
-
-	return 1;
 }
 
 static void rwsem_stop_turbo_inherit(struct rw_semaphore *sem)
