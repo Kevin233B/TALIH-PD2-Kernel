@@ -386,6 +386,7 @@ static long adsp_driver_ioctl(
 	return ret;
 }
 
+#if IS_ENABLED(CONFIG_COMPAT)
 static long adsp_driver_compat_ioctl(
 	struct file *file, unsigned int cmd, unsigned long arg)
 {
@@ -395,6 +396,7 @@ static long adsp_driver_compat_ioctl(
 	}
 	return file->f_op->unlocked_ioctl(file, cmd, arg);
 }
+#endif
 
 const struct file_operations adspsys_file_ops = {
 	.owner = THIS_MODULE,
