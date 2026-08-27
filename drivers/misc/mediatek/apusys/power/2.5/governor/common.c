@@ -91,7 +91,7 @@ free_passdata:
 void apu_dump_list(struct apu_gov_data *gov_data)
 {
 	struct apu_req *ptr;
-	char buffer[__LOG_BUF_LEN];
+	char buffer[1024];  /* printk 单行上限 1024；__LOG_BUF_LEN 随 CONFIG_LOG_BUF_SHIFT=23 膨胀为 8KB 爆栈 */
 	int n_pos = 0;
 
 	if (apupw_dbg_get_loglvl() >= VERBOSE_LVL) {
@@ -113,7 +113,7 @@ void apu_dump_list(struct apu_gov_data *gov_data)
 void apu_dump_pe_gov(struct apu_dev *ad, struct list_head *head)
 {
 	struct apu_req *ptr;
-	char buffer[__LOG_BUF_LEN];
+	char buffer[1024];  /* printk 单行上限 1024；__LOG_BUF_LEN 随 CONFIG_LOG_BUF_SHIFT=23 膨胀为 8KB 爆栈 */
 	int n_pos = 0;
 
 	if (apupw_dbg_get_loglvl() >= VERBOSE_LVL) {
