@@ -571,7 +571,9 @@ static inline void typec_unattached_cc_entry(struct tcpc_device *tcpc)
 		tcpc_typec_handle_ctd(tcpc, TCPC_CABLE_TYPE_NONE);
 #endif /* CONFIG_CABLE_TYPE_DETECTION */
 
+#ifdef OPLUS_FEATURE_CHG_BASIC
 	tcpc->typec_role = tcpc->typec_role_new;
+#endif /* OPLUS_FEATURE_CHG_BASIC */
 
 	switch (tcpc->typec_role) {
 	case TYPEC_ROLE_SNK:
@@ -2814,6 +2816,7 @@ int tcpc_typec_change_role(
 		return -EINVAL;
 	}
 
+#ifdef OPLUS_FEATURE_CHG_BASIC
 	if (tcpc->typec_role_new == typec_role) {
 		TYPEC_INFO("typec_new_role: %s is the same\n",
 			typec_role_name[typec_role]);
@@ -2821,6 +2824,7 @@ int tcpc_typec_change_role(
 		return 0;
 	}
 	tcpc->typec_role_new = typec_role;
+#endif /* OPLUS_FEATURE_CHG_BASIC */
 
 	TYPEC_INFO("typec_new_role: %s\n", typec_role_name[typec_role]);
 
@@ -2887,7 +2891,9 @@ int tcpc_typec_init(struct tcpc_device *tcpc, uint8_t typec_role)
 	TYPEC_INFO("typec_init: %s\n", typec_role_name[typec_role]);
 
 	tcpc->typec_role = typec_role;
+#ifdef OPLUS_FEATURE_CHG_BASIC
 	tcpc->typec_role_new = typec_role;
+#endif /* OPLUS_FEATURE_CHG_BASIC */
 	tcpc->typec_attach_new = TYPEC_UNATTACHED;
 	tcpc->typec_attach_old = TYPEC_UNATTACHED;
 

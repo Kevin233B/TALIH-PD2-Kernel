@@ -745,7 +745,7 @@ static bool ufs_mtk_is_data_cmd(struct scsi_cmnd *cmd)
 	return false;
 }
 
-static void ufshcd_lrb_scsicmd_time_statistics(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
+static void __maybe_unused ufshcd_lrb_scsicmd_time_statistics(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
 {
 	if (lrbp->cmd->cmnd[0] == WRITE_10 || lrbp->cmd->cmnd[0] == WRITE_16) {
 		if (hba->pwr_info.gear_tx == 1) {
@@ -786,7 +786,7 @@ static void ufshcd_lrb_scsicmd_time_statistics(struct ufs_hba *hba, struct ufshc
 	return;
 }
 
-static void ufshcd_lrb_devcmd_time_statistics(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
+static void __maybe_unused ufshcd_lrb_devcmd_time_statistics(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
 {
 	if (hba->pwr_info.gear_tx == 1) {
 		ufs_transmission_status.gear_min_dev_us +=

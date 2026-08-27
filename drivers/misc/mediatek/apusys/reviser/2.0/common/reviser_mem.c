@@ -5,6 +5,7 @@
 
 #include <linux/errno.h>
 #include <linux/slab.h>
+#include <linux/kmemleak.h>
 #include <linux/dma-direction.h>
 #include <linux/scatterlist.h>
 #include <linux/dma-mapping.h>
