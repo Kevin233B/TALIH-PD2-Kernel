@@ -460,57 +460,6 @@ static void log_hang_info(const char *fmt, ...)
 }
 
 #ifdef CONFIG_MTK_HANG_DETECT_DB
-#ifndef MODULE
-static void buffer_hang_info(const char *buff, unsigned long size)
-{
-	if (((unsigned long)Hang_Info_Size + size)
-		>= (unsigned long)MaxHangInfoSize)
-		return;
-
-	memcpy(&Hang_Info[Hang_Info_Size], buff, size);
-	Hang_Info_Size += size;
-}
-
-static void dump_msdc_hang_info(void)
-{
-	char *buff_add = NULL;
-	unsigned long buff_size = 0;
-
-	if (get_msdc_aee_buffer) {
-		get_msdc_aee_buffer((unsigned long *)&buff_add, &buff_size);
-		if (buff_size != 0 && buff_add) {
-			if (buff_size > MSDC_BUFFER_DEFAULT_SIZE) {
-				buff_add = buff_add + buff_size - MSDC_BUFFER_DEFAULT_SIZE;
-				buff_size = MSDC_BUFFER_DEFAULT_SIZE;
-			}
-			buffer_hang_info(buff_add, buff_size);
-		}
-	}
-}
-
-static void dump_mem_info(void)
-{
-	char *buff_add = NULL;
-	int buff_size = 0;
-
-	if (mlog_get_buffer) {
-		mlog_get_buffer(&buff_add, &buff_size);
-		if (buff_size <= 0 || !buff_add) {
-			pr_info("hang_detect: mlog_get_buffer size %d.\n",
-				buff_size);
-			return;
-		}
-
-		if (buff_size > MEM_BUFFER_DEFAULT_SIZE) {
-			buff_add = buff_add + buff_size - MEM_BUFFER_DEFAULT_SIZE;
-			buff_size = MEM_BUFFER_DEFAULT_SIZE;
-		}
-
-		buffer_hang_info(buff_add, buff_size);
-	}
-}
-#endif
-
 void trigger_hang_db(void)
 {
 	pr_notice("[Hang_Detect] we  triger DB.\n");
@@ -1257,16 +1206,6 @@ static void show_task_backtrace(void)
 
 static void show_status(int flag)
 {
-
-#ifdef CONFIG_MTK_HANG_DETECT_DB
-#ifndef MODULE
-	if (Hang_first_done)	{ /* the last dump */
-		dump_mem_info();
-		dump_msdc_hang_info();
-	}
-#endif
-#endif
-
 
 #if IS_ENABLED(CONFIG_MTK_HANG_PROC)
 	show_mem(0, NULL);
