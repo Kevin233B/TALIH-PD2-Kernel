@@ -87,6 +87,7 @@ static void _opp_limiter(int vpu_max, int vpu_min, int dla_max, int dla_min,
 
 }
 
+#if IS_ENABLED(CONFIG_DEBUG_FS)
 static void limit_opp_to_all_devices(int opp)
 {
 	int c_id, d_id;
@@ -95,6 +96,7 @@ static void limit_opp_to_all_devices(int opp)
 		for (d_id = 0 ; d_id < DEVICE_NUM ; d_id++)
 			_opp_limiter(opp, opp, opp, opp, OPP_LIMIT_DEBUG);
 }
+#endif
 
 void mt6895_aputop_opp_limit(struct aputop_func_param *aputop,
 		enum apu_opp_limit_type type)
