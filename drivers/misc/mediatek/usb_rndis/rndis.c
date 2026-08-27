@@ -966,7 +966,7 @@ struct rndis_params *mtk_rndis_register(void (*resp_avail)(void *v), void *v)
 
 		sprintf(name, NAME_TEMPLATE, i);
 		proc_entry = proc_create_data(name, 0660, NULL,
-					      &rndis_proc_fops, params);
+					      &rndis_proc_ops, params);
 		if (!proc_entry) {
 			kfree(params);
 			rndis_put_nr(i);
