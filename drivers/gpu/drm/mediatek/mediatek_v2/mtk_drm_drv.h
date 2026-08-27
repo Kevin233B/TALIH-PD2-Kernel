@@ -147,6 +147,8 @@ struct mtk_drm_private {
 	struct drm_property *crtc_property[MAX_CRTC][CRTC_PROP_MAX];
 
 	struct mtk_ddp_fb_info fb_info;
+	struct drm_fb_helper fb_helper;
+	struct drm_gem_object *fbdev_bo;
 
 	struct list_head lyeblob_head;
 	struct mutex lyeblob_list_mutex;
