@@ -1402,7 +1402,7 @@ static void fbt_set_min_cap_locked(struct render_info *thr, int min_cap,
 	int bhr_local;
 	int cluster = 0;
 	int max_cap = 100;
-	struct fpsgo_loading dep_need_set[MAX_DEP_NUM];
+	struct fpsgo_loading *dep_need_set = NULL;
 	int temp_size_need_set = 0;
 
 
@@ -1503,6 +1503,12 @@ static void fbt_set_min_cap_locked(struct render_info *thr, int min_cap,
 	if (thr->pid == max_blc_pid && thr->buffer_id == max_blc_buffer_id)
 		size_final = size;
 	else {
+		dep_need_set = kcalloc(MAX_DEP_NUM,
+			sizeof(*dep_need_set), GFP_KERNEL);
+		if (!dep_need_set) {
+			kfree(dep_str);
+			return;
+		}
 		dep_a_except_b(
 			&(thr->dep_arr[0]), thr->dep_valid_size,
 			&max_blc_dep[0], max_blc_dep_num,
@@ -1585,6 +1591,7 @@ static void fbt_set_min_cap_locked(struct render_info *thr, int min_cap,
 
 	fpsgo_main_trace("[%d] dep-list %s", thr->pid, dep_str);
 	kfree(dep_str);
+	kfree(dep_need_set);
 
 	fpsgo_systrace_c_fbt(thr->pid, thr->buffer_id,
 		min_cap,	"perf idx");

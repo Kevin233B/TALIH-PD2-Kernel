@@ -498,6 +498,8 @@ CONFIG_SCHEDSTATS=y
 CONFIG_RCU_CPU_STALL_TIMEOUT=60
 CONFIG_FAULT_INJECTION=y
 CONFIG_ENABLE_DEFAULT_TRACERS=y
+# MTK sched/perf/task_turbo 等 15 文件无条件 register_trace_android_vh_*（GKI 2.0 vendor hooks）
+CONFIG_ANDROID_VENDOR_HOOKS=y
 # 补齐 4 项 AND-depends 父符号（音频 ipi / 调度 core_ctl / 频控 nonlinear / USB dp mux，2026-08-26）
 CONFIG_MTK_AUDIODSP_SUPPORT=y
 CONFIG_MTK_SCHEDULER=y
