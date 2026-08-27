@@ -172,8 +172,11 @@ SECTIONS
 	 * contains only the lazy dispatch entries.
 	 */
 	.got.plt : { *(.got.plt) }
+	/* DIAGNOSTIC: 临时关掉 ASSERT，让 lld 完成链接并写出 vmlinux，
+	 * 再用 llvm-readelf -r 揪出产生 .plt/.got.plt 的具体符号。查出后恢复。
 	ASSERT(SIZEOF(.got.plt) == 0 || SIZEOF(.got.plt) == 0x18,
 	       "Unexpected GOT/PLT entries detected!")
+	*/
 
 	. = ALIGN(SEGMENT_ALIGN);
 	_etext = .;			/* End of text section */
@@ -308,7 +311,9 @@ SECTIONS
 	.plt : {
 		*(.plt) *(.plt.*) *(.iplt) *(.igot .igot.plt)
 	}
+	/* DIAGNOSTIC: 临时关闭 .plt ASSERT 以写出 vmlinux 供 readelf。
 	ASSERT(SIZEOF(.plt) == 0, "Unexpected run-time procedure linkages detected!")
+	*/
 
 	.data.rel.ro : { *(.data.rel.ro) }
 	ASSERT(SIZEOF(.data.rel.ro) == 0, "Unexpected RELRO detected!")

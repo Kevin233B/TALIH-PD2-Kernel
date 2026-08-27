@@ -78,6 +78,19 @@ jobs:
           make O=out ls12_mt8797_wifi_64_defconfig
           make O=out -j"$(nproc)" Image dtbs
 
+      # DIAGNOSTIC（临时，查出 GOT/PLT 符号后删除）：ASSERT 已临时关闭使链接能
+      # 写出 vmlinux，这里 dump 动态重定位与动态符号，命名产生 .plt/.got.plt 的符号。
+      - name: DIAG dump GOT/PLT relocations
+        continue-on-error: true
+        run: |
+          export PATH="$PWD/prebuilts-master/clang/host/linux-x86/clang-r416183b/bin:$PATH"
+          echo "===== .plt/.got 相关 section ====="
+          llvm-readelf -S out/vmlinux 2>/dev/null | grep -iE '\.plt|\.got|rela' || echo "(no vmlinux)"
+          echo "===== JUMP_SLOT / GLOB_DAT 重定位（= 产生 GOT/PLT 的符号名）====="
+          llvm-readelf -r out/vmlinux 2>/dev/null | grep -iE 'JUMP_SLOT|GLOB_DAT' || echo "(no jump-slot/glob-dat)"
+          echo "===== 动态符号表（FUNC/GLOBAL，preemptible 候选）====="
+          llvm-readelf --dyn-syms out/vmlinux 2>/dev/null | grep -iE 'FUNC|GLOBAL|UND' | head -120 || echo "(no dyn-syms)"
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
