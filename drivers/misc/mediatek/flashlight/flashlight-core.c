@@ -1972,13 +1972,19 @@ static int __init flashlight_init(void)
 
 #ifdef CONFIG_MTK_FLASHLIGHT_PT
 #ifndef OPLUS_FEATURE_CAMERA_COMMON
+#if IS_ENABLED(CONFIG_MTK_LOW_BATTERY_POWER_THROTTLING)
 	register_low_battery_notify(
 			&pt_low_vol_callback, LOW_BATTERY_PRIO_FLASHLIGHT);
+#endif
+#if IS_ENABLED(CONFIG_MTK_BATTERY_PERCENT_THROTTLING)
 	register_bp_thl_notify(
 			&pt_low_bat_callback, BATTERY_PERCENT_PRIO_FLASHLIGHT);
+#endif
 #endif // OPLUS_FEATURE_CAMERA_COMMON
+#if IS_ENABLED(CONFIG_MTK_BATTERY_OC_POWER_THROTTLING)
 	register_battery_oc_notify(
 			&pt_oc_callback, BATTERY_OC_PRIO_FLASHLIGHT);
+#endif
 #endif
 
 	pr_debug("Init done\n");
