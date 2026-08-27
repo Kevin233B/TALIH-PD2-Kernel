@@ -345,11 +345,22 @@ CONFIG_DRM_MEDIATEK=y
 # V2 走 mediatek_v2/mml 分支；否则 Makefile 落入 legacy 精简 DRM（mt8173/8183 系），该 legacy
 # 分支 include 主线 mtk-cmdq.h（两参数 API）与 ext cmdq 撞名，且并非本 SoC 的显示驱动。
 CONFIG_DRM_MEDIATEK_V2=y
+# mediatek_v2 显示通路无条件引用 mml_drm_*（PQ/racing 同步）；mml 需内建，否则 vmlinux 链接 undefined
+CONFIG_MTK_MML=y
 CONFIG_DRM_BRIDGE=y
 CONFIG_DRM_PANEL_BRIDGE=y
 CONFIG_MTK_GPU_SUPPORT=y
 CONFIG_MTK_GPU_VERSION="mali valhall r32p1 mt6893"
 CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y
+# 内建代码无条件引用以下符号（通用 MTK 功能，需内建编入）：
+#   ged_hal -> ged_debugFS_*（CONFIG_DEBUG_FS）；apu_ipi -> rproc_remove_subdev（CONFIG_REMOTEPROC）
+#   mtk_sec_heap/system_heap -> dmabuf_to_tmem_type/mtk_dma_buf_set_name（CONFIG_DMABUF_HEAPS*）
+CONFIG_DEBUG_FS=y
+CONFIG_REMOTEPROC=y
+CONFIG_DMABUF_HEAPS=y
+CONFIG_DMABUF_HEAPS_DEFERRED_FREE=y
+CONFIG_DMABUF_HEAPS_PAGE_POOL=y
+CONFIG_DMABUF_HEAPS_SYSTEM=y
 CONFIG_FB=y
 CONFIG_FB_CMDLINE=y
 CONFIG_FB_NOTIFY=y

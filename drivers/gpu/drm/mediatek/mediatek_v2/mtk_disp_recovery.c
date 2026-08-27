@@ -41,10 +41,7 @@
 //#else
 #define ESD_CHECK_PERIOD 5000 /* ms */
 #define TIMEOUT_MS 20
-extern unsigned int esd_mode;
 extern unsigned int ffl_backlight_backup;
-unsigned long esd_flag = 0;
-EXPORT_SYMBOL(esd_flag);
 /* pinctrl implementation */
 long _set_state(struct drm_crtc *crtc, const char *name)
 {
@@ -578,14 +575,8 @@ static int mtk_drm_esd_check_worker_kthread(void *data)
 		i = 0; /* repeat */
 		do {
 			ret = mtk_drm_esd_check(crtc);
-			//#ifndef OPLUS_FEATURE_ESD
-			//if (!ret) /* success */
-				//break;
-			//#else
-			if (!esd_mode && !ret) /* success */
+			if (!ret) /* success */
 				break;
-			esd_flag = 1;
-			//#endif
 			DDPPR_ERR(
 				"[ESD]esd check fail, will do esd recovery. try=%d\n",
 				i);
@@ -596,10 +587,6 @@ static int mtk_drm_esd_check_worker_kthread(void *data)
 			drm_trigger_repaint(DRM_REPAINT_FOR_ESD, crtc->dev);
 #endif
 			msleep(2000);
-			//#ifdef OPLUS_FEATURE_ESD
-			esd_mode = 0;
-			esd_flag = 0;
-			//#endif
 			recovery_flg = 1;
 		} while (++i < ESD_TRY_CNT);
 

@@ -368,7 +368,6 @@ struct DSI_T0_INS {
 enum dsi_porch_type { DECLARE_DSI_PORCH(DECLARE_NUM) };
 
 //#ifdef OPLUS_FEATURE_SILENCEMODE
-extern unsigned long esd_flag;
 unsigned long long last_te_time = 0;
 //#ifdef OPLUS_BUG_STABILITY
 void mipi_dsi_dcs_write_gce(struct mtk_dsi *dsi, struct cmdq_pkt *handle,
@@ -2557,18 +2556,6 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi,
 			DDPPR_ERR("failed to prepare the panel\n");
 			return;
 		}
-
-		//#ifdef OPLUS_FEATURE_ESD
-		/* this code phase maybe after mode_switch*/
-		if (esd_flag == 1){
-			if (ext && ext->funcs
-				&& ext->funcs->esd_backlight_recovery){
-					ext->funcs->esd_backlight_recovery(dsi,
-					       mipi_dsi_dcs_write_gce2,
-					       NULL);
-			}
-		}
-		//#endif
 
 		DDPINFO("%s:continue before doze_enable\n", __func__);
 
