@@ -3260,26 +3260,6 @@ bool mtk_crtc_frame_buffer_existed(void)
 	return !already_free;
 }
 
-static int free_reserved_buf(phys_addr_t start_phys, phys_addr_t end_phys)
-{
-	phys_addr_t pos;
-
-	BUG_ON(start_phys & ~PAGE_MASK);
-	BUG_ON(end_phys & ~PAGE_MASK);
-
-	if (end_phys <= start_phys) {
-		DDPPR_ERR("%s end_phys:0x%lx is smaller than start_phys:0x%lx\n",
-			__func__, (unsigned long)end_phys, (unsigned long)start_phys);
-
-		return -1;
-	}
-
-	for (pos = start_phys; pos < end_phys; pos += PAGE_SIZE)
-		free_reserved_page(phys_to_page(pos));
-
-	return 0;
-}
-
 static void mtk_crtc_frame_buffer_release(struct drm_crtc *crtc,
 		int index, bool hrt_valid)
 {
