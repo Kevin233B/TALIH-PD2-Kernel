@@ -54,9 +54,25 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential bc flex bison libssl-dev libelf-dev libncurses-dev dwarves \
+            build-essential bc flex bison libssl-dev libelf-dev libncurses-dev \
             gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
             gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi
+
+      # pahole 必须与 5.10 同代。ubuntu-22.04 自带的 dwarves 1.22（v1.21 起新增 BTF_KIND_FLOAT
+      # 编码）会让 5.10 内核的 resolve_btfids + 内核态 kernel/bpf/btf.c（BTF_KIND_MAX=DATASEC）
+      # 解析失败："FAILED: load BTF from vmlinux: Unknown error -22"。改装 ubuntu-21.04(hirsute)
+      # 的 dwarves 1.20——无 float 编码、5.10~5.11 同代，其 libbpf0/libdw1/libelf1 运行依赖 jammy
+      # 全部满足（libbpf0 0.5.0、libdw1 0.186）。SHA256 钉死 hirsute 官方 .deb。
+      - name: Install pahole 1.20 (5.10-compatible BTF)
+        run: |
+          set -eo pipefail
+          curl -fsSL --retry 3 --retry-delay 5 \
+            "http://old-releases.ubuntu.com/ubuntu/pool/universe/d/dwarves-dfsg/dwarves_1.20-1_amd64.deb" \
+            -o /tmp/dwarves_1.20-1_amd64.deb
+          echo "67efe8ddbf5e16b84a5aa322f4e02955a6939dbbb615dca1f590071641e0acef  /tmp/dwarves_1.20-1_amd64.deb" | sha256sum -c -
+          sudo apt-get update
+          sudo apt-get install -y /tmp/dwarves_1.20-1_amd64.deb
+          pahole --version
 
       - name: Toolchain versions
         run: |
