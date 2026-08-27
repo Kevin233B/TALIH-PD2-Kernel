@@ -1213,31 +1213,48 @@ static int fbt_get_dep_list(struct render_info *thr)
 	int pid;
 	int count = 0;
 	int ret_size;
-	struct fpsgo_loading dep_new[MAX_DEP_NUM],
-		dep_only_old[MAX_DEP_NUM], dep_old_need_reset[MAX_DEP_NUM];
+	int ret = 0;
+	struct fpsgo_loading *dep_new;
+	struct fpsgo_loading *dep_only_old;
+	struct fpsgo_loading *dep_old_need_reset;
 	int i;
 	int temp_size_only_old = 0, temp_size_old_need_reset = 0;
 
-	memset(dep_new, 0,
-		MAX_DEP_NUM * sizeof(struct fpsgo_loading));
-
-	if (!thr)
+	dep_new = kcalloc(MAX_DEP_NUM, sizeof(struct fpsgo_loading), GFP_KERNEL);
+	dep_only_old = kcalloc(MAX_DEP_NUM, sizeof(struct fpsgo_loading), GFP_KERNEL);
+	dep_old_need_reset = kcalloc(MAX_DEP_NUM, sizeof(struct fpsgo_loading), GFP_KERNEL);
+	if (!dep_new || !dep_only_old || !dep_old_need_reset) {
+		kfree(dep_new);
+		kfree(dep_only_old);
+		kfree(dep_old_need_reset);
 		return 1;
+	}
+
+	if (!thr) {
+		ret = 1;
+		goto out;
+	}
 
 	pid = thr->pid;
-	if (!pid)
-		return 2;
+	if (!pid) {
+		ret = 2;
+		goto out;
+	}
 
 	count = fpsgo_fbt2xgf_get_dep_list_num(pid, thr->buffer_id);
-	if (count <= 0)
-		return 3;
+	if (count <= 0) {
+		ret = 3;
+		goto out;
+	}
 	count = clamp(count, 1, MAX_DEP_NUM);
 
 	ret_size = fpsgo_fbt2xgf_get_dep_list(pid, count,
 		dep_new, thr->buffer_id);
 
-	if (ret_size == 0 || ret_size != count)
-		return 4;
+	if (ret_size == 0 || ret_size != count) {
+		ret = 4;
+		goto out;
+	}
 
 	fbt_dep_list_filter(dep_new, count);
 	sort(dep_new, count, sizeof(struct fpsgo_loading), __cmp1, NULL);
@@ -1279,7 +1296,8 @@ static int fbt_get_dep_list(struct render_info *thr)
 				sizeof(struct fpsgo_loading));
 		if (thr->dep_arr == NULL) {
 			thr->dep_valid_size = 0;
-			return 5;
+			ret = 5;
+			goto out;
 		}
 	}
 
@@ -1289,7 +1307,12 @@ static int fbt_get_dep_list(struct render_info *thr)
 	memcpy(thr->dep_arr, dep_new,
 		thr->dep_valid_size * sizeof(struct fpsgo_loading));
 
-	return 0;
+	ret = 0;
+out:
+	kfree(dep_new);
+	kfree(dep_only_old);
+	kfree(dep_old_need_reset);
+	return ret;
 }
 
 static void fbt_clear_dep_list(struct fpsgo_loading *pdep)
