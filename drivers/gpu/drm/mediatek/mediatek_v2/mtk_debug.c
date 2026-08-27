@@ -9,8 +9,8 @@
 #include <linux/wait.h>
 #if IS_ENABLED(CONFIG_DEBUG_FS)
 #include <linux/debugfs.h>
-#include <mt-plat/mrdump.h>
 #endif
+#include <mt-plat/mrdump.h>
 
 #if IS_ENABLED(CONFIG_PROC_FS)
 #include <linux/proc_fs.h>
