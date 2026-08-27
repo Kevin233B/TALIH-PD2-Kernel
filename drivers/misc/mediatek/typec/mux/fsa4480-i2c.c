@@ -254,24 +254,24 @@ static int fsa4480_parse_dt(struct fsa4480_priv *fsa_priv,struct device *dev)
 
 	fsa_priv->hs_det_pin = of_get_named_gpio(dNode, "hs-det-gpio", 0);
 	if (!gpio_is_valid(fsa_priv->hs_det_pin)) {
-	    pr_warning("%s: hs-det-gpio in dt node is missing\n", __func__);
+	    pr_warn("%s: hs-det-gpio in dt node is missing\n", __func__);
 	    return -ENODEV;
 	}
 	ret = gpio_request(fsa_priv->hs_det_pin, "fsa4480_hs_det");
 	if (ret) {
-		pr_warning("%s: hs-det-gpio request fail\n", __func__);
+		pr_warn("%s: hs-det-gpio request fail\n", __func__);
 		return ret;
 	}
 	gpio_direction_output(fsa_priv->hs_det_pin, 0);
 	//Begin added for mic detect
 	fsa_priv->mic_det_pin = of_get_named_gpio(dNode, "mic-gpio", 0);
 	if (!gpio_is_valid(fsa_priv->mic_det_pin)) {
-	    pr_warning("%s: hs-mic-gpio in dt node is missing\n", __func__);
+	    pr_warn("%s: hs-mic-gpio in dt node is missing\n", __func__);
 	    return -ENODEV;
 	}
 	ret = gpio_request(fsa_priv->mic_det_pin, "fsa4480_mic_det");
 	if (ret) {
-		pr_warning("%s: hs-mic-gpio request fail\n", __func__);
+		pr_warn("%s: hs-mic-gpio request fail\n", __func__);
 		return ret;
 	}
 	gpio_direction_output(fsa_priv->mic_det_pin, 1);	

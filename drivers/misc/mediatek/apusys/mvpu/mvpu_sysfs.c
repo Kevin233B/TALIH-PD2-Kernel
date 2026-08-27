@@ -117,10 +117,10 @@ int mvpu_sysfs_init(void)
 		return -EINVAL;
 	}
 
-	sysfs_create_file(root_dir, &loglevel.attr);
+	ret = sysfs_create_file(root_dir, &loglevel.attr);
 
 #ifdef MVPU_SECURITY
-	sysfs_create_file(root_dir, &get_mvpu_img.attr);
+	ret = sysfs_create_file(root_dir, &get_mvpu_img.attr);
 #endif
 
 	return ret;
