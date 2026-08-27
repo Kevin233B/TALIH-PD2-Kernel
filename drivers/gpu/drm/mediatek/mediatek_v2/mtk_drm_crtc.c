@@ -3234,10 +3234,6 @@ static void mtk_crtc_disp_mode_switch_begin(struct drm_crtc *crtc,
 	}
 
 	drm_invoke_fps_chg_callbacks(fps_dst);
-	/* #ifdef OPLUS_BUG_STABILITY */
-	g_cur_fps = fps_dst;
-	DDPINFO("%s fps: %d\n", __func__, g_cur_fps);
-	/* #endif OPLUS_BUG_STABILITY */
 
 
 	/* update framedur_ns for VSYNC report */
@@ -6459,11 +6455,7 @@ void mtk_drm_crtc_init_para(struct drm_crtc *crtc)
 	crtc->state->adjusted_mode.vtotal       = timing->vtotal;
 	crtc->state->adjusted_mode.vscan        = timing->vscan;
 
-	/* #ifdef OPLUS_BUG_STABILITY */
-	g_cur_fps = drm_mode_vrefresh(timing);
-	drm_invoke_fps_chg_callbacks(g_cur_fps);
-	/* drm_invoke_fps_chg_callbacks(drm_mode_vrefresh(timing)); */
-	/* #endif OPLUS_BUG_STABILITY */
+	drm_invoke_fps_chg_callbacks(drm_mode_vrefresh(timing));
 	mtk_crtc_attach_ddp_comp(crtc, mtk_crtc->ddp_mode, true);
 
 	/* backup display context */
