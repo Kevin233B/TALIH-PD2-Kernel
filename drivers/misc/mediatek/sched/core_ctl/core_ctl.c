@@ -12,6 +12,7 @@
 #include <linux/sched/rt.h>
 #include <linux/syscore_ops.h>
 #include <linux/module.h>
+#include <linux/slab.h>
 #include <uapi/linux/sched/types.h>
 #include <trace/hooks/sched.h>
 #include <sched/sched.h>

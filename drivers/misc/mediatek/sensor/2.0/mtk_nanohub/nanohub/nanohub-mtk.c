@@ -8,6 +8,7 @@
 #include <linux/module.h>
 #include <linux/completion.h>
 #include <linux/workqueue.h>
+#include <linux/slab.h>
 #include <scp.h>
 
 #include "main.h"

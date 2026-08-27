@@ -9,6 +9,7 @@
 #include <linux/sched.h>
 #include <linux/module.h>
 #include <linux/printk.h>
+#include <linux/slab.h>
 #include <uapi/linux/sched/types.h>
 #include <uapi/linux/prctl.h>
 #include <linux/futex.h>
