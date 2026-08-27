@@ -137,8 +137,6 @@ void fsa4480_usbc_event_changed(int plug_state)
 }
 EXPORT_SYMBOL(fsa4480_usbc_event_changed);
 
-extern void accdet_eint_callback_wrapper(unsigned int plug_status);
-
 static int fsa4480_usbc_analog_setup_switches(struct fsa4480_priv *fsa_priv)
 {
 	int rc = 0;
@@ -211,7 +209,6 @@ static int fsa4480_usbc_analog_setup_switches(struct fsa4480_priv *fsa_priv)
 		}
 		printk("hly %s line = %d",__func__,__LINE__);
         fsa4480_dump_reg(fsa_priv);
-		accdet_eint_callback_wrapper(1);
 	} else {
 
 		/* deactivate switches */
@@ -221,7 +218,6 @@ static int fsa4480_usbc_analog_setup_switches(struct fsa4480_priv *fsa_priv)
 	//begin add by wenhaodeng for task  LUSHAN-102 on 20230803
 		printk("hly %s line = %d",__func__,__LINE__);
 		fsa4480_dump_reg(fsa_priv);
-		accdet_eint_callback_wrapper(0);
 //Begein added by lanying.he for mic detect
 		if (gpio_is_valid(fsa_priv->mic_det_pin)) {
 			state = gpio_get_value(fsa_priv->mic_det_pin);

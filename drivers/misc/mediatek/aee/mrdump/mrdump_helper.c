@@ -602,6 +602,33 @@ unsigned long aee_get_kti_addresses(void)
 	return (unsigned long)kallsyms_token_index;
 }
 
+#if IS_ENABLED(CONFIG_KALLSYMS_BASE_RELATIVE)
+unsigned long aee_get_kn_off(void)
+{
+	return (unsigned long)kallsyms_names - (unsigned long)kallsyms_offsets;
+}
+
+unsigned long aee_get_kns_off(void)
+{
+	return (unsigned long)&kallsyms_num_syms - (unsigned long)kallsyms_offsets;
+}
+
+unsigned long aee_get_km_off(void)
+{
+	return (unsigned long)kallsyms_markers - (unsigned long)kallsyms_offsets;
+}
+
+unsigned long aee_get_ktt_off(void)
+{
+	return (unsigned long)kallsyms_token_table - (unsigned long)kallsyms_offsets;
+}
+
+unsigned long aee_get_kti_off(void)
+{
+	return (unsigned long)kallsyms_token_index - (unsigned long)kallsyms_offsets;
+}
+#endif
+
 static raw_spinlock_t *p_die_lock;
 void aee_reinit_die_lock(void)
 {
