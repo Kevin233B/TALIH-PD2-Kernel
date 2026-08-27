@@ -39,9 +39,6 @@ static DEFINE_MUTEX(gpueb_logger_mutex);
 static DEFINE_MUTEX(gpueb_log_enable_mutex);
 static struct log_ctrl_s *gpueb_log_ctl;
 
-static unsigned int r_pos_debug;
-static unsigned int log_ctl_debug;
-
 static unsigned int gpueb_log_enable_set(unsigned int enable)
 {
 	int ret = 0;
@@ -136,11 +133,9 @@ ssize_t gpueb_log_read(char __user *data, size_t len)
 		datalen = len;
 
 	/* Debug for logger pos fail */
-	r_pos_debug = r_pos;
-	log_ctl_debug = gpueb_log_ctl->buff_ofs;
 	if (r_pos >= DRAM_BUF_LEN) {
 		gpueb_pr_info("@%s: r_pos >= DRAM_BUF_LEN, %x, %x\n",
-			__func__, r_pos_debug, log_ctl_debug);
+			__func__, r_pos, gpueb_log_ctl->buff_ofs);
 		datalen = 0;
 		goto error;
 	}

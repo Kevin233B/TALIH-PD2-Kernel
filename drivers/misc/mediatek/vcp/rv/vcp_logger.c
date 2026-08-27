@@ -114,8 +114,6 @@ static wait_queue_head_t vcp_A_logwait;
 static DEFINE_MUTEX(vcp_logger_mutex);
 static char *vcp_last_logger;
 /*global value*/
-static unsigned int r_pos_debug;
-static unsigned int log_ctl_debug;
 static struct mutex vcp_logger_mutex;
 
 /* ipi message buffer */
@@ -254,11 +252,9 @@ ssize_t vcp_A_log_read(char __user *data, size_t len)
 		datalen = len;
 
 	/*debug for logger pos fail*/
-	r_pos_debug = r_pos;
-	log_ctl_debug = VCP_A_log_ctl->buff_ofs;
 	if (r_pos >= DRAM_BUF_LEN) {
 		pr_notice("[VCP] %s(): r_pos >= DRAM_BUF_LEN,%x,%x\n",
-			__func__, r_pos_debug, log_ctl_debug);
+			__func__, r_pos, VCP_A_log_ctl->buff_ofs);
 		datalen = 0;
 		goto error;
 	}
