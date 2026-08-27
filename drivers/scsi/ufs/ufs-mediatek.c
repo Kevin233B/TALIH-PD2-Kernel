@@ -2339,7 +2339,9 @@ static void ufs_mtk_dbg_register_dump(struct ufs_hba *hba)
 	/* Direct debugging information to REG_MTK_PROBE */
 	ufs_mtk_dbg_sel(hba);
 	ufshcd_dump_regs(hba, REG_UFS_PROBE, 0x4, "Debug Probe ");
+#if IS_ENABLED(CONFIG_SCSI_UFS_MEDIATEK_DBG)
 	ufs_mtk_dbg_dump(100);
+#endif
 }
 
 static int ufs_mtk_setup_regulators(struct ufs_hba *hba, bool on)
@@ -2518,7 +2520,9 @@ static void ufs_mtk_event_notify(struct ufs_hba *hba,
 
 #if IS_ENABLED(CONFIG_MTK_AEE_FEATURE)
 	if (evt == UFS_EVT_ABORT && !ufs_abort_aee_count) {
+#if IS_ENABLED(CONFIG_SCSI_UFS_MEDIATEK_DBG)
 		cmd_hist_disable();
+#endif
 		ufs_abort_aee_count++;
 		aee_kernel_warning_api(__FILE__,
 			__LINE__, DB_OPT_FS_IO_LOG,
@@ -2569,35 +2573,6 @@ void ufs_mtk_setup_task_mgmt(struct ufs_hba *hba, int tag, u8 tm_function)
 #endif
 }
 
-//bsp.storage.ufs 2021.10.14 add for /proc/devinfo/ufs
-static void create_devinfo_ufs(void *data, async_cookie_t cookie)
-{
-        struct device *dev = (struct device*)data;
-        struct ufs_hba *hba = NULL;
-        //struct Scsi_Host *shost = NULL;
-        //struct scsi_device *sdev = NULL;
-        static char temp_version[5] = {0};
-        static char vendor[9] = {0};
-        static char model[17] = {0};
-
-        hba = (struct ufs_hba*)dev->driver_data;
-        msleep(1000);
-        /* scsi_device debug
-        shost = hba->host;
-        shost_for_each_device(sdev, shost) {
-                pr_err("ufs vendor: %s model: %s rev: %s\n", sdev->vendor, sdev->model, sdev->rev);
-        } */
-
-        if (hba && hba->sdev_ufs_device) {
-                pr_err("get ufs device vendor/model/rev\n");
-                strncpy(temp_version, hba->sdev_ufs_device->rev, 4);
-                strncpy(vendor, hba->sdev_ufs_device->vendor, 8);
-                strncpy(model, hba->sdev_ufs_device->model, 16);
-        }
-
-	register_device_proc("ufs_version", temp_version, vendor);
-	register_device_proc("ufs", model, vendor);
-}
 
 /*
  * struct ufs_hba_mtk_vops - UFS MTK specific variant operations
@@ -2676,8 +2651,6 @@ skip_reset:
 	if (hba && hba->irq)
 		irq_set_affinity_hint(hba->irq, get_cpu_mask(3));
 
-	//bsp.storage.ufs 2021.10.14 add for /proc/devinfo/ufs
-	async_schedule(create_devinfo_ufs, dev);
 	/*
 	 * Because the default power setting of VSx (the upper layer of
 	 * VCCQ/VCCQ2) is HWLP, we need to prevent VCCQ/VCCQ2 from
