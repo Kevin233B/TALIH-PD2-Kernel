@@ -114,8 +114,8 @@ static wait_queue_head_t vcp_A_logwait;
 static DEFINE_MUTEX(vcp_logger_mutex);
 static char *vcp_last_logger;
 /*global value*/
-unsigned int r_pos_debug;
-unsigned int log_ctl_debug;
+static unsigned int r_pos_debug;
+static unsigned int log_ctl_debug;
 static struct mutex vcp_logger_mutex;
 
 /* ipi message buffer */
