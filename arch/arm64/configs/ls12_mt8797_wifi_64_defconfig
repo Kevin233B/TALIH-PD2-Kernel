@@ -11,6 +11,13 @@ CONFIG_FUSE_BPF=y
 CONFIG_LOG_BUF_SHIFT=23
 CONFIG_UCLAMP_TASK=y
 CONFIG_UCLAMP_TASK_GROUP=y
+# cgroup 基座：eas_trace.h 的 sched_select_task_rq_rt 引用 cpu_cgrp_id/cpuset_cgrp_id，
+# 这两个枚举成员在 enum cgroup_subsys_id 里被 CGROUP_SCHED/CPUSETS 条件编译；而它们又都
+# 依赖父开关 CGROUPS（depends on 由 init/Kconfig 的 if CGROUPS 块间接施加）。缺 CGROUPS 时
+# 下面这些已写 =y 的开关（CPUSETS/CGROUP_BPF/UCLAMP_TASK_GROUP）会被 Kconfig 静默关闭，
+# 导致 cpu_cgrp_id/cpuset_cgrp_id undeclared。Android 内核标配 CGROUPS=y（对齐 gki_defconfig）。
+CONFIG_CGROUPS=y
+CONFIG_CGROUP_SCHED=y
 CONFIG_CPUSETS=y
 # CONFIG_RD_BZIP2 is not set
 # CONFIG_RD_LZMA is not set
