@@ -3,6 +3,7 @@
 #define __ASM_CPUIDLE_H
 
 #include <asm/proc-fns.h>
+#include <linux/errno.h>
 
 #ifdef CONFIG_CPU_IDLE
 extern int arm_cpuidle_init(unsigned int cpu);
