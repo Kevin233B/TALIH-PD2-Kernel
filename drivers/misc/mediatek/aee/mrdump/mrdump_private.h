@@ -44,8 +44,8 @@ extern const int kallsyms_offsets[] __weak;
 extern const u8 kallsyms_names[] __weak;
 extern const u8 kallsyms_token_table[] __weak;
 extern const u16 kallsyms_token_index[] __weak;
-extern const unsigned long kallsyms_markers[] __weak;
-extern const unsigned long kallsyms_num_syms
+extern const unsigned int kallsyms_markers[] __weak;
+extern const unsigned int kallsyms_num_syms
 __attribute__((weak, section(".rodata")));
 
 #ifdef MODULE
