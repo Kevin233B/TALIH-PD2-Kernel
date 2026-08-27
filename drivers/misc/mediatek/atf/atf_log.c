@@ -371,7 +371,9 @@ static const struct proc_ops atf_log_proc_fops = {
 static const struct file_operations atf_log_fops = {
 	.owner      = THIS_MODULE,
 	.unlocked_ioctl = atf_log_ioctl,
+#if IS_ENABLED(CONFIG_COMPAT)
 	.compat_ioctl = atf_log_ioctl,
+#endif
 	.poll       = atf_log_poll,
 	.open       = atf_log_open,
 	.release    = atf_log_release,

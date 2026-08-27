@@ -1463,7 +1463,9 @@ static const struct file_operations hf_manager_fops = {
 	.write          = hf_manager_write,
 	.poll           = hf_manager_poll,
 	.unlocked_ioctl = hf_manager_ioctl,
+#if IS_ENABLED(CONFIG_COMPAT)
 	.compat_ioctl   = hf_manager_ioctl,
+#endif
 };
 
 static int hf_manager_proc_show(struct seq_file *m, void *v)

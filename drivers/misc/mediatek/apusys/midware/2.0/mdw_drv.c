@@ -117,7 +117,9 @@ static const struct file_operations mdw_fops = {
 	.open = mdw_drv_open,
 	.release = mdw_drv_close,
 	.unlocked_ioctl = mdw_ioctl,
+#if IS_ENABLED(CONFIG_COMPAT)
 	.compat_ioctl = mdw_ioctl,
+#endif
 };
 
 static struct miscdevice mdw_misc_dev = {

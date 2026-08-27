@@ -121,11 +121,13 @@ static long mdla_ioctl(struct file *filp, unsigned int command,
 }
 
 
+#if IS_ENABLED(CONFIG_COMPAT)
 static long mdla_compat_ioctl(struct file *file,
 	unsigned int cmd, unsigned long arg)
 {
 	return mdla_ioctl(file, cmd, (unsigned long) compat_ptr(arg));
 }
+#endif
 
 static int mdla_open(struct inode *inodep, struct file *filep)
 {
@@ -142,7 +144,9 @@ static int mdla_release(struct inode *inodep, struct file *filep)
 static const struct file_operations fops = {
 	.open = mdla_open,
 	.unlocked_ioctl = mdla_ioctl,
+#if IS_ENABLED(CONFIG_COMPAT)
 	.compat_ioctl = mdla_compat_ioctl,
+#endif
 	.release = mdla_release,
 };
 
