@@ -157,6 +157,11 @@ CONFIG_MTK_LPM_GS_DUMP_SUPPORT=y
 CONFIG_MTK_LPM_GS_DUMP_VERSION="v1"
 CONFIG_MTK_LPM_MODULE_NAME="mt6885"
 CONFIG_MTK_LPM_MT6885=y
+# cmdq-sec-mailbox.c（MTK_CMDQ_MBOX_EXT 内建）无条件用 mmprofile_register_event/log_ex 等，
+# 且 struct cmdq_mmp_event 定义在 #if IS_ENABLED(CONFIG_MMPROFILE) 内、字段无条件；
+# MMPROFILE=n 时字段 incomplete type + mmprofile 调用变量 cmdq unused。MMPROFILE 是 MTK 通用
+# profiling 机制（tristate，mmp/src/mmprofile.c 内建），非 OnePlus 专属，补齐内建即可。
+CONFIG_MMPROFILE=y
 CONFIG_MTK_MMPROFILE_SUPPORT=y
 CONFIG_MTK_PERFORMANCE_MODULE=y
 CONFIG_MTK_PID_MAP=y
