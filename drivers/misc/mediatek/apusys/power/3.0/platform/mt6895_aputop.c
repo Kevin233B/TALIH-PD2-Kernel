@@ -1159,7 +1159,7 @@ static int mt6895_apu_top_on(struct device *dev)
 
 	// for refcnt ++ to avoid be auto turned off by regulator framework
 	pr_info("%s enable vapu regulator\n", __func__);
-	regulator_enable(vapu_reg_id);
+	(void)regulator_enable(vapu_reg_id);
 
 	pr_info("%s -\n", __func__);
 	return 0;
@@ -1409,7 +1409,7 @@ static int mt6895_apu_top_pb(struct platform_device *pdev)
 
 #if APU_POWER_INIT
 	// enable vapu buck
-	regulator_enable(vapu_reg_id);
+	(void)regulator_enable(vapu_reg_id);
 
 	// set vapu to default voltage
 	regulator_set_voltage(vapu_reg_id, VAPU_DEF_VOLT, VAPU_DEF_VOLT);
