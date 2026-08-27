@@ -290,7 +290,7 @@ int cmdq_sec_pkt_wait_complete(struct cmdq_pkt *pkt)
 	s32 thread_id = cmdq_sec_mbox_chan_id(client->chan);
 	u32 timeout_ms = cmdq_mbox_get_thread_timeout((void *)client->chan);
 
-#if IS_ENABLED(CONFIG_MMPROFILE)
+#if IS_ENABLED(CMDQ_MMPROFILE_SUPPORT)
 	cmdq_sec_mmp_wait(client->chan, pkt);
 #endif
 
@@ -326,7 +326,7 @@ int cmdq_sec_pkt_wait_complete(struct cmdq_pkt *pkt)
 
 	cmdq_sec_mbox_disable(client->chan);
 
-#if IS_ENABLED(CONFIG_MMPROFILE)
+#if IS_ENABLED(CMDQ_MMPROFILE_SUPPORT)
 	cmdq_sec_mmp_wait_done(client->chan, pkt);
 #endif
 

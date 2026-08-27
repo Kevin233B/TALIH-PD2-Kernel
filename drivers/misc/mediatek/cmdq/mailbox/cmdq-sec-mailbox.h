@@ -72,7 +72,7 @@ s32 cmdq_sec_mtee_execute_session(struct cmdq_sec_mtee_context *tee,
 	u32 cmd, s32 timeout_ms, bool share_mem_ex, bool share_mem_ex2);
 #endif
 
-#if IS_ENABLED(CONFIG_MMPROFILE)
+#if IS_ENABLED(CMDQ_MMPROFILE_SUPPORT)
 void cmdq_sec_mmp_wait(struct mbox_chan *chan, void *pkt);
 void cmdq_sec_mmp_wait_done(struct mbox_chan *chan, void *pkt);
 #endif
