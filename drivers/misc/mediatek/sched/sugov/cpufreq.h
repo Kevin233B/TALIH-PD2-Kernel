@@ -61,9 +61,6 @@ struct sugov_policy {
 
 	bool			limits_changed;
 	bool			need_freq_update;
-#if IS_ENABLED(CONFIG_OPLUS_FEATURE_FRAME_BOOST)
-	unsigned int	flags;
-#endif
 };
 
 #if IS_ENABLED(CONFIG_MTK_OPP_CAP_INFO)

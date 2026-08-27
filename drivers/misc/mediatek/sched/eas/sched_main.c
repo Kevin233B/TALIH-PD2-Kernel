@@ -20,9 +20,6 @@
 #include "common.h"
 #include "eas_plus.h"
 #include "sched_sys_common.h"
-#if IS_ENABLED(CONFIG_OPLUS_FEATURE_SCHED_ASSIST)
-#include <../kernel/oplus_perf_sched/sched_assist/sa_common.h>
-#endif
 
 #define CREATE_TRACE_POINTS
 #include "eas_trace.h"
@@ -119,9 +116,6 @@ static void sched_queue_task_hook(void *data, struct rq *rq, struct task_struct 
 	spin_unlock(&per_cpu(cpufreq_idle_cpu_lock, cpu));
 #endif
 
-#if IS_ENABLED(CONFIG_OPLUS_FEATURE_SCHED_ASSIST)
-	queue_ux_thread(rq, p, (type == enqueue));
-#endif
 }
 
 static void mtk_sched_trace_init(void)
