@@ -21,6 +21,9 @@
 #include <linux/seq_file.h>
 #include <linux/nvmem-consumer.h>
 
+/* 5.10 无 CONFIG_MTK_DEVINFO 时走 devinfo 表兜底路径，由 devinfo.c 提供 */
+extern u32 get_devinfo_with_index(u32 index);
+
 /* Register definitions */
 #define MT6577_AUXADC_CON0                    0x00
 #define MT6577_AUXADC_CON1                    0x04
