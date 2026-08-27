@@ -385,6 +385,7 @@ struct vow_payloaddump_info_kernel_t {
 struct vow_speaker_model_t {
 	void *model_ptr;
 	int  id;
+	int  keyword;
 	int  uuid;
 	int  flag;
 	int  enabled;
