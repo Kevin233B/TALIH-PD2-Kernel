@@ -13,3 +13,6 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
 dtb-$(CONFIG_ARCH_MEDIATEK) += mt8183-evb.dtb
 dtb-$(CONFIG_ARCH_MEDIATEK) += mt8183-kukui-krane-sku176.dtb
 dtb-$(CONFIG_ARCH_MEDIATEK) += mt8516-pumpkin.dtb
+# ls12 (MT6893/天玑1200, OnePlus) 设备树：SoC 参考 dtb + board dtb
+dtb-$(CONFIG_ARCH_MEDIATEK) += mt6893.dtb
+dtb-$(CONFIG_ARCH_MEDIATEK) += ls12_mt8797_wifi_64.dtb
