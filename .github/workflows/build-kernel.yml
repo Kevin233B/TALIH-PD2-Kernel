@@ -112,6 +112,14 @@ jobs:
           ls -la out_device/arch/arm64/boot/dts/mediatek/ls12_mt8797_wifi_64.dtb
           ls -la out_device/arch/arm64/boot/dts/mediatek/mt6893.dtb
 
+      # Stage 3 硬门禁：device 内核（gki_defconfig + ls12 fragment）的核心冻结 KMI 仍须 0 diff。
+      # fragment 只 ADD vendor 设备驱动，不改 LTO/CFI/KASAN/NR_CPUS/PREEMPT 等核心 flip，
+      # 核心头文件又是 rebase 纯净（kernel/mm/fs/net/security 0 diff）→ 7298 冻结符号 CRC 应全对齐。
+      # 若此处 crc_diff/missing 非 0，即 vendor 增量越界污染了核心 KMI，须修到 0。
+      - name: KMI strictness (device kernel frozen CRC still 0 diff)
+        run: |
+          python3 .github/scripts/kmi_probe.py out_device/vmlinux.symvers android/abi_gki_aarch64.xml
+
       - name: Upload boot artifacts
         if: always()
         uses: actions/upload-artifact@v4
