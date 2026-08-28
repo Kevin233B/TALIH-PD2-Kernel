@@ -60,8 +60,43 @@ CONFIG_F2FS_FS=y
 CONFIG_F2FS_FS_SECURITY=y
 CONFIG_OVERLAY_FS=y
 CONFIG_EROFS_FS=y
+# device-mapper 整块在 drivers/md/Kconfig 的 "if MD ... endif" 内，MD 是 menuconfig 父门控。
+# 注意：BLK_DEV_DM/DM_VERITY 的 =y 若在 CONFIG_MD=n 时会被 conf 静默丢弃（展开 .config 里
+# 连 BLK_DEV_DM 行都不出现），故必须先开 MD。
+CONFIG_MD=y
 CONFIG_BLK_DEV_DM=y
 CONFIG_DM_VERITY=y
+# Android 启动必需第三组：cgroup/定时器/unix socket/loop/存储配额与加密。
+# 全部 4.19 gki_defconfig =y、5.10 缺失，展开 .config 后仍 is not set（真缺，非门控）：
+#   - UNIX：unix socket，几乎所有 Android 服务/IPC 基座，缺了 zygote/system_server 必挂
+#   - NO_HZ/HIGH_RES_TIMERS：hrtimer 基座
+#   - COMPAT：32 位进程（大量 apk/服务仍是 32 位）
+#   - MEMCG/BLK_CGROUP/PSI：Android 12 lmkd 内存/IO 压测 cgroup
+#   - BLK_DEV_LOOP：apex/动态分区/super 子分区挂载
+#   - FS_ENCRYPTION/FS_VERITY：data 加密与 verity
+#   - QUOTA/QFMT_V2：per-app 存储配额
+CONFIG_NO_HZ=y
+CONFIG_HIGH_RES_TIMERS=y
+CONFIG_UNIX=y
+CONFIG_COMPAT=y
+CONFIG_MEMCG=y
+CONFIG_MEMCG_SWAP=y
+CONFIG_BLK_CGROUP=y
+CONFIG_PSI=y
+CONFIG_BLK_DEV_LOOP=y
+CONFIG_TMPFS_POSIX_ACL=y
+CONFIG_FS_ENCRYPTION=y
+CONFIG_FS_VERITY=y
+CONFIG_FS_VERITY_BUILTIN_SIGNATURES=y
+CONFIG_QUOTA=y
+CONFIG_QFMT_V2=y
+CONFIG_QUOTA_NETLINK_INTERFACE=y
+CONFIG_INPUT_EVDEV=y
+CONFIG_CGROUP_FREEZER=y
+CONFIG_CGROUP_CPUACCT=y
+CONFIG_BINFMT_MISC=y
+CONFIG_IKCONFIG=y
+CONFIG_IKCONFIG_PROC=y
 # CONFIG_FHANDLE is not set
 CONFIG_DEBUG_KERNEL=y
 CONFIG_KALLSYMS=y
