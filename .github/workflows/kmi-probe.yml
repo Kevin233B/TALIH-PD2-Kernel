@@ -177,9 +177,14 @@ jobs:
           export CLANG_TRIPLE=aarch64-linux-gnu-
           export CROSS_COMPILE=aarch64-linux-gnu-
           export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
+          # PINCTRL_MT6397(default MFD_MT6397) 会 select 老框架 PINCTRL_MTK → 编译 broken 死代码
+          # pinctrl-mtk-common.c/moore.c（struct mtk_eint_hw 已被 fork 的 mtk-eint.h v2 移除）。
+          # ls12 走 paris 框架(mt6885)仅需 PINCTRL_MTK_PARIS，参考 fork defconfig 显式
+          # "# CONFIG_PINCTRL_MT6397 is not set"，故这里显式 disable 对齐"能开机"配置。
           scripts/config --file out_gki/.config \
             --enable PINCTRL_MT6885 \
             --enable MFD_MT6397 \
+            --disable PINCTRL_MT6397 \
             --enable MFD_MT6360 \
             --enable REGULATOR_MT6359P \
             --enable REGULATOR_MT6360 \
