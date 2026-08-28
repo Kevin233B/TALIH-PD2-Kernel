@@ -53,3 +53,8 @@ obj-$(CONFIG_DRM_PANEL_TPO_TPG110) += panel-tpo-tpg110.o
 obj-$(CONFIG_DRM_PANEL_TRULY_NT35597_WQXGA) += panel-truly-nt35597.o
 obj-$(CONFIG_DRM_PANEL_VISIONOX_RM69299) += panel-visionox-rm69299.o
 obj-$(CONFIG_DRM_PANEL_XINPENG_XPP055C272) += panel-xinpeng-xpp055c272.o
+
+# TALIH-PD2 (lushan12) HX83121A CSOT display panels + AW3750x bias power
+obj-$(CONFIG_DRM_PANEL_LUSHAN12_HX83121A_CDOT_CSOT_WQXGA_VDO) += lushan12_hx83121a_cdot_csot_wqxga_dsi_vdo.o
+obj-$(CONFIG_DRM_PANEL_LUSHAN12_HX83121A_CDOT_CSOT_WITHOUT_VCOM_WQXGA_VDO) += lushan12_hx83121a_cdot_csot_without_vcom_wqxga_dsi_vdo.o
+obj-$(CONFIG_AW3750X_POWER) += aw3750x_power.o

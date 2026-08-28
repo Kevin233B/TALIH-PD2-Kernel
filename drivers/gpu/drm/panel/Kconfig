@@ -501,3 +501,32 @@ config DRM_PANEL_XINPENG_XPP055C272
 	  XPP055C272 controller for 720x1280 LCD panels with MIPI/RGB/SPI
 	  system interfaces.
 endmenu
+
+# TALIH-PD2 (lushan12) HX83121A CSOT display panels（vendor 增量，默认关，GKI 零污染）
+config DRM_PANEL_LUSHAN12_HX83121A_CDOT_CSOT_WQXGA_VDO
+	tristate "lushan12 hx83121a wqxga vdo mode panel (with vcom)"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+	  Say Y here to enable the TALPAD (TALIH-PD2) HX83121A CSOT
+	  WQXGA DSI video mode panel with external VCOM. The compatible
+	  is lushan12,hx83121a_cdot_csot_wqxga_dsi_vdo.
+
+config DRM_PANEL_LUSHAN12_HX83121A_CDOT_CSOT_WITHOUT_VCOM_WQXGA_VDO
+	tristate "lushan12 hx83121a wqxga vdo mode panel (without vcom)"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+	  Say Y here to enable the TALPAD (TALIH-PD2) HX83121A CSOT
+	  WQXGA DSI video mode panel without external VCOM. The
+	  compatible is lushan12,hx83121a_cdot_csot_without_vcom_wqxga_dsi_vdo.
+
+config AW3750X_POWER
+	tristate "aw3750x LCD bias power driver"
+	depends on I2C
+	help
+	  Say Y here to enable the AW3750x LCD bias (VSP/VSN) power
+	  driver used by the TALPAD (TALIH-PD2) HX83121A panels.
+
