@@ -158,3 +158,12 @@ x509.genkey
 
 # Documentation toolchain
 sphinx_*/
+
+# TALIH-PD2 项目本地残留/诊断资产（禁提交：用户明确「不要提交 assets 文件夹」）
+# 移植过程 patch 生成的备份垃圾（fs/kernel/mm/security/drivers 下散落）
+*.orig
+# 启动日志/镜像/ramoops 诊断资产（~800MB，含 boot_a.img/dtbo/vendor_boot/模型交接文档）
+/assets/
+/boot_logs.zip
+# 本地 clang 工具链残留（CI 自行 fetch prebuilts-master/clang + prebuilts/gas，不入库）
+/prebuilts/
