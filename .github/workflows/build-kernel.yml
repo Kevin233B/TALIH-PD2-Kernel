@@ -1,0 +1,125 @@
+name: Build ls12 Device Kernel
+
+# Stage 3「恢复开机」专用：gki_defconfig 叠加 ls12_gki.fragment 编出可开机的 ls12 设备内核
+# （Image + dtbs），验证 vendor fragment 能落地成真实 device kernel。
+# 与 kmi-probe.yml（gki_defconfig KMI 0-diff 探测 + vendor 增量编译验证）互补：
+#   - 本 workflow 关注「fragment 是否编出可开机产物」，全量 LTO 链接会暴露 vmlinux 链接期
+#     undefined 符号（如 register_3way_semaphore_notifier/mml_drm_*，ls12 defconfig 注释已点名的坑）。
+#   - kmi-probe.yml 关注「核心 KMI 冻结符号 CRC 是否仍 0 diff」。
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ gki-5.10-rebase ]
+  pull_request:
+    branches: [ gki-5.10-rebase ]
+
+jobs:
+  build:
+    name: ls12 device kernel (Image + dtbs)
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch official Clang toolchain (clang-r416183b)
+        run: |
+          set -eo pipefail
+          mkdir -p prebuilts-master/clang/host/linux-x86/clang-r416183b
+          curl -fsSL --retry 3 --retry-delay 5 \
+            "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/6e3223f76384455acde43affde3df0ea9df66c0d/clang-r416183b.tar.gz" \
+            -o /tmp/clang-r416183b.tar.gz
+          tar -xzf /tmp/clang-r416183b.tar.gz -C prebuilts-master/clang/host/linux-x86/clang-r416183b
+          rm -f /tmp/clang-r416183b.tar.gz
+
+      - name: Fetch official binutils (gas)
+        run: |
+          set -eo pipefail
+          mkdir -p prebuilts/gas/linux-x86
+          curl -fsSL --retry 3 --retry-delay 5 \
+            "https://android.googlesource.com/platform/prebuilts/gas/linux-x86/+archive/b2a189331333e014bfef4c0425b3ef4b74accdd0.tar.gz" \
+            -o /tmp/gas.tar.gz
+          tar -xzf /tmp/gas.tar.gz -C prebuilts/gas/linux-x86
+          rm -f /tmp/gas.tar.gz
+
+      - name: Install cross binutils + host build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential bc flex bison libssl-dev libelf-dev libncurses-dev \
+            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi
+
+      - name: Install pahole 1.20 (5.10-compatible BTF)
+        run: |
+          set -eo pipefail
+          curl -fsSL --retry 3 --retry-delay 5 \
+            "http://old-releases.ubuntu.com/ubuntu/pool/universe/d/dwarves-dfsg/dwarves_1.20-1_amd64.deb" \
+            -o /tmp/dwarves_1.20-1_amd64.deb
+          echo "67efe8ddbf5e16b84a5aa322f4e02955a6939dbbb615dca1f590071641e0acef  /tmp/dwarves_1.20-1_amd64.deb" | sha256sum -c -
+          sudo apt-get update
+          sudo apt-get install -y /tmp/dwarves_1.20-1_amd64.deb
+          pahole --version
+
+      - name: Boost swap for FULL LTO link
+        run: |
+          set -eo pipefail
+          echo "--- swap/disk 现状 ---"
+          swapon --show || true
+          free -h
+          df -h / | tail -1
+          if [ ! -f /swapfile_lto ]; then
+            avail_mb=$(df --output=avail -m / | tail -1 | tr -d ' ')
+            want_mb=$(( (avail_mb - 3072) * 2 / 3 ))
+            [ "$want_mb" -gt 10240 ] && want_mb=10240
+            [ "$want_mb" -lt 4096 ] && want_mb=4096
+            echo "配置额外 swap: ${want_mb}MB"
+            sudo fallocate -l ${want_mb}M /swapfile_lto || sudo dd if=/dev/zero of=/swapfile_lto bs=1M count="$want_mb"
+            sudo chmod 600 /swapfile_lto
+            sudo mkswap /swapfile_lto
+            sudo swapon /swapfile_lto
+          fi
+          echo "--- swap 后 ---"
+          swapon --show
+          free -h
+
+      - name: Build device kernel (gki_defconfig + ls12_gki.fragment)
+        run: |
+          set -eo pipefail
+          export PATH="$PWD/prebuilts-master/clang/host/linux-x86/clang-r416183b/bin:$PWD/prebuilts/gas/linux-x86:$PATH"
+          export ARCH=arm64
+          export LLVM=1
+          export LLVM_IAS=1
+          export CLANG_TRIPLE=aarch64-linux-gnu-
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
+          # gki_defconfig 为核心底座（LTO_CLANG_FULL/CFI_CLANG/KASAN_HW_TAGS 全开），fragment 只 ADD vendor 设备驱动
+          make O=out_device gki_defconfig
+          # 叠加 ls12 fragment（-m 只合并不触发 make，随后统一 olddefconfig）
+          scripts/kconfig/merge_config.sh -m -O out_device out_device/.config arch/arm64/configs/ls12_gki.fragment
+          make O=out_device olddefconfig
+          echo "=== .config 关键值（核验核心 flip 未被 fragment 破坏 + vendor 已开）==="
+          grep -E "CONFIG_(LTO_CLANG_FULL|CFI_CLANG|KASAN_HW_TAGS|ARCH_MEDIATEK|BLK_DEV_INITRD|DEVTMPFS|COMMON_CLK_MT6893|PINCTRL_MT6885|SCSI_UFS_MEDIATEK|DRM_MEDIATEK_V2|SPMI_MTK_PMIF|MTK_DEVMPU|MTK_DEVINFO|MEDIATEK_MT635X_AUXADC)=" out_device/.config || true
+          # 全量编 Image（vmlinux 链接会暴露 vendor 驱动 link 期 undefined）+ dtbs（ls12 dtb）
+          make O=out_device -j"$(nproc)" Image dtbs
+
+      - name: Verify boot artifacts
+        run: |
+          set -eo pipefail
+          echo "=== Image ==="
+          ls -la out_device/arch/arm64/boot/Image
+          echo "=== ls12/mt6893 dtb ==="
+          ls -la out_device/arch/arm64/boot/dts/mediatek/ls12_mt8797_wifi_64.dtb
+          ls -la out_device/arch/arm64/boot/dts/mediatek/mt6893.dtb
+
+      - name: Upload boot artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ls12-boot
+          path: |
+            out_device/arch/arm64/boot/Image
+            out_device/arch/arm64/boot/dts/mediatek/ls12_mt8797_wifi_64.dtb
+            out_device/arch/arm64/boot/dts/mediatek/mt6893.dtb
+            out_device/.config
+          if-no-files-found: warn
