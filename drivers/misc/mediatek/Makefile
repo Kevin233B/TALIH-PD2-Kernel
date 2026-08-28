@@ -7,3 +7,7 @@
 # an obj-$(CONFIG_...) hook here; each added in its own stage of the port.
 
 obj-$(CONFIG_MTK_SMI)		+= smi/
+obj-$(CONFIG_MTK_CMDQ_MBOX_EXT)	+= cmdq/
+obj-$(CONFIG_MTK_IOMMU_MISC)	+= iommu/
+obj-$(CONFIG_MMPROFILE)		+= mmp/
+obj-$(CONFIG_MTK_TINYSYS_VCP_SUPPORT)	+= vcp/

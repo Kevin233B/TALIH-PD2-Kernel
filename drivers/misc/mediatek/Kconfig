@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: GPL-2.0
+
+# MediaTek misc Kconfig (vendor increment over google common baseline).
+# Only subdirs that have actually been ported get a source line; each added in
+# its own stage of the port. Menu grouping mirrors MTK gki-5.10.
+
+menu "MultiMedia, Display, Camera"
+source "drivers/misc/mediatek/iommu/Kconfig"
+source "drivers/misc/mediatek/cmdq/Kconfig"
+source "drivers/misc/mediatek/mmp/Kconfig"
+endmenu # MultiMedia, Display, Camera
+
+menu "Tinysys"
+source "drivers/misc/mediatek/vcp/Kconfig"
+endmenu # Tinysys
