@@ -165,6 +165,40 @@ jobs:
           ls out_gki/drivers/clk/mediatek/clk-mt6893*.o | wc -l
           ls out_gki/drivers/clk/mediatek/clk-mt6893*.o | sed 's#.*/##'
 
+      # Stage 2 boot-critical 层的 vendor 增量编译验证：pinctrl(mt6885) + pmic(mfd/regulator) + ufs。
+      # 复用 clk step 已 enable 的 ARCH_MEDIATEK 累积 config，此处再叠 boot 必需层；
+      # 只编对应目录（compile-only，验证头文件/依赖齐全），不重链 vmlinux，不污染上面的 kmi 判定。
+      - name: Verify boot-critical layers compile (pinctrl/pmic/ufs)
+        run: |
+          export PATH="$PWD/prebuilts-master/clang/host/linux-x86/clang-r416183b/bin:$PWD/prebuilts/gas/linux-x86:$PATH"
+          export ARCH=arm64
+          export LLVM=1
+          export LLVM_IAS=1
+          export CLANG_TRIPLE=aarch64-linux-gnu-
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
+          scripts/config --file out_gki/.config \
+            --enable PINCTRL_MT6885 \
+            --enable MFD_MT6397 \
+            --enable MFD_MT6360 \
+            --enable REGULATOR_MT6359P \
+            --enable REGULATOR_MT6360 \
+            --enable REGULATOR_MT6315 \
+            --enable SCSI_UFS_MEDIATEK
+          make O=out_gki olddefconfig
+          make O=out_gki -j"$(nproc)" \
+            drivers/pinctrl/mediatek/ \
+            drivers/mfd/ \
+            drivers/regulator/ \
+            drivers/scsi/ufs/ \
+            drivers/phy/mediatek/
+          echo "=== boot-critical .o 清单（缺失即 fail）==="
+          ls out_gki/drivers/pinctrl/mediatek/pinctrl-mt6885.o
+          ls out_gki/drivers/mfd/mt6397.o out_gki/drivers/mfd/mt6360-core.o
+          ls out_gki/drivers/regulator/mt6315-regulator.o out_gki/drivers/regulator/mt6359p-regulator.o out_gki/drivers/regulator/mt6360-regulator.o
+          ls out_gki/drivers/scsi/ufs/ufs-mediatek.o
+          ls out_gki/drivers/phy/mediatek/phy-mtk-ufs.o
+
       - name: Upload KMI probe artifacts
         if: always()
         uses: actions/upload-artifact@v4
