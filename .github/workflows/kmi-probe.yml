@@ -241,6 +241,80 @@ jobs:
           ls out_gki/drivers/soc/mediatek/mtk-socinfo.o
           ls out_gki/drivers/soc/mediatek/devapc/ | wc -l
 
+      # Stage 2 收尾·批2：drm 显示（mediatek_v2 + mml）+ panel(HX83121A) + iommu/smi + cmdq ext。
+      # 复用累积 config（ARCH_MEDIATEK + clk + boot-critical + audio/soc 已 enable）。
+      # gki_defconfig 缺 DRM DSI/KMS/panel/bridge 核心 helper，需显式开，否则 mediatek_v2/panel 被丢弃。
+      # 只编对应目录，不重链 vmlinux，不污染上面的 kmi 判定。
+      - name: Verify drm(v2/mml)+panel+iommu compile (vendor increment)
+        run: |
+          export PATH="$PWD/prebuilts-master/clang/host/linux-x86/clang-r416183b/bin:$PWD/prebuilts/gas/linux-x86:$PATH"
+          export ARCH=arm64
+          export LLVM=1
+          export LLVM_IAS=1
+          export CLANG_TRIPLE=aarch64-linux-gnu-
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
+          scripts/config --file out_gki/.config \
+            --enable DRM_MIPI_DSI \
+            --enable DRM_KMS_HELPER \
+            --enable DRM_PANEL \
+            --enable DRM_BRIDGE \
+            --enable DRM_MEDIATEK \
+            --enable DRM_MEDIATEK_V2 \
+            --enable MTK_MML \
+            --enable MTK_IOMMU \
+            --enable MTK_IOMMU_MISC \
+            --enable MTK_SMI \
+            --enable MTK_CMDQ_MBOX_EXT \
+            --disable MTK_CMDQ \
+            --enable DRM_PANEL_LUSHAN12_HX83121A_CDOT_CSOT_WQXGA_VDO \
+            --enable DRM_PANEL_LUSHAN12_HX83121A_CDOT_CSOT_WITHOUT_VCOM_WQXGA_VDO \
+            --enable AW3750X_POWER \
+            --enable MTK_AAL_SUPPORT \
+            --enable PWM_MTK_DISP \
+            --enable MTK_ROUND_CORNER_SUPPORT
+          make O=out_gki olddefconfig
+          make O=out_gki -j"$(nproc)" \
+            drivers/gpu/drm/mediatek/ \
+            drivers/gpu/drm/panel/
+          echo "=== drm_v2/mml/panel .o 清单（缺失即 fail）==="
+          ls out_gki/drivers/gpu/drm/mediatek/mediatek_v2/mtk_drm_drv.o
+          ls out_gki/drivers/gpu/drm/mediatek/mml/mtk-mml.o
+          ls out_gki/drivers/gpu/drm/panel/lushan12_hx83121a_cdot_csot_wqxga_dsi_vdo.o
+          ls out_gki/drivers/gpu/drm/panel/lushan12_hx83121a_cdot_csot_without_vcom_wqxga_dsi_vdo.o
+          ls out_gki/drivers/gpu/drm/panel/aw3750x_power.o
+
+      # Stage 2 收尾·批3：boot 关键 6 缺口里 4 个真 =y 驱动（spmi-pmif/devmpu/devinfo/auxadc）。
+      # 注意：MTK_DRAMC depends on HAVE_MTK_MC 且 ls12 不设伞 config → 与 4.19 同为死码不编，
+      # 故不在此断言（忠实镜像 4.19 行为，非缺口）。只编对应目录，不重链 vmlinux。
+      - name: Verify gap-drivers compile (spmi-pmif/devmpu/devinfo/auxadc)
+        run: |
+          export PATH="$PWD/prebuilts-master/clang/host/linux-x86/clang-r416183b/bin:$PWD/prebuilts/gas/linux-x86:$PATH"
+          export ARCH=arm64
+          export LLVM=1
+          export LLVM_IAS=1
+          export CLANG_TRIPLE=aarch64-linux-gnu-
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
+          scripts/config --file out_gki/.config \
+            --enable SPMI_MTK_PMIF \
+            --enable MTK_DEVMPU \
+            --enable MTK_DEVINFO \
+            --enable MEDIATEK_MT635X_AUXADC
+          make O=out_gki olddefconfig
+          make O=out_gki -j"$(nproc)" \
+            drivers/spmi/ \
+            drivers/soc/mediatek/ \
+            drivers/nvmem/ \
+            drivers/iio/adc/
+          echo "=== gap-driver .o 清单（缺失即 fail；=y 复合 obj 产出的是子 .o）==="
+          ls out_gki/drivers/spmi/spmi-mtk-pmif-core.o
+          ls out_gki/drivers/spmi/spmi-mtk-debug.o
+          ls out_gki/drivers/spmi/spmi-mtk-mpu.o
+          ls out_gki/drivers/soc/mediatek/devmpu/devmpu.o
+          ls out_gki/drivers/nvmem/mtk-devinfo.o
+          ls out_gki/drivers/iio/adc/mt635x-auxadc.o
+
       - name: Upload KMI probe artifacts
         if: always()
         uses: actions/upload-artifact@v4
