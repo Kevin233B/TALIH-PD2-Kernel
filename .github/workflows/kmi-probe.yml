@@ -233,7 +233,7 @@ jobs:
           echo "=== audio .o 清单（缺失即 fail）==="
           ls out_gki/sound/soc/mediatek/mt6885/*.o | wc -l
           ls out_gki/sound/soc/mediatek/common/mtk-afe-platform-driver.o
-          ls out_gki/sound/soc/codecs/snd-soc-mt6359.o
+          ls out_gki/sound/soc/codecs/mt6359.o
           echo "=== soc 底座 .o 清单（缺失即 fail）==="
           ls out_gki/drivers/soc/mediatek/mtk-scpsys.o
           ls out_gki/drivers/soc/mediatek/mtk-pmic-wrap.o
