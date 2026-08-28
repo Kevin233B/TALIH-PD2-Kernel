@@ -168,6 +168,16 @@ config BATTERY_LEGO_EV3
 	help
 	  Say Y here to enable support for the LEGO MINDSTORMS EV3 battery.
 
+config BATTERY_MT6359P
+	tristate "MT6359P fuel gauge support"
+	depends on MFD_MT6397
+	default m
+	help
+	  Say Y to enable support for MT6359P battery driver.
+	  it measure battery current and temperature to provide
+	  battery information , It issues interrupt when trigger
+	  threshold is met.
+
 config BATTERY_PMU
 	tristate "Apple PMU battery"
 	depends on PPC32 && ADB_PMU
@@ -768,6 +778,120 @@ config CHARGER_WILCO
 	  information can be found in
 	  Documentation/ABI/testing/sysfs-class-power-wilco
 
+config CHARGER_MT6360
+	tristate "Mediatek MT6360 Charger Driver"
+	depends on MFD_MT6360
+	depends on REGULATOR
+	select EXTCON
+	help
+	  Say Y here to enable MT6360 Charger Part.
+	  support High-Accuracy Voltage/Current Regulation,
+	  Average Input Current Regulation, Battery Tempature Sensing,
+	  Over-Temperature Protection, DPDM Detection for BC1.2
+
+config CHARGER_MT6362
+	tristate "MT6362 SPMI CHG driver"
+	depends on MFD_MT6362
+	help
+	  Say yes here to have support for the MT6362 CHG
+	  It supports BC1.2 and OTG boost.
+	  The driver can also be build as a module.
+	  If so, the module will be called mt6362_chg
+
+config CHARGER_MT6375
+	tristate "MT6375 charger driver"
+	depends on MFD_MT6375
+	help
+	  Say Y to enable support for the MT6375 charger.
+	  The driver supports controlling switching charger and OTG
+	  with high-accuracy current and voltage regulation.
+	  The device is compliant with the USB Battery Charging Specification
+	  Revision 1.2.
+
+config GAUGE_MT6375
+	tristate "MT6375 fuel gauge driver"
+	depends on MFD_MT6375
+	help
+	  This adds support for battery fuel gauge in Mediatek MT6375 PMIC.
+	  The fuelgauge calculates and determines the battery state of charge
+	  according to battery open circuit voltage.
+
+config MTK_CHARGER_TYPE_DETECT
+	tristate "Mediatek Charger Type Detect Driver"
+	depends on TCPC_CLASS
+	help
+	  Say Y here to enable Mediatek Charger Type Detect.
+	  Support enable charger type detect when receiving
+	  typec attach notify.
+	  Say N to disable.
+
+#Begin added by lanying.he for TALPAD SC856X chargepump fast charge
+config CHARGER_SC856X
+	tristate "SC856X chargepump charger driver"
+	depends on MTK_CHARGER
+	help
+	  Say Y here to enable the Southchip SC856X high-voltage
+	  charge pump (direct charging) driver used on TALPAD (TALIH-PD2).
+#End added by lanying.he for TALPAD SC856X chargepump fast charge
+
+config MTK_CHARGER
+	tristate "MediaTek Charging Driver"
+	help
+	  Say yes here to enable MediaTek charging driver.
+	  This driver contains charging control flow and
+	  maintains charging status.
+	  Say no if not using MediaTek charging driver.
+
+config MTK_PUMP_EXPRESS_PLUS_SUPPORT
+	tristate "MediaTek PUMP EXPRESS PLUS"
+	depends on MTK_CHARGER
+	help
+	  Fast charging technology using switch charger and current pattern
+	  to achive better charging ability.
+	  Set Yes to enable PE+
+	  Set No to disable PE+
+
+config MTK_PUMP_EXPRESS_PLUS_20_SUPPORT
+	tristate "MediaTek PUMP EXPRESS PLUS 2.0"
+	depends on MTK_CHARGER
+	help
+	  Fast charging technology using switch charger and current pattern
+	  to achive better charging ability. It has higher charging efficiency
+	  and has better thermal performance than PE+.
+	  Set Yes to enable PE+2.0
+	  Set No to disable PE+2.0
+
+config MTK_PUMP_EXPRESS_40_SUPPORT
+	tristate "MediaTek PUMP EXPRESS 4.0"
+	depends on MTK_CHARGER
+	help
+	  Fast charging technology supports request adjustments of source output
+	  voltage in increments as small as 50 mV to achive better charging ability.
+	  It has higher charging efficiency and has better thermal performance than
+	  PE+/PE+2.0.
+	  Set Yes to enable PE 4.0
+	  Set No to disable PE 4.0
+
+config MTK_PUMP_EXPRESS_50_SUPPORT
+	tristate "MediaTek PUMP EXPRESS 5.0"
+	depends on MTK_CHARGER
+	help
+	  Fast charging technology using divider charger
+	  to achive better charging ability. It has higher charging efficiency
+	  and has better thermal performance than PE+.
+	  Set Yes to enable PE 5.0
+	  Set No to disable PE 5.0
+
+config CHARGER_RT9759
+	tristate "Charger Driver for Richtek RT9759 Charger IC"
+	default n
+	depends on MTK_CHARGER
+	help
+	  Say Yes to enable Richtek RT9759 driver.
+	  It is mainly used as cap divider charger
+	  for Mediatek Pump Express 5.0.
+	  It depends on config MTK_CHARGER
+
 config RN5T618_POWER
 	tristate "RN5T618 charger/fuel gauge support"
 	depends on MFD_RN5T618
@@ -775,5 +899,13 @@ config RN5T618_POWER
 	  Say Y here to have support for RN5T618 PMIC family fuel gauge and charger.
 	  This driver can also be built as a module. If so, the module will be
 	  called rn5t618_power.
+
+config GAUGE_MT6983_ALPHA_SUPPORT
+	tristate "Specify Alpha Gauge Platform is mt6983"
+	help
+	  Select Alpha Gauge Platform is mt6983.
+	  To compile this dirver for used touch IC.
+	  Set Y or M to select this feature for specific platform-mt6983,
+	  and set N to disable.
 
 endif # POWER_SUPPLY
