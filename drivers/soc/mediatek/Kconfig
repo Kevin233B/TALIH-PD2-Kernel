@@ -17,6 +17,19 @@ config MTK_CMDQ
 	  time limitation, such as updating display configuration during the
 	  vblank.
 
+config MTK_DVFSRC
+	tristate "MediaTek DVFSRC Support"
+	depends on ARCH_MEDIATEK || COMPILE_TEST
+	depends on MTK_SCPSYS
+	select PM_GENERIC_DOMAINS if PM
+	help
+	  Say yes here to add support for the MediaTek DVFSRC (dynamic
+	  voltage and frequency scaling resource collector) found on
+	  different MediaTek SoCs. The DVFSRC is a proprietary hardware
+	  which is used to collect all the requests from system and turn
+	  into the decision of minimum Vcore voltage and minimum DRAM
+	  frequency to fulfill those requests.
+
 config MTK_INFRACFG
 	bool "MediaTek INFRACFG Support"
 	select REGMAP
@@ -50,5 +63,18 @@ config MTK_MMSYS
 	help
 	  Say yes here to add support for the MediaTek Multimedia
 	  Subsystem (MMSYS).
+
+menu "Security"
+
+source "drivers/soc/mediatek/devapc/Kconfig"
+
+endmenu # Security
+
+config MTK_SOCINFO
+	tristate "MediaTek SoCInfo Driver"
+	select SOC_BUS
+	help
+	  Say yes here to support the MediaTek SoCInfo driver, providing
+	  information about the SoC to user space.
 
 endmenu
