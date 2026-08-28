@@ -199,7 +199,7 @@ jobs:
             drivers/phy/mediatek/
           echo "=== boot-critical .o 清单（缺失即 fail）==="
           ls out_gki/drivers/pinctrl/mediatek/pinctrl-mt6885.o
-          ls out_gki/drivers/mfd/mt6397.o out_gki/drivers/mfd/mt6360-core.o
+          ls out_gki/drivers/mfd/mt6397-core.o out_gki/drivers/mfd/mt6360-core.o
           ls out_gki/drivers/regulator/mt6315-regulator.o out_gki/drivers/regulator/mt6359p-regulator.o out_gki/drivers/regulator/mt6360-regulator.o
           ls out_gki/drivers/scsi/ufs/ufs-mediatek.o
           ls out_gki/drivers/phy/mediatek/phy-mtk-ufs.o
