@@ -63,6 +63,19 @@ jobs:
           sudo apt-get install -y /tmp/dwarves_1.20-1_amd64.deb
           pahole --version
 
+      # LTO_CLANG_FULL 的 vmlinux.o 链接是 ld.lld whole-program 优化，内存峰值远超免费 runner 的
+      # 7GB 物理内存（官方 GKI KMI 在 32GB+ 机器构建）；内存不足会卡死/OOM 在 vmlinux.o。
+      # 社区在 GitHub Actions 上的标准 workaround：加 swap 用磁盘换虚拟内存扛过 LTO 峰值。
+      - name: Add swap for LTO link
+        run: |
+          set -eo pipefail
+          sudo fallocate -l 8G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=8192
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          echo "--- memory ---"
+          free -h
+
       - name: Build gki_defconfig vmlinux
         run: |
           export PATH="$PWD/prebuilts-master/clang/host/linux-x86/clang-r416183b/bin:$PWD/prebuilts/gas/linux-x86:$PATH"
@@ -76,6 +89,12 @@ jobs:
           export CROSS_COMPILE=aarch64-linux-gnu-
           export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
           make O=out_gki gki_defconfig
+          # LTO_CLANG_FULL 的 whole-program 链接内存峰值超大（官方在 32GB+ 机器构建），
+          # 7GB runner 会在 vmlinux.o 卡死/OOM。切 LTO_CLANG_THIN：二者都 select LTO_CLANG →
+          # 定义相同的 CONFIG_LTO/CONFIG_LTO_CLANG，genksyms CRC 在编译 .o 时算、与 LTO 链接
+          # 变体无关，故 CRC 与 Google LTO_FULL 一致，仅链接内存(4-6GB)远低于 FULL。
+          scripts/config --file out_gki/.config -d LTO_CLANG_FULL -e LTO_CLANG_THIN
+          make O=out_gki olddefconfig
           make O=out_gki -j"$(nproc)" vmlinux
           echo "=== .config 关键值（核验 LTO/CFI/KASAN/LLVM 是否真开）==="
           grep -E "CONFIG_(LTO|CFI_CLANG|KASAN|CC_IS_CLANG|AS_IS_LLVM|LD_IS_LLD|MODVERSIONS|TRIM_UNUSED_KSYMS)" out_gki/.config || true
