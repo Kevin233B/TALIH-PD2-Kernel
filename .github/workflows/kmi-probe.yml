@@ -1,0 +1,88 @@
+name: KMI Probe (gki_defconfig vs abi_gki_aarch64.xml)
+
+# Stage 0/1 专用：编 gki_defconfig vmlinux → Module.symvers，跑 kmi_probe.py 比对树内
+# MTK 声明的冻结 KMI（android/abi_gki_aarch64.xml，6401 符号）是否被 gki_defconfig 原样复现。
+# 独立 workflow，与 build-kernel.yml（ls12 可开机构建）完全隔离：gki 探测失败不阻塞开机产物。
+#
+# 判定门槛（见 .github/scripts/kmi_probe.py 注释）：crc_diff（同名异 CRC）必须 =0，
+# 否则 gki_defconfig 构建与声明 KMI 不一致 = 核心层已被破坏，官方 ko 无法对齐。
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ gki-5.10-standard-kmi ]
+  pull_request:
+    branches: [ gki-5.10-standard-kmi ]
+
+jobs:
+  probe:
+    name: gki_defconfig KMI probe
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch official Clang toolchain (clang-r416183b)
+        run: |
+          set -eo pipefail
+          mkdir -p prebuilts-master/clang/host/linux-x86/clang-r416183b
+          curl -fsSL --retry 3 --retry-delay 5 \
+            "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/6e3223f76384455acde43affde3df0ea9df66c0d/clang-r416183b.tar.gz" \
+            -o /tmp/clang-r416183b.tar.gz
+          tar -xzf /tmp/clang-r416183b.tar.gz -C prebuilts-master/clang/host/linux-x86/clang-r416183b
+          rm -f /tmp/clang-r416183b.tar.gz
+
+      - name: Fetch official binutils (gas)
+        run: |
+          set -eo pipefail
+          mkdir -p prebuilts/gas/linux-x86
+          curl -fsSL --retry 3 --retry-delay 5 \
+            "https://android.googlesource.com/platform/prebuilts/gas/linux-x86/+archive/b2a189331333e014bfef4c0425b3ef4b74accdd0.tar.gz" \
+            -o /tmp/gas.tar.gz
+          tar -xzf /tmp/gas.tar.gz -C prebuilts/gas/linux-x86
+          rm -f /tmp/gas.tar.gz
+
+      - name: Install cross binutils + host build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential bc flex bison libssl-dev libelf-dev libncurses-dev \
+            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi
+
+      # gki_defconfig 可能不含 DEBUG_INFO_BTF（BTF 由 build.config.gki 的 debug 片段另行开启），
+      # 但为与可开机构建链完全一致仍钉 pahole 1.20（无害；若 gki_defconfig 真带 BTF 也能过）。
+      - name: Install pahole 1.20 (5.10-compatible BTF)
+        run: |
+          set -eo pipefail
+          curl -fsSL --retry 3 --retry-delay 5 \
+            "http://old-releases.ubuntu.com/ubuntu/pool/universe/d/dwarves-dfsg/dwarves_1.20-1_amd64.deb" \
+            -o /tmp/dwarves_1.20-1_amd64.deb
+          echo "67efe8ddbf5e16b84a5aa322f4e02955a6939dbbb615dca1f590071641e0acef  /tmp/dwarves_1.20-1_amd64.deb" | sha256sum -c -
+          sudo apt-get update
+          sudo apt-get install -y /tmp/dwarves_1.20-1_amd64.deb
+          pahole --version
+
+      - name: Build gki_defconfig vmlinux
+        run: |
+          export PATH="$PWD/prebuilts-master/clang/host/linux-x86/clang-r416183b/bin:$PWD/prebuilts/gas/linux-x86:$PATH"
+          export ARCH=arm64
+          export LLVM=1
+          export CLANG_TRIPLE=aarch64-linux-gnu-
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
+          make O=out_gki gki_defconfig
+          make O=out_gki -j"$(nproc)" vmlinux
+
+      - name: KMI probe (Module.symvers vs abi_gki_aarch64.xml)
+        run: |
+          python3 .github/scripts/kmi_probe.py out_gki/Module.symvers android/abi_gki_aarch64.xml
+
+      - name: Upload KMI probe artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kmi-probe
+          path: |
+            out_gki/Module.symvers
+            out_gki/.config
+          if-no-files-found: error
