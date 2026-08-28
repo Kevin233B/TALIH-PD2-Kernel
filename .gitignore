@@ -11,6 +11,8 @@
 # Normal rules (sorted alphabetically)
 #
 .*
+!/.github/
+__pycache__/
 *.a
 *.asn1.[ch]
 *.bin

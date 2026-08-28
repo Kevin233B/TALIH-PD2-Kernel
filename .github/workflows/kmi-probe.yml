@@ -1,0 +1,124 @@
+name: KMI Probe (gki_defconfig vs abi_gki_aarch64.xml)
+
+# Stage 1 锚点专用：编 gki_defconfig vmlinux → vmlinux.symvers，跑 kmi_probe.py 比对树内
+# google/android12-5.10.264 纯基线的冻结 KMI（android/abi_gki_aarch64.xml，7298 符号）是否被自证复现。
+# 独立 workflow，与 build-kernel.yml（ls12 可开机构建）完全隔离：gki 探测失败不阻塞开机产物。
+#
+# 判定门槛（见 .github/scripts/kmi_probe.py 注释）：crc_diff（同名异 CRC）必须 =0，
+# 否则 gki_defconfig 构建与声明 KMI 不一致 = 核心层已被破坏，官方 ko 无法对齐。
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ gki-5.10-rebase ]
+  pull_request:
+    branches: [ gki-5.10-rebase ]
+
+jobs:
+  probe:
+    name: gki_defconfig KMI probe
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch official Clang toolchain (clang-r416183b)
+        run: |
+          set -eo pipefail
+          mkdir -p prebuilts-master/clang/host/linux-x86/clang-r416183b
+          curl -fsSL --retry 3 --retry-delay 5 \
+            "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/6e3223f76384455acde43affde3df0ea9df66c0d/clang-r416183b.tar.gz" \
+            -o /tmp/clang-r416183b.tar.gz
+          tar -xzf /tmp/clang-r416183b.tar.gz -C prebuilts-master/clang/host/linux-x86/clang-r416183b
+          rm -f /tmp/clang-r416183b.tar.gz
+
+      - name: Fetch official binutils (gas)
+        run: |
+          set -eo pipefail
+          mkdir -p prebuilts/gas/linux-x86
+          curl -fsSL --retry 3 --retry-delay 5 \
+            "https://android.googlesource.com/platform/prebuilts/gas/linux-x86/+archive/b2a189331333e014bfef4c0425b3ef4b74accdd0.tar.gz" \
+            -o /tmp/gas.tar.gz
+          tar -xzf /tmp/gas.tar.gz -C prebuilts/gas/linux-x86
+          rm -f /tmp/gas.tar.gz
+
+      - name: Install cross binutils + host build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential bc flex bison libssl-dev libelf-dev libncurses-dev \
+            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            gcc-arm-linux-gnueabi binutils-arm-linux-gnueabi
+
+      # gki_defconfig 可能不含 DEBUG_INFO_BTF（BTF 由 build.config.gki 的 debug 片段另行开启），
+      # 但为与可开机构建链完全一致仍钉 pahole 1.20（无害；若 gki_defconfig 真带 BTF 也能过）。
+      - name: Install pahole 1.20 (5.10-compatible BTF)
+        run: |
+          set -eo pipefail
+          curl -fsSL --retry 3 --retry-delay 5 \
+            "http://old-releases.ubuntu.com/ubuntu/pool/universe/d/dwarves-dfsg/dwarves_1.20-1_amd64.deb" \
+            -o /tmp/dwarves_1.20-1_amd64.deb
+          echo "67efe8ddbf5e16b84a5aa322f4e02955a6939dbbb615dca1f590071641e0acef  /tmp/dwarves_1.20-1_amd64.deb" | sha256sum -c -
+          sudo apt-get update
+          sudo apt-get install -y /tmp/dwarves_1.20-1_amd64.deb
+          pahole --version
+
+      # LTO_CLANG_FULL 的 vmlinux.o 链接是 ld.lld whole-program 优化，内存峰值远超免费 runner 的
+      # 物理内存（官方 GKI KMI 在 32GB+ 机器构建）；内存不足会卡死/OOM 在 vmlinux.o。
+      # 应对：加独立 swap 文件，用磁盘换虚拟内存扛过 LTO 峰值。避开 runner 自带的 /swapfile。
+      - name: Boost swap for FULL LTO link
+        run: |
+          set -eo pipefail
+          echo "--- swap/disk 现状 ---"
+          swapon --show || true
+          free -h
+          df -h / | tail -1
+          # 尚无额外 swap 时，按根分区可用空间动态配（上限 10G，预留 3G 给 build 产物），
+          # 避免固定大文件撑爆磁盘；vm.swappiness 默认 60，内存压力大时会主动换页，保证 swap 被用上。
+          if [ ! -f /swapfile_lto ]; then
+            avail_mb=$(df --output=avail -m / | tail -1 | tr -d ' ')
+            want_mb=$(( (avail_mb - 3072) * 2 / 3 ))
+            [ "$want_mb" -gt 10240 ] && want_mb=10240
+            [ "$want_mb" -lt 4096 ] && want_mb=4096
+            echo "配置额外 swap: ${want_mb}MB"
+            sudo fallocate -l ${want_mb}M /swapfile_lto || sudo dd if=/dev/zero of=/swapfile_lto bs=1M count="$want_mb"
+            sudo chmod 600 /swapfile_lto
+            sudo mkswap /swapfile_lto
+            sudo swapon /swapfile_lto
+          fi
+          echo "--- swap 后 ---"
+          swapon --show
+          free -h
+
+      - name: Build gki_defconfig vmlinux
+        run: |
+          export PATH="$PWD/prebuilts-master/clang/host/linux-x86/clang-r416183b/bin:$PWD/prebuilts/gas/linux-x86:$PATH"
+          export ARCH=arm64
+          export LLVM=1
+          # gki_defconfig 的 LTO_CLANG_FULL/CFI_CLANG/KASAN_HW_TAGS 全部依赖 clang 集成汇编器
+          # (AS_IS_LLVM)。漏设 LLVM_IAS=1 会被 Kconfig 静默关掉 → 符号 CRC 全面偏移
+          # （CI 首跑 crc_diff=4476、missing __cfi_slowpath/kasan_flag_enabled 即此因）。
+          export LLVM_IAS=1
+          export CLANG_TRIPLE=aarch64-linux-gnu-
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
+          make O=out_gki gki_defconfig
+          # 保持 gki_defconfig 原始的 LTO_CLANG_FULL（与 Google KMI 构建严格一致，不做 ThinLTO 妥协），
+          # 链接内存峰值靠上一步 boost 的大 swap 扛。
+          make O=out_gki -j"$(nproc)" vmlinux
+          echo "=== .config 关键值（核验 LTO/CFI/KASAN/LLVM 是否真开）==="
+          grep -E "CONFIG_(LTO|CFI_CLANG|KASAN|CC_IS_CLANG|AS_IS_LLVM|LD_IS_LLD|MODVERSIONS|TRIM_UNUSED_KSYMS)" out_gki/.config || true
+
+      - name: KMI probe (symvers vs abi_gki_aarch64.xml)
+        run: |
+          python3 .github/scripts/kmi_probe.py out_gki/vmlinux.symvers android/abi_gki_aarch64.xml
+
+      - name: Upload KMI probe artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kmi-probe
+          path: |
+            out_gki/vmlinux.symvers
+            out_gki/.config
+          if-no-files-found: warn
