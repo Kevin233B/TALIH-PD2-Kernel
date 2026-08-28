@@ -199,6 +199,43 @@ jobs:
           ls out_gki/drivers/scsi/ufs/ufs-mediatek.o
           ls out_gki/drivers/phy/mediatek/phy-mtk-ufs.o
 
+      # Stage 2 收尾·批1：audio(mt6885+mt6359p) + 底座 soc/mediatek(scpsys/pmic-wrap/dvfsrc/socinfo/devapc)。
+      # 复用累积 config（ARCH_MEDIATEK + clk + boot-critical 已 enable），再叠 audio + soc 底座；
+      # 只编对应目录，不重链 vmlinux，不污染上面的 kmi 判定（核心 KMI 仍由纯净 gki_defconfig 独占判定）。
+      - name: Verify audio + soc/base compile (vendor increment)
+        run: |
+          export PATH="$PWD/prebuilts-master/clang/host/linux-x86/clang-r416183b/bin:$PWD/prebuilts/gas/linux-x86:$PATH"
+          export ARCH=arm64
+          export LLVM=1
+          export LLVM_IAS=1
+          export CLANG_TRIPLE=aarch64-linux-gnu-
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
+          scripts/config --file out_gki/.config \
+            --enable SND_SOC_MT6885 \
+            --enable SND_SOC_MT6885_MT6359P \
+            --enable MTK_SCPSYS \
+            --enable MTK_PMIC_WRAP \
+            --enable MTK_DVFSRC \
+            --enable MTK_DEVAPC \
+            --enable MTK_SOCINFO \
+            --enable MTK_INFRACFG
+          make O=out_gki olddefconfig
+          make O=out_gki -j"$(nproc)" \
+            sound/soc/mediatek/ \
+            sound/soc/codecs/ \
+            drivers/soc/mediatek/
+          echo "=== audio .o 清单（缺失即 fail）==="
+          ls out_gki/sound/soc/mediatek/mt6885/*.o | wc -l
+          ls out_gki/sound/soc/mediatek/common/mtk-afe-platform-driver.o
+          ls out_gki/sound/soc/codecs/snd-soc-mt6359.o
+          echo "=== soc 底座 .o 清单（缺失即 fail）==="
+          ls out_gki/drivers/soc/mediatek/mtk-scpsys.o
+          ls out_gki/drivers/soc/mediatek/mtk-pmic-wrap.o
+          ls out_gki/drivers/soc/mediatek/mtk-dvfsrc.o
+          ls out_gki/drivers/soc/mediatek/mtk-socinfo.o
+          ls out_gki/drivers/soc/mediatek/devapc/ | wc -l
+
       - name: Upload KMI probe artifacts
         if: always()
         uses: actions/upload-artifact@v4
