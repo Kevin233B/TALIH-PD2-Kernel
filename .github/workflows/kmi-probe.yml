@@ -66,15 +66,22 @@ jobs:
       # LTO_CLANG_FULL 的 vmlinux.o 链接是 ld.lld whole-program 优化，内存峰值远超免费 runner 的
       # 7GB 物理内存（官方 GKI KMI 在 32GB+ 机器构建）；内存不足会卡死/OOM 在 vmlinux.o。
       # 社区在 GitHub Actions 上的标准 workaround：加 swap 用磁盘换虚拟内存扛过 LTO 峰值。
-      - name: Add swap for LTO link
+      - name: Ensure swap for LTO link
         run: |
           set -eo pipefail
-          sudo fallocate -l 8G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=8192
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
-          echo "--- memory ---"
+          echo "--- swap 现状 ---"
+          swapon --show || true
           free -h
+          # runner 镜像常自带 /swapfile（已被 swapon，直接复用，fallocate 会撞 "Text file busy"）；
+          # 仅当确实无任何 swap 时才新建。
+          if ! swapon --show | grep -q .; then
+            sudo fallocate -l 8G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=8192
+            sudo chmod 600 /swapfile
+            sudo mkswap /swapfile
+            sudo swapon /swapfile
+            echo "--- after add ---"
+            free -h
+          fi
 
       - name: Build gki_defconfig vmlinux
         run: |
