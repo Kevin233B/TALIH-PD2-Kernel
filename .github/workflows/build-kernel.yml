@@ -94,11 +94,23 @@ jobs:
           make O=out ls12_mt8797_wifi_64_defconfig
           make O=out -j"$(nproc)" Image dtbs
 
+      - name: Package Image.gz + empty dtbo
+        run: |
+          set -eo pipefail
+          # 真机 boot.img 的 kernel 段是 gzip 的 Image（11MB gzip），CI 只编出裸 Image，
+          # 打包 boot.img 前需 gzip。参照 [[talih-pd2-flash-guide]]。
+          gzip -9 -c out/arch/arm64/boot/Image > out/arch/arm64/boot/Image.gz
+          # 空 dtbo：严格参照 lk 解析逻辑（odm_mdtbo.c），count=1 + 合法空 FDT，
+          # 让 lk overlay 阶段变 no-op，防止 4.19 工厂 overlay 污染 5.10 dtb。
+          python3 .github/scripts/gen_empty_dtbo.py out/arch/arm64/boot/dts/mediatek/empty_dtbo.img
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: talih-pd2-ls12-kernel
           path: |
             out/arch/arm64/boot/Image
+            out/arch/arm64/boot/Image.gz
             out/arch/arm64/boot/dts/mediatek/ls12_mt8797_wifi_64.dtb
+            out/arch/arm64/boot/dts/mediatek/empty_dtbo.img
           if-no-files-found: error
