@@ -181,3 +181,11 @@ CONFIG_MTK_LPM_MT6893=y
 
 # --- 热管理 ---
 CONFIG_MTK_THERMAL=y
+
+# --- AEE（Android Exception Engine，drm_v2/cmdq/camsys 等 vendor 驱动的 mtk_log.h 依赖）---
+# MTK_AEE_FEATURE 门控 <aee.h>（定义 aee_kernel_exception_api 宏 + DB_OPT_* 枚举），
+# 不开则 mtk_drm_crtc.c 的 DDPAEE_1 展开报「implicit declaration」+ 未声明枚举；
+# MTK_AEE_AED 编译 aee-common.o 提供 aee_kernel_exception_api_func 定义（修链接），
+# 二者均在 4.19 能开机参照 defconfig。
+CONFIG_MTK_AEE_FEATURE=y
+CONFIG_MTK_AEE_AED=y

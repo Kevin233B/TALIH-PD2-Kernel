@@ -272,7 +272,9 @@ jobs:
             --enable AW3750X_POWER \
             --enable MTK_AAL_SUPPORT \
             --enable PWM_MTK_DISP \
-            --enable MTK_ROUND_CORNER_SUPPORT
+            --enable MTK_ROUND_CORNER_SUPPORT \
+            --enable MTK_AEE_FEATURE \
+            --enable MTK_AEE_AED
           make O=out_gki olddefconfig
           make O=out_gki -j"$(nproc)" \
             drivers/gpu/drm/mediatek/ \
