@@ -74,15 +74,15 @@ jobs:
           make O=out_gki gki_defconfig
           make O=out_gki -j"$(nproc)" vmlinux
 
-      - name: KMI probe (Module.symvers vs abi_gki_aarch64.xml)
+      - name: KMI probe (symvers vs abi_gki_aarch64.xml)
         run: |
-          python3 .github/scripts/kmi_probe.py out_gki/Module.symvers android/abi_gki_aarch64.xml
+          python3 .github/scripts/kmi_probe.py out_gki/vmlinux.symvers android/abi_gki_aarch64.xml
 
       - name: Upload KMI probe artifacts
         uses: actions/upload-artifact@v4
         with:
           name: kmi-probe
           path: |
-            out_gki/Module.symvers
+            out_gki/vmlinux.symvers
             out_gki/.config
           if-no-files-found: error

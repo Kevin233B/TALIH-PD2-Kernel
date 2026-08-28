@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
-# KMI 探测：比对「gki_defconfig 实际构建产出的 Module.symvers」与「树内 android/abi_gki_aarch64.xml
+# KMI 探测：比对「gki_defconfig 实际构建产出的 symvers」与「树内 android/abi_gki_aarch64.xml
 # （MTK 声明的 GKI KMI = google android12-5.10 KMI 的严格子集，6401 符号）」，验证声明确实能复现。
 #
 # 背景（见 memory talih-pd2-kmi-subset-finding）：静态比对已证明 MTK 的 6401 个 KMI 符号与 Google
 # android12-5.10 的对应符号 CRC 零差异（module_layout=0x7c24b32d 两边相同）。本脚本把「静态声明」
-# 提升为「实际构建验证」：若 gki_defconfig 编出的 vmlinux 的 Module.symvers 与声明的 6401 符号 CRC
+# 提升为「实际构建验证」：若 gki_defconfig 编出的 vmlinux 的 symvers 与声明的 6401 符号 CRC
 # 全部一致（crc_diff=0），则该实际构建就是 Google-KMI 兼容内核，官方 DDK ko 的静态依赖
 # （module_layout/kallsyms_lookup_name/kallsyms_lookup）即可对齐。
+#
+# 关键：`make vmlinux` 只生成 vmlinux.symvers（scripts/link-vmlinux.sh 末尾
+#   `${MAKE} -f scripts/Makefile.modpost MODPOST_VMLINUX=1` 产出 vmlinux 的导出符号+CRC）；
+#   Module.symvers 要等 modules 阶段才汇总。故默认读 vmlinux.symvers，兜底 Module.symvers。
 #
 # 语义：
 #   match    —— 声明 KMI 符号里，构建同样导出且 CRC 相同（目标=全部 6401）
@@ -14,13 +18,25 @@
 #   missing  —— 声明有、构建无（gki_defconfig 漏出；报前 20）
 #   extra    —— 构建有、声明无（非冻结 GPL 导出，如 kallsyms_lookup_name，属正常）
 #
-# 用法：python3 kmi_probe.py [Module.symvers 路径] [abi xml 路径]
+# 用法：python3 kmi_probe.py [symvers 路径] [abi xml 路径]
 
+import os
 import re
 import sys
 
-SYMVERS = sys.argv[1] if len(sys.argv) > 1 else "out_gki/Module.symvers"
 ABI_XML = sys.argv[2] if len(sys.argv) > 2 else "android/abi_gki_aarch64.xml"
+_DEFAULT_SYMVERS = ["out_gki/vmlinux.symvers", "out_gki/Module.symvers"]
+
+
+def resolve_symvers():
+    """优先命令行显式参数，其次 vmlinux.symvers，兜底 Module.symvers，全无则报清晰错误。"""
+    cands = ([sys.argv[1]] if len(sys.argv) > 1 else []) + _DEFAULT_SYMVERS
+    for p in cands:
+        if os.path.isfile(p):
+            return p
+    print(f"!! 找不到 symvers 文件，检查过：{cands}")
+    print("   make vmlinux 应产出 out_gki/vmlinux.symvers；若不存在，确认 gki_defconfig 构建确实成功。")
+    sys.exit(2)
 
 
 def load_abi(path):
@@ -35,7 +51,7 @@ def load_abi(path):
 
 
 def load_symvers(path):
-    """Module.symvers 每行：0xCRC<TAB>符号名<TAB>... 取前两列"""
+    """symvers 每行：0xCRC<TAB>符号名<TAB>... 取前两列"""
     symbols = {}
     with open(path) as f:
         for line in f:
@@ -49,8 +65,9 @@ def load_symvers(path):
 
 
 def main():
+    symvers = resolve_symvers()
     abi = load_abi(ABI_XML)
-    build = load_symvers(SYMVERS)
+    build = load_symvers(symvers)
 
     match = 0
     crc_diff = 0
@@ -67,6 +84,7 @@ def main():
 
     extra = sorted(set(build) - set(abi))
 
+    print(f"[kmi_probe] symvers 来源    : {symvers}")
     print(f"[kmi_probe] abi 声明符号   : {len(abi)}")
     print(f"[kmi_probe] 构建导出符号   : {len(build)}")
     print(f"[kmi_probe] match(CRC 一致): {match}")
@@ -80,11 +98,9 @@ def main():
         print("!! FAIL: 存在同名异 CRC 符号，构建与声明 KMI 不一致")
         sys.exit(1)
     if match == 0:
-        print("!! FAIL: 无任何匹配，检查 gki_defconfig 构建是否成功 / Module.symvers 是否生成")
+        print("!! FAIL: 无任何匹配，检查 gki_defconfig 构建是否成功 / symvers 是否生成")
         sys.exit(1)
     print(f"[kmi_probe] OK: 构建复现声明 KMI（{match}/{len(abi)} 符号 CRC 一致）")
-    # missing 非零仅在异常时告警（正常 gki_defconfig 应全出），但主要由 crc_diff 判 FAIL，
-    # 因为 missing 可能含个别手工导出差异；此处给 soft 提示即可。
 
 
 if __name__ == "__main__":
