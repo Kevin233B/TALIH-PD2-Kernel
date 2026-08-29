@@ -28,6 +28,20 @@ CONFIG_SECURITYFS=y
 #     ADD-only，不 flip 任何冻结 KMI CRC（BTF 是 debug info 非符号结构））---
 CONFIG_DEBUG_INFO_BTF=y
 
+# --- 尺寸硬约束（64MB boot 分区）：KASAN 关闭 —— 本 fragment 唯一的核心反向覆盖 ---
+# 实测（CI run 33247272293 产物）：gki_defconfig 的 KASAN_HW_TAGS 形态裸 Image 233MB
+# → gzip -9 后 84.6MB，+ 原厂 ramdisk 11.67MB + dtb ≈ 92.6MB > boot 分区 64MB
+# （超 28.6MB）→ 装不进分区 = 物理不能开机，违反硬原则①（保证开机）。
+# KASAN 关闭的 KMI 核验（静态全过，CI kmi_probe 复验）：
+#   ① android/abi_gki_aarch64.xml 零 __kasan 冻结符号 → 关掉不产生 missing；
+#   ② KASAN 门控仅存在于 include/linux/kasan.h（函数桩），核心头零结构体字段
+#      #ifdef 门控 → genksyms CRC 零影响；
+#   ③ struct module 无 KASAN 字段 → module_layout CRC 不变（官方 ko 第一道门不受影响）。
+# 反之 CFI/LTO 不能关：__cfi_slowpath 是冻结符号（关=立即 missing FAIL）；
+# LTO_CLANG_FULL 是 Google KMI 构建形态。
+# CONFIG_KASAN is not set
+# CONFIG_KASAN_HW_TAGS is not set
+
 # --- dmabuf system heap（gki_defconfig 只有 DMABUF_HEAPS 框架、无 system heap；system_heap.c
 #     里的 mtk_dma_buf_set_name(mml/ged/hcp/cam 引用) 必须编进去，5.10 fork ls12 defconfig =y）---
 CONFIG_DMABUF_HEAPS_SYSTEM=y
