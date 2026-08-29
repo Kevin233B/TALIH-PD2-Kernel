@@ -238,6 +238,11 @@ static int mtk_iommu_pseudo_probe(struct platform_device *pdev)
 }
 #endif
 
+/* tmem_type2sec_id：secure/trusted_mem 延后——依赖 enum TRUSTED_MEM_REQ_TYPE
+ * 与 SEC_ID_* 枚举，二者仅在 GenieZone 开启时才可见（经 iommu_pseudo.h 引入）。
+ * GenieZone 关闭时（当前 deferred 路径）无任何调用者，据此门控避免编译失败。
+ */
+#if IS_ENABLED(CONFIG_MTK_ENABLE_GENIEZONE)
 int tmem_type2sec_id(enum TRUSTED_MEM_REQ_TYPE tmem)
 {
 	switch (tmem) {
@@ -252,6 +257,7 @@ int tmem_type2sec_id(enum TRUSTED_MEM_REQ_TYPE tmem)
 	}
 }
 EXPORT_SYMBOL_GPL(tmem_type2sec_id);
+#endif /* CONFIG_MTK_ENABLE_GENIEZONE */
 
 static const struct of_device_id mtk_iommu_pseudo_of_ids[] = {
 	{ .compatible = "mediatek,mt6833-iommu-pseudo" },
