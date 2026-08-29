@@ -166,6 +166,13 @@ CONFIG_SND_SOC_MT6359=y
 CONFIG_SND_SOC_MT6359P_ACCDET=y
 CONFIG_SND_SOC_MTK_SRAM=y
 CONFIG_SND_SOC_MTK_SMART_PHONE=y
+# audio DSP IPI（4.19 defconfig 有 =y）：audio HAL 经 ADSP 子系统通信。
+# 依赖链 MTK_AUDIODSP_SUPPORT(adsp/ 框架 Stage2 已搬)→MTK_AUDIO_IPI(audio_ipi/)。
+# 不影响开机（纯 userspace 音频功能），对齐 4.19 补齐。
+CONFIG_MTK_AUDIODSP_SUPPORT=y
+CONFIG_MTK_AUDIO_IPI=y
+# 蓝牙通话 CVSD/MSBC 软件通路（4.19 =y），无依赖纯 ALSA 驱动
+CONFIG_SND_SOC_MTK_BTCVSD=y
 
 # --- nvmem / iio（校准数据 + auxadc）---
 CONFIG_MTK_DEVINFO=y

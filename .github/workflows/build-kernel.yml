@@ -174,6 +174,48 @@ jobs:
           print(f"  boot.img 估算 = {total/1048576:.2f} MiB / 64 MiB 分区，余量 {(64*1048576-total)/1048576:+.2f} MiB")
           PY
 
+      # FULL LTO 下 .o 归因无意义（单一 vmlinux.o）→ 尺寸归因只能对 vmlinux 本体做：
+      # size 段分布 + nm --size-sort top 符号。刀口选择（KERNEL_ZSTD / KALLSYMS_ALL / 非 boot =y 剥离）
+      # 全部以此输出为依据，不再盲猜。
+      - name: Size attribution (section sizes + top symbols + BTF-zeroed A/B)
+        run: |
+          # host(x86) binutils 未必支持 aarch64 ELF → 优先 aarch64-linux-gnu- 前缀工具
+          RE=aarch64-linux-gnu-readelf; command -v $RE >/dev/null || RE=readelf
+          SZ=aarch64-linux-gnu-size;  command -v $SZ >/dev/null || SZ=size
+          NM=aarch64-linux-gnu-nm;    command -v $NM >/dev/null  || NM=nm
+          OC=aarch64-linux-gnu-objcopy; command -v $OC >/dev/null || OC=objcopy
+          echo "=== vmlinux section sizes（找 .BTF 大头）==="
+          $SZ -A out_device/vmlinux | sort -k2 -n -r | head -25 || true
+          echo "=== top-40 symbols by size ==="
+          $NM -S --size-sort out_device/vmlinux 2>/dev/null | tail -40 || true
+          echo "=== A/B: 原 Image.gz vs .BTF 零填充后 Image.gz ==="
+          echo -n "orig  Image.gz: "; gzip -9 -c out_device/arch/arm64/boot/Image | wc -c
+          # BTF 瘦身刀（零填充版，勿用 -R .BTF！）：
+          # arm64 Image 可重定位（head.S 按 .rela.dyn 以 _text 为基址打补丁，文件偏移
+          # 必须严格等于 vma-_text）——.BTF 在 RO_DATA 中段，-R 剔除会把后续所有段文件
+          # 偏移前移 size(.BTF)，而重定位 addend 仍烙链接期 vma → BTF 后符号引用全体
+          # 偏移 → 开机即崩。正确刀法 = 原位零填充（objcopy --update-section 等长 0 覆盖）：
+          # 布局/重定位 100% 不动，__start_BTF 指向全零 → btf_parse_hdr magic(0xeb9f)
+          # 校验 -EINVAL 优雅降级（google 5.10 btf 惰性初始化，boot 期零 BTF 消费），
+          # gzip 对 100MB 零只压 ~100KB → gz 收益与剔除等同。KMI 零影响（symvers
+          # 链接期已生成）。4.19 原厂无 DEBUG_INFO_BTF 照样全功能开机。
+          # readelf -W -S 宽格式单行：[Nr] Name Type Address Off Size ES Flg Lk Inf Al
+          # → $2=Name $6=Size（$7 是 EntSize）；Size 是不带 0x 的十六进制 → 16# 转十进制
+          BTF_HEX=$($RE -W -S out_device/vmlinux | awk '$2==".BTF" {print $6}')
+          BTF_SIZE=$((16#$BTF_HEX))
+          if [ -n "$BTF_SIZE" ] && [ "$BTF_SIZE" -gt 0 ] 2>/dev/null; then
+            echo ".BTF raw size = $BTF_SIZE bytes"
+            truncate -s "$BTF_SIZE" /tmp/btf_zeros.bin
+            $OC --update-section .BTF=/tmp/btf_zeros.bin \
+              out_device/vmlinux out_device/vmlinux.btfzeroed || true
+            $OC -O binary -R .note -R .note.gnu.build-id -R .comment -S \
+              out_device/vmlinux.btfzeroed out_device/arch/arm64/boot/Image.nobtf || true
+            ls -la out_device/arch/arm64/boot/Image.nobtf || true
+            echo -n "nobtf Image.gz: "; gzip -9 -c out_device/arch/arm64/boot/Image.nobtf | wc -c || true
+          else
+            echo ".BTF 不存在或为空（跳过 A/B）"
+          fi
+
       # Stage 3 硬门禁：device 内核（gki_defconfig + ls12 fragment）的核心冻结 KMI 仍须 0 diff。
       # fragment 只 ADD vendor 设备驱动，不改 LTO/CFI/KASAN/NR_CPUS/PREEMPT 等核心 flip，
       # 核心头文件又是 rebase 纯净（kernel/mm/fs/net/security 0 diff）→ 7298 冻结符号 CRC 应全对齐。
