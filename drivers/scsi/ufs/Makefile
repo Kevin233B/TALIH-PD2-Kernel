@@ -1,6 +1,11 @@
 # SPDX-License-Identifier: GPL-2.0
 # UFSHCD makefile
 
+# TALIH-PD2：ufs-mediatek.c 是 MTK mt6893 增强版（覆盖 google mainline mt8183），
+# 其 `#include <mt-plat/aee.h>`（CONFIG_MTK_AEE_FEATURE 门控）需 MTK 私有头路径。
+# 对齐 MTK fork 的 ufs/Makefile ccflags（blocktag/vendor 延后未搬，故只补 include/）。
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/
+
 # The link order is important here. ufshcd-core must initialize
 # before vendor drivers.
 obj-$(CONFIG_SCSI_UFSHCD)		+= ufshcd-core.o
