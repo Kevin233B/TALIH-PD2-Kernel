@@ -22,6 +22,12 @@ CONFIG_DEVTMPFS=y
 CONFIG_DEVTMPFS_MOUNT=y
 CONFIG_SECURITYFS=y
 
+# --- BTF debug info（官方 GKI 必需；core kernel/bpf/btf.c(google 原生) 用 extern __weak __start_BTF/__stop_BTF，
+#     该符号仅当 DEBUG_INFO_BTF=y 时由 vmlinux.lds.S 定义。不开 → 链接期弱未定义 → .got.plt/.plt ASSERT
+#     （ld.lld: Unexpected GOT/PLT entries detected）拦死 vmlinux。gki_defconfig 只给了 DEBUG_INFO 没给 BTF。
+#     ADD-only，不 flip 任何冻结 KMI CRC（BTF 是 debug info 非符号结构））---
+CONFIG_DEBUG_INFO_BTF=y
+
 # --- dmabuf system heap（gki_defconfig 只有 DMABUF_HEAPS 框架、无 system heap；system_heap.c
 #     里的 mtk_dma_buf_set_name(mml/ged/hcp/cam 引用) 必须编进去，5.10 fork ls12 defconfig =y）---
 CONFIG_DMABUF_HEAPS_SYSTEM=y
