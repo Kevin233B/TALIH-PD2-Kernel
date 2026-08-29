@@ -281,7 +281,11 @@ jobs:
             drivers/gpu/drm/panel/
           echo "=== drm_v2/mml/panel .o 清单（缺失即 fail）==="
           ls out_gki/drivers/gpu/drm/mediatek/mediatek_v2/mtk_drm_drv.o
-          ls out_gki/drivers/gpu/drm/mediatek/mml/mtk-mml.o
+          # 注：mml/Makefile `mtk-mml-legacy-objs := mtk-mml.o` 令 mtk-mml.o 成为 multi-used
+          # 复合对象，kbuild 不会单独 emit 顶层 mtk-mml.o（子对象直接进 built-in.a）。
+          # 故断言子对象 mtk-mml-driver.o + built-in.a（AR 成功即有），而非不存在的 mtk-mml.o。
+          ls out_gki/drivers/gpu/drm/mediatek/mml/mtk-mml-driver.o
+          ls out_gki/drivers/gpu/drm/mediatek/mml/built-in.a
           ls out_gki/drivers/gpu/drm/panel/lushan12_hx83121a_cdot_csot_wqxga_dsi_vdo.o
           ls out_gki/drivers/gpu/drm/panel/lushan12_hx83121a_cdot_csot_without_vcom_wqxga_dsi_vdo.o
           ls out_gki/drivers/gpu/drm/panel/aw3750x_power.o
