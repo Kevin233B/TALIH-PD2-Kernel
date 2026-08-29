@@ -94,6 +94,10 @@ endif
 
 mediatek-drm-$(CONFIG_DRM_FBDEV_EMULATION) += mtk_drm_fbdev.o
 
+# atag,videolfb 解析（mtk_drm_lcm_is_connect/_parse_tag_videolfb/free_fb_buf）：
+# crtc/drv/disp_recovery 无条件引用，原实现困在 FBDEV 门控里 → 拆出无条件编译。
+mediatek-drm-y += mtk_drm_atag.o
+
 obj-$(CONFIG_DRM_MEDIATEK) += mediatek-drm.o
 obj-$(CONFIG_DRM_MEDIATEK) += mtk_sync.o
 

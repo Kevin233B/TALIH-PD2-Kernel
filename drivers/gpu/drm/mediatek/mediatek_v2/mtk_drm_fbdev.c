@@ -236,96 +236,9 @@ static struct fb_ops mtk_fbdev_ops = {
 	.fb_ioctl = mtk_drm_fb_ioctl,
 };
 
-bool mtk_drm_lcm_is_connect(void)
-{
-	struct device_node *chosen_node;
-
-	chosen_node = of_find_node_by_path("/chosen");
-	if (chosen_node) {
-		struct tag_videolfb *videolfb_tag = NULL;
-		unsigned long size = 0;
-
-		videolfb_tag = (struct tag_videolfb *)of_get_property(
-			chosen_node,
-			"atag,videolfb", (int *)&size);
-		if (videolfb_tag)
-			return videolfb_tag->islcmfound;
-
-		DDPINFO("[DT][videolfb] videolfb_tag not found\n");
-	} else {
-		DDPINFO("[DT][videolfb] of_chosen not found\n");
-	}
-
-	return false;
-}
-
-int _parse_tag_videolfb(unsigned int *vramsize, phys_addr_t *fb_base,
-			unsigned int *fps)
-{
-#ifdef CONFIG_MTK_DISP_NO_LK
-		return -1;
-#else
-	struct device_node *chosen_node;
-
-	*fps = 6000;
-	chosen_node = of_find_node_by_path("/chosen");
-	if (chosen_node) {
-		struct tag_videolfb *videolfb_tag = NULL;
-		unsigned long size = 0;
-
-		videolfb_tag = (struct tag_videolfb *)of_get_property(
-			chosen_node, "atag,videolfb", (int *)&size);
-		if (videolfb_tag) {
-			*vramsize = videolfb_tag->vram;
-			*fb_base = videolfb_tag->fb_base;
-			*fps = videolfb_tag->fps;
-			if (*fps == 0)
-				*fps = 6000;
-			return 0;
-		}
-
-		DDPINFO("[DT][videolfb] videolfb_tag not found\n");
-		goto found;
-	} else {
-		DDPINFO("[DT][videolfb] of_chosen not found\n");
-	}
-	return -1;
-
-found:
-	DDPINFO("[DT][videolfb] fb_base    = 0x%lx\n", (unsigned long)*fb_base);
-	DDPINFO("[DT][videolfb] vram       = 0x%x (%d)\n", *vramsize,
-		*vramsize);
-	DDPINFO("[DT][videolfb] fps	   = %d\n", *fps);
-
-	return 0;
-#endif
-}
-
-int free_fb_buf(void)
-{
-	unsigned long va_start = 0;
-	unsigned long va_end = 0;
-	phys_addr_t fb_base;
-	unsigned int vramsize, fps;
-
-	_parse_tag_videolfb(&vramsize, &fb_base, &fps);
-
-	if (!fb_base) {
-		DDPINFO("%s:get fb pa error\n", __func__);
-		return -1;
-	}
-
-	va_start = (unsigned long)__va(fb_base);
-	va_end = (unsigned long)__va(fb_base + (unsigned long)vramsize);
-	if (va_start)
-		//free_reserved_area((void *)va_start,
-		//		   (void *)va_end, 0xff, "fbmem");
-		;
-	else
-		DDPINFO("%s:va invalid\n", __func__);
-
-	return 0;
-}
+/* mtk_drm_lcm_is_connect / _parse_tag_videolfb / free_fb_buf 三个纯 DT 解析函数
+ * 已拆至 mtk_drm_atag.c 无条件编译（crtc/drv 无条件引用它们，而本文件被
+ * CONFIG_DRM_FBDEV_EMULATION 门控——GKI 关 FBDEV 时曾链接 undefined）。 */
 
 static int mtk_fbdev_probe(struct drm_fb_helper *helper,
 			   struct drm_fb_helper_surface_size *sizes)
