@@ -103,6 +103,22 @@ jobs:
           # 全量编 Image（vmlinux 链接会暴露 vendor 驱动 link 期 undefined）+ dtbs（ls12 dtb）
           make O=out_device -j"$(nproc)" Image dtbs
 
+      # DIAGNOSTIC（查出 GOT/PLT 断言触发者后删除）：最终 -shared -Bsymbolic --no-undefined
+      # 链接里能触发 .got.plt/.plt ASSERT 的，只能是「弱未定义符号」（`lmm-nm -u` 里小写 w）。
+      # vmlinux.o 是 LTO 合并产物（最终链接的输入，链接失败也保留），从它的 .symtab 枚举命名即可。
+      - name: DIAG list weak-undefined symbols (GOT/PLT culprits)
+        if: always()
+        run: |
+          export PATH="$PWD/prebuilts-master/clang/host/linux-x86/clang-r416183b/bin:$PATH"
+          echo "===== vmlinux.o 是否存在 ====="
+          ls -la out_device/vmlinux.o 2>&1 || echo "(no vmlinux.o)"
+          echo "===== 弱符号全量（小写 w=弱未定义，大写 W=弱已定义）====="
+          llvm-nm out_device/vmlinux.o 2>&1 | grep -E ' [wW] ' | sort | head -200 || echo "(none)"
+          echo "===== 未定义符号 llvm-nm -u（w=弱未定义是元凶；U=强未定义由 lds PROVIDE/--no-undefined 判）====="
+          llvm-nm -u out_device/vmlinux.o 2>&1 | sort | head -200 || echo "(none)"
+          echo "===== readelf WEAK 行（含 FUNC/OBJECT 类型）====="
+          llvm-readelf -sW out_device/vmlinux.o 2>&1 | grep -iE 'WEAK' | head -200 || echo "(none)"
+
       - name: Verify boot artifacts
         run: |
           set -eo pipefail

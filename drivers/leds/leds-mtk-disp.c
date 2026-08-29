@@ -13,8 +13,22 @@
 #include <leds-mtk.h>
 #include "../drivers/gpu/drm/mediatek/mediatek_v2/mtk_panel_ext.h"
 
-extern int __attribute__ ((weak)) mtk_drm_gateic_set_backlight(unsigned int level, char func);
-extern int __attribute__ ((weak)) _gate_ic_backlight_set(unsigned int brightness);
+/*
+ * gate-IC 背光弱桩：ls12 面板是 HX83121A DSI 面板，背光走 mtkfb_set_backlight_level
+ * (led_disp_set)，不经过 gate IC；这两个 gate-IC 函数只在 gate-IC 面板的 led_i2c_set
+ * 路径用到。5.10 GKI 的 vmlinux 以 -shared -Bsymbolic --no-undefined 链接，弱【未定义】
+ * 函数会生成 .got.plt/.plt 触发链接 ASSERT（Unexpected GOT/PLT entries detected）。
+ * 这里提供弱【定义】空桩（对标 5.10 fork 的 mtk_drm_panel_common.h #else 分支），
+ * 让引用本地绑定、return 0 无害，避免引入 rt4831a 等 gate-IC 驱动的连带依赖。
+ */
+__attribute__ ((weak)) int mtk_drm_gateic_set_backlight(unsigned int level, char func)
+{
+	return 0;
+}
+__attribute__ ((weak)) int _gate_ic_backlight_set(unsigned int brightness)
+{
+	return 0;
+}
 
 #undef pr_fmt
 #define pr_fmt(fmt) KBUILD_MODNAME " %s(%d) :" fmt, __func__, __LINE__
