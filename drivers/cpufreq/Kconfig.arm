@@ -123,6 +123,22 @@ config ARM_MEDIATEK_CPUFREQ
 	help
 	  This adds the CPUFreq driver support for MediaTek SoCs.
 
+# vendor 增量（自 gki-5.10 fork drivers/cpufreq/Kconfig.arm:126 移植，为 mt6893 的
+# dts "mediatek,cpufreq-hw" performance-controller 节点提供驱动；上游 mediatek-cpufreq.c
+# 只支持 mt2701..mt8516 老平台）。与 fork 版差异：去掉 default m（gki_defconfig 不开它，
+# default m 会让 olddefconfig 静默设 m→编成模块但 ramdisk 无它→cpufreq 全失），
+# 由 ls12_gki.fragment 显式 =y 控制。
+config ARM_MEDIATEK_CPUFREQ_HW
+	tristate "MediaTek CPUFreq HW driver"
+	depends on ARCH_MEDIATEK || COMPILE_TEST
+	help
+	  Support for the CPUFreq HW driver.
+	  Some MediaTek chipsets have a HW engine to offload the steps
+	  necessary for changing the frequency of the CPUs. Firmware loaded
+	  in this engine exposes a programming interface to the OS.
+	  The driver implements the cpufreq interface for this HW engine.
+	  Say Y if you want to support CPUFreq HW.
+
 config ARM_OMAP2PLUS_CPUFREQ
 	bool "TI OMAP2+"
 	depends on ARCH_OMAP2PLUS

@@ -163,6 +163,25 @@ CONFIG_SND_SOC_MTK_SMART_PHONE=y
 CONFIG_MTK_DEVINFO=y
 CONFIG_TCT_DEVICEINFO=y
 CONFIG_MEDIATEK_MT635X_AUXADC=y
+# SoC 级 auxadc（mt6893.dtsi auxadc@11001000 "mediatek,mt6765-auxadc"，google 主线
+# mt6577_auxadc.c 兼容）。ls12 板级 3 个 NTC 热敏（generic-adc-thermal，io-channels=<&auxadc 0/1/2>）
+# 走它；不开=板温全失→thermal zones 无源。GENERIC_ADC_THERMAL depends on IIO，而
+# gki_defconfig 未开 IIO，须一并补。
+CONFIG_IIO=y
+CONFIG_MEDIATEK_MT6577_AUXADC=y
+CONFIG_GENERIC_ADC_THERMAL=y
+
+# --- cpufreq（mt6893 dts "mediatek,cpufreq-hw" performance-controller 节点）---
+# 上游 ARM_MEDIATEK_CPUFREQ 只支持 mt2701..mt8516；mt6893 走 HW 引擎驱动
+# （自 gki-5.10 fork 移植 mediatek-cpufreq-hw.c）。不开=performance-controller 无驱动
+# →无 cpufreq→thermal cooling 无处降频。KMI 核验：SCHEDUTIL 在 sched.h 两处门控均为
+# 函数/静态内联（非结构体字段）→零 CRC 影响；xml 零 sugov/__kasan 冻结符号。
+CONFIG_ARM_MEDIATEK_CPUFREQ_HW=y
+# governor：4.19/fork 参考 defconfig 均为 DEFAULT_GOV_SCHEDUTIL+USERSPACE+ONDEMAND
+CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
+CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=y
+CONFIG_CPU_FREQ_GOV_USERSPACE=y
+CONFIG_CPU_FREQ_GOV_ONDEMAND=y
 
 # --- rtc / watchdog ---
 CONFIG_RTC_DRV_MT6397=y
