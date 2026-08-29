@@ -347,5 +347,48 @@ TZ_RESULT KREE_ConfigSecureMultiChunkMemInfo(KREE_SESSION_HANDLE session,
 					     uint64_t pa, uint32_t size,
 					     uint32_t region_id);
 
+#else /* !(CONFIG_MTK_IN_HOUSE_TEE_SUPPORT || CONFIG_MTK_ENABLE_GENIEZONE) */
+/*
+ * TALIH-PD2 gki-5.10-rebase：GenieZone TEE 暂延后未启用。
+ * cmdq_sec_mtee 等 deferred secure 路径仍无条件引用 KREE 类型/接口
+ * （编译+链接需要符号存在，但运行时无需真实 TEE 会话）。此处提供「内联空实现」
+ * stub：所有调用返回 TZ_RESULT_ERROR_GENERIC，运行时安全降级（无 TEE 会话）。
+ * 一旦启用 GenieZone，本分支被上方 #if 遮蔽，真实实现自动生效。
+ */
+#include <linux/types.h>
+#include <tz_cross/trustzone.h>
+
+typedef int32_t KREE_SESSION_HANDLE;
+typedef uint32_t KREE_SHAREDMEM_HANDLE;
+typedef uint32_t KREE_SECUREMEM_HANDLE;
+typedef uint32_t KREE_SECURECM_HANDLE;
+typedef uint32_t KREE_RELEASECM_HANDLE;
+typedef uint32_t KREE_ION_HANDLE;
+typedef uint32_t *KREE_ION_HANDLE_PTR;
+
+#define KREE_SESSION_HANDLE_NULL ((KREE_SESSION_HANDLE)0)
+#define KREE_SESSION_HANDLE_FAIL ((KREE_SESSION_HANDLE)-1)
+
+struct kree_shared_mem_param {
+	uint32_t size;
+	uint32_t region_id;
+	void *buffer;
+	void *mapAry;
+};
+#define KREE_SHAREDMEM_PARAM struct kree_shared_mem_param
+
+static inline TZ_RESULT KREE_RegisterSharedmem(KREE_SESSION_HANDLE session,
+					  KREE_SHAREDMEM_HANDLE *shm_handle,
+					  KREE_SHAREDMEM_PARAM *param)
+{
+	return TZ_RESULT_ERROR_GENERIC;
+}
+
+static inline TZ_RESULT KREE_UnregisterSharedmem(KREE_SESSION_HANDLE session,
+					   KREE_SHAREDMEM_HANDLE shm_handle)
+{
+	return TZ_RESULT_ERROR_GENERIC;
+}
+
 #endif /* CONFIG_MTK_IN_HOUSE_TEE_SUPPORT || CONFIG_MTK_ENABLE_GENIEZONE*/
 #endif /* __KREE_MEM_H__ */

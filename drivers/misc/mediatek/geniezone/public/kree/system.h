@@ -127,5 +127,34 @@ u32 KREE_GetSystemCntFrq(void);
  */
 TZ_RESULT KREE_SessionToTID(KREE_SESSION_HANDLE session, enum tee_id_t *o_tid);
 
+#else /* !(CONFIG_MTK_IN_HOUSE_TEE_SUPPORT || CONFIG_MTK_ENABLE_GENIEZONE) */
+/*
+ * TALIH-PD2 gki-5.10-rebase：GenieZone TEE 暂延后，KREE session 仅需符号存在，
+ * 实际无 TEE 会话可建。内联空实现，全部返回 TZ_RESULT_ERROR_GENERIC（见 mem.h stub）。
+ */
+#include <tz_cross/trustzone.h>
+#include "mem.h"
+
+#define MAX_UUID_LEN (40)
+
+static inline TZ_RESULT KREE_CreateSession(const char *ta_uuid,
+					   KREE_SESSION_HANDLE *pHandle)
+{
+	return TZ_RESULT_ERROR_GENERIC;
+}
+
+static inline TZ_RESULT KREE_CloseSession(KREE_SESSION_HANDLE handle)
+{
+	return TZ_RESULT_ERROR_GENERIC;
+}
+
+static inline TZ_RESULT KREE_TeeServiceCall(KREE_SESSION_HANDLE handle,
+					    uint32_t command,
+					    uint32_t paramTypes,
+					    union MTEEC_PARAM param[4])
+{
+	return TZ_RESULT_ERROR_GENERIC;
+}
+
 #endif /* CONFIG_MTK_IN_HOUSE_TEE_SUPPORT || CONFIG_MTK_ENABLE_GENIEZONE */
 #endif /* __KREE_H__ */
