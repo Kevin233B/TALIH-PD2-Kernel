@@ -8,3 +8,5 @@ obj-$(CONFIG_MTK_MMSYS) += mtk-mmsys.o
 obj-$(CONFIG_MTK_DEVAPC) += devapc/
 obj-$(CONFIG_MTK_DEVMPU) += devmpu/
 obj-$(CONFIG_MTK_SOCINFO) += mtk-socinfo.o
+obj-$(CONFIG_MTK_IPI) += mtk_tinysys_ipi.o
+obj-$(CONFIG_MTK_MBOX) += mtk-mbox.o

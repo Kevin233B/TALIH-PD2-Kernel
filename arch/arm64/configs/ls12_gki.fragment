@@ -22,6 +22,10 @@ CONFIG_DEVTMPFS=y
 CONFIG_DEVTMPFS_MOUNT=y
 CONFIG_SECURITYFS=y
 
+# --- dmabuf system heap（gki_defconfig 只有 DMABUF_HEAPS 框架、无 system heap；system_heap.c
+#     里的 mtk_dma_buf_set_name(mml/ged/hcp/cam 引用) 必须编进去，5.10 fork ls12 defconfig =y）---
+CONFIG_DMABUF_HEAPS_SYSTEM=y
+
 # --- I2C 总线核（gki_defconfig 显式未开，ls12 参考 defconfig 有 =y）---
 CONFIG_I2C=y
 
@@ -73,6 +77,16 @@ CONFIG_MTK_DEVAPC=y
 CONFIG_MTK_DEVMPU=y
 CONFIG_MTK_SOCINFO=y
 
+# --- tinysys IPI/mbox 底座 + SCP（4.19 能开机 defconfig 全 =y）---
+# mtk_tinysys_ipi.c(MTK_IPI) 提供 mtk_ipi_register/send，被 gpueb/vcp/mcupm/cm_mgr/
+# thermal/sensor 等几十个 =y 驱动引用；其依赖链 MTK_MBOX → RPMSG_MTK → MTK_IPI。
+# MTK_TINYSYS_SCP_SUPPORT 编 scp/rv/ 框架，提供 scp_ipidev 符号(EXPORT)。
+# 全链从 gki-5.10 fork 搬 mtk-mbox.c/mtk_rpmsg_mbox.c/mtk_tinysys_ipi.c 三个缺失文件。
+CONFIG_MTK_MBOX=y
+CONFIG_RPMSG_MTK=y
+CONFIG_MTK_IPI=y
+CONFIG_MTK_TINYSYS_SCP_SUPPORT=y
+
 # --- memory（镜像 4.19：仅 MTK_DRAMC=y；HAVE_MTK_MC/MTK_EMI 保持不设 → 与 4.19 同为死码，不改行为）---
 CONFIG_MTK_DRAMC=y
 CONFIG_MTK_CACHE_PARITY_CHECK=y
@@ -94,6 +108,7 @@ CONFIG_MTK_FLASHLIGHT_MT6360=y
 # --- iommu / smi ---
 CONFIG_MTK_IOMMU=y
 CONFIG_MTK_IOMMU_MISC=y
+CONFIG_MTK_IOMMU_MISC_DBG=y
 CONFIG_MTK_SMI=y
 
 # --- cmdq（禁主线 MTK_CMDQ，走 vendor ext）---
@@ -205,4 +220,5 @@ CONFIG_MTK_THERMAL=y
 # 开 =y 后 aee.h 只留声明、hang_detect.c 提供唯一实现（与 4.19 能开机 defconfig 一致）。
 CONFIG_MTK_AEE_FEATURE=y
 CONFIG_MTK_AEE_AED=y
+CONFIG_MTK_AEE_IPANIC=y
 CONFIG_MTK_HANG_DETECT=y
