@@ -173,6 +173,18 @@ jobs:
           print(f"  Image.gz = {gz/1048576:.2f} MiB（裸 {233145716/1048576:.0f} MiB 参照）")
           print(f"  boot.img 估算 = {total/1048576:.2f} MiB / 64 MiB 分区，余量 {(64*1048576-total)/1048576:+.2f} MiB")
           PY
+          # BTF 零填充刀后的预算（若 Size attribution step 产出了 Image.nobtf）
+          if [ -f out_device/arch/arm64/boot/Image.nobtf ]; then
+            gz2=$(gzip -9 -c out_device/arch/arm64/boot/Image.nobtf | wc -c)
+            python3 - "$gz2" "$dtb" <<'PY'
+            import math, sys
+            gz, dtb, rd = int(sys.argv[1]), int(sys.argv[2]), 12239359
+            P = lambda x: math.ceil(x/2048)*2048
+            total = 4096 + P(gz) + P(rd) + P(dtb)
+            print(f"  [BTF 零填充后] Image.gz = {gz/1048576:.2f} MiB")
+            print(f"  [BTF 零填充后] boot.img 估算 = {total/1048576:.2f} MiB / 64 MiB 分区，余量 {(64*1048576-total)/1048576:+.2f} MiB")
+            PY
+          fi
 
       # FULL LTO 下 .o 归因无意义（单一 vmlinux.o）→ 尺寸归因只能对 vmlinux 本体做：
       # size 段分布 + nm --size-sort top 符号。刀口选择（KERNEL_ZSTD / KALLSYMS_ALL / 非 boot =y 剥离）
@@ -224,6 +236,16 @@ jobs:
         run: |
           python3 .github/scripts/kmi_probe.py out_device/vmlinux.symvers android/abi_gki_aarch64.xml
 
+      # 5.10 刷机硬前提：dtbo 必须刷「空 dt_table + 内嵌空 FDT」——5.10 dtb 已重编号，
+      # 不可再叠 4.19 工厂 overlay（81 fragment 全是占位符+符号重定位，跨版必错）。
+      # lk（odm_mdtbo.c）有 4 个 assert(0) 硬砖点 → count=0/全 0/全 0xff 都会砖，
+      # 唯一安全形态 = 合法 dt_table(magic d7b7ab1e 大端) + count=1 + 72B 空 FDT
+      # （ufdt 遍历 0 fragment = no-op）。脚本自带四 assert 点回读自检。
+      - name: Generate empty dtbo (lk-safe)
+        run: |
+          python3 .github/scripts/gen_empty_dtbo.py out_device/empty_dtbo.img
+          xxd out_device/empty_dtbo.img | head -3
+
       - name: Upload boot artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -231,7 +253,9 @@ jobs:
           name: ls12-boot
           path: |
             out_device/arch/arm64/boot/Image
+            out_device/arch/arm64/boot/Image.nobtf
             out_device/arch/arm64/boot/dts/mediatek/ls12_mt8797_wifi_64.dtb
             out_device/arch/arm64/boot/dts/mediatek/mt6893.dtb
+            out_device/empty_dtbo.img
             out_device/device_config.txt
           if-no-files-found: warn
