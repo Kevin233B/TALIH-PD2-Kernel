@@ -101,7 +101,19 @@ jobs:
           echo "=== .config 关键值（核验核心 flip 未被 fragment 破坏 + vendor 已开）==="
           grep -E "CONFIG_(LTO_CLANG_FULL|CFI_CLANG|KASAN_HW_TAGS|ARCH_MEDIATEK|BLK_DEV_INITRD|DEVTMPFS|COMMON_CLK_MT6893|PINCTRL_MT6885|SCSI_UFS_MEDIATEK|DRM_MEDIATEK_V2|SPMI_MTK_PMIF|MTK_DEVMPU|MTK_DEVINFO|MEDIATEK_MT635X_AUXADC)=" out_device/.config || true
           # 全量编 Image（vmlinux 链接会暴露 vendor 驱动 link 期 undefined）+ dtbs（ls12 dtb）
-          make O=out_device -j"$(nproc)" Image dtbs
+          # pahole（BTF 阶段）在 FULL LTO 的 DWARF 上每条类型引用打一行 "couldn't find" 告警，
+          # 实测单次构建 1120 万行 / 2.3GB，灌爆 Actions 日志 → 全量输出重定向到文件，
+          # 日志只留统计；失败时 tail 4000 行（定位信息不丢）。
+          make O=out_device -j"$(nproc)" Image dtbs > build_full.log 2>&1 || {
+            echo "=== 构建失败，build_full.log 最后 4000 行 ==="
+            tail -n 4000 build_full.log
+            exit 1
+          }
+          echo "=== 构建成功；build_full.log 统计 ==="
+          wc -l build_full.log
+          printf "pahole couldn't-find 告警（已知 LTO DWARF 噪音源）: %s 行\n" \
+            "$(grep -c "couldn't find" build_full.log || true)"
+          tail -n 20 build_full.log
           # .config 是 dotfile，upload-artifact v4 不会收录隐藏文件 → 复制非隐藏名
           cp out_device/.config out_device/device_config.txt
 
@@ -150,6 +162,17 @@ jobs:
           echo "=== ls12/mt6893 dtb ==="
           ls -la out_device/arch/arm64/boot/dts/mediatek/ls12_mt8797_wifi_64.dtb
           ls -la out_device/arch/arm64/boot/dts/mediatek/mt6893.dtb
+          echo "=== 尺寸预算（boot 分区 64MB，原厂 ramdisk 11.67MiB 沿用）==="
+          gz=$(gzip -9 -c out_device/arch/arm64/boot/Image | wc -c)
+          dtb=$(stat -c%s out_device/arch/arm64/boot/dts/mediatek/ls12_mt8797_wifi_64.dtb)
+          python3 - "$gz" "$dtb" <<'PY'
+          import math, sys
+          gz, dtb, rd = int(sys.argv[1]), int(sys.argv[2]), 12239359
+          P = lambda x: math.ceil(x/2048)*2048
+          total = 4096 + P(gz) + P(rd) + P(dtb)
+          print(f"  Image.gz = {gz/1048576:.2f} MiB（裸 {233145716/1048576:.0f} MiB 参照）")
+          print(f"  boot.img 估算 = {total/1048576:.2f} MiB / 64 MiB 分区，余量 {(64*1048576-total)/1048576:+.2f} MiB")
+          PY
 
       # Stage 3 硬门禁：device 内核（gki_defconfig + ls12 fragment）的核心冻结 KMI 仍须 0 diff。
       # fragment 只 ADD vendor 设备驱动，不改 LTO/CFI/KASAN/NR_CPUS/PREEMPT 等核心 flip，

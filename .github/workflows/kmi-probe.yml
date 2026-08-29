@@ -105,7 +105,14 @@ jobs:
           make O=out_gki gki_defconfig
           # 保持 gki_defconfig 原始的 LTO_CLANG_FULL（与 Google KMI 构建严格一致，不做 ThinLTO 妥协），
           # 链接内存峰值靠上一步 boost 的大 swap 扛。
-          make O=out_gki -j"$(nproc)" vmlinux
+          # 输出重定向：pahole（BTF）在 LTO DWARF 上的 couldn't-find 告警实测千万行级
+          # （见 build-kernel.yml 同改），失败时 tail 定位。
+          make O=out_gki -j"$(nproc)" vmlinux > build_full.log 2>&1 || {
+            echo "=== 构建失败，build_full.log 最后 4000 行 ==="
+            tail -n 4000 build_full.log
+            exit 1
+          }
+          echo "=== vmlinux 构建成功；build_full.log 共 $(wc -l < build_full.log) 行 ==="
           echo "=== .config 关键值（核验 LTO/CFI/KASAN/LLVM 是否真开）==="
           grep -E "CONFIG_(LTO|CFI_CLANG|KASAN|CC_IS_CLANG|AS_IS_LLVM|LD_IS_LLD|MODVERSIONS|TRIM_UNUSED_KSYMS)" out_gki/.config || true
 
