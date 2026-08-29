@@ -8,6 +8,7 @@
 #include <linux/of.h>
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
+#include <linux/module.h>
 #include <dt-bindings/memory/mtk-memory-port.h>
 
 #if IS_ENABLED(CONFIG_MTK_ENABLE_GENIEZONE)
