@@ -28,19 +28,13 @@ CONFIG_SECURITYFS=y
 #     ADD-only，不 flip 任何冻结 KMI CRC（BTF 是 debug info 非符号结构））---
 CONFIG_DEBUG_INFO_BTF=y
 
-# --- 尺寸硬约束（64MB boot 分区）：KASAN 关闭 —— 本 fragment 唯一的核心反向覆盖 ---
-# 实测（CI run 33247272293 产物）：gki_defconfig 的 KASAN_HW_TAGS 形态裸 Image 233MB
-# → gzip -9 后 84.6MB，+ 原厂 ramdisk 11.67MB + dtb ≈ 92.6MB > boot 分区 64MB
-# （超 28.6MB）→ 装不进分区 = 物理不能开机，违反硬原则①（保证开机）。
-# KASAN 关闭的 KMI 核验（静态全过，CI kmi_probe 复验）：
-#   ① android/abi_gki_aarch64.xml 零 __kasan 冻结符号 → 关掉不产生 missing；
-#   ② KASAN 门控仅存在于 include/linux/kasan.h（函数桩），核心头零结构体字段
-#      #ifdef 门控 → genksyms CRC 零影响；
-#   ③ struct module 无 KASAN 字段 → module_layout CRC 不变（官方 ko 第一道门不受影响）。
-# 反之 CFI/LTO 不能关：__cfi_slowpath 是冻结符号（关=立即 missing FAIL）；
-# LTO_CLANG_FULL 是 Google KMI 构建形态。
-# CONFIG_KASAN is not set
-# CONFIG_KASAN_HW_TAGS is not set
+# --- 尺寸硬约束（64MB boot 分区）教训记录：KASAN 【不可】关（CI run 33252268586 实测 FAIL）---
+# 实验：关 KASAN → KMI 16 crc_diff + 1 missing 全灭：
+#   ① kasan_flag_enabled 是冻结符号（名字无 __kasan 前缀，静态 grep "零 __kasan 符号"误判）；
+#   ② slab/memcg 结构有 CONFIG_KASAN 字段级门控（struct kmem_cache kasan_info 等）→
+#      kmem_cache_*/mem_cgroup_*/kmalloc_caches 16 个冻结 CRC 全漂。
+# Google android12-5.10 KMI 就是 KASAN_HW_TAGS=y 形态下冻结的。64MB 尺寸须另寻刀
+# （压缩算法/camera FD 权重/GPU =m 等），不得动 KASAN。
 
 # --- dmabuf system heap（gki_defconfig 只有 DMABUF_HEAPS 框架、无 system heap；system_heap.c
 #     里的 mtk_dma_buf_set_name(mml/ged/hcp/cam 引用) 必须编进去，5.10 fork ls12 defconfig =y）---
@@ -196,6 +190,26 @@ CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
 CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=y
 CONFIG_CPU_FREQ_GOV_USERSPACE=y
 CONFIG_CPU_FREQ_GOV_ONDEMAND=y
+
+# --- thermal 全链（SoC LVTS + PMIC 温控 + thermal-ipi）---
+# mt6893.dtsi 18 个 thermal zone 的 sensor 全部 <&lvts N>（"mediatek,mt6893-lvts"，
+# lvts@1100b000：nvmem-cells lvts_e_data1/2 + resets infracfg_rst）——LVTS 是唯一
+# sensor provider，不开=全部 zone 无源→关机保护失效。soc_temp_lvts.c 依赖
+# NVMEM(gki 未开)+RESET_TI_SYSCON(gki 未开)，olddefconfig 会静默丢行，须显式补。
+CONFIG_NVMEM=y
+CONFIG_RESET_TI_SYSCON=y
+CONFIG_MTK_SOC_THERMAL_LVTS=y
+# thermal-ipi 节点(target-bitmask 0x2=MCUPM)：MTK_THERMAL_IPI depends on
+# SSPM_SUPPORT||MCUPM_SUPPORT，两者均须开（tinysys 框架 Stage2 已搬）。
+CONFIG_MTK_TINYSYS_MCUPM_SUPPORT=y
+CONFIG_MTK_TINYSYS_SSPM_SUPPORT=y
+CONFIG_MTK_TINYSYS_SSPM_V2=y
+CONFIG_MTK_THERMAL_IPI=y
+# PMIC 温控（mt6359p.dtsi "mediatek,mt6359p-efuse" provider → thermal_efuse_data1
+# 等校准 cell → pmic_temp 消费）：MTK_PMIC_THERMAL depends on MT635X_EFUSE+MT635X_AUXADC。
+# mt635x-efuse.c 自 gki-5.10 fork drivers/nvmem 移植（depends MFD_MT6397=y 已开）。
+CONFIG_MT635X_EFUSE=y
+CONFIG_MTK_PMIC_THERMAL=y
 
 # --- rtc / watchdog ---
 CONFIG_RTC_DRV_MT6397=y
