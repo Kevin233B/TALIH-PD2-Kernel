@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/
 obj-$(CONFIG_DRM_PANEL_ARM_VERSATILE) += panel-arm-versatile.o
 obj-$(CONFIG_DRM_PANEL_ASUS_Z00T_TM5P5_NT35596) += panel-asus-z00t-tm5p5-n35596.o
 obj-$(CONFIG_DRM_PANEL_BOE_HIMAX8279D) += panel-boe-himax8279d.o
@@ -58,3 +59,8 @@ obj-$(CONFIG_DRM_PANEL_XINPENG_XPP055C272) += panel-xinpeng-xpp055c272.o
 obj-$(CONFIG_DRM_PANEL_LUSHAN12_HX83121A_CDOT_CSOT_WQXGA_VDO) += lushan12_hx83121a_cdot_csot_wqxga_dsi_vdo.o
 obj-$(CONFIG_DRM_PANEL_LUSHAN12_HX83121A_CDOT_CSOT_WITHOUT_VCOM_WQXGA_VDO) += lushan12_hx83121a_cdot_csot_without_vcom_wqxga_dsi_vdo.o
 obj-$(CONFIG_AW3750X_POWER) += aw3750x_power.o
+
+# MTK vendor 面板依赖的 include 路径（fork 同款）：mtk_log.h 经 aee.h 需 mt-plat/；leds 供背光头。
+ccflags-$(CONFIG_DRM_MEDIATEK_PANEL) += -I$(srctree)/drivers/leds/
+subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/
+subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/
