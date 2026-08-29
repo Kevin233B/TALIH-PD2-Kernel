@@ -83,10 +83,13 @@ CONFIG_LEDS_MTK_DISP=y
 CONFIG_LEDS_MTK_PWM=y
 CONFIG_LEDS_REGULATOR_VIBRATOR=y
 CONFIG_MTK_FLASHLIGHT=y
-# richtek 闪光灯控制(flashlights-mt6360 用 flashlight_dev_register/flashlight_by_name/is_ready API)
-# 是 5.10 闭源框架(richtek/rt-flashlight.h+c 在 fork/main/oneplus 均无)，4.19 版 API 不兼容
-# (flashlight_device_register/find_flashlight_by_name)。闪光灯非 boot 关键 → defer Stage4。
-# CONFIG_MTK_FLASHLIGHT_MT6360 is not set
+CONFIG_RT_FLASHLIGHT=y
+# richtek 闪光灯框架(rt-flashlight + rtfled)已从 4.19 移植——与 5.10 fork 的
+# flashlights-mt6360.c 消费者 API 同名同签名(find_flashlight_by_name/set_mode/
+# is_ready/set_torch_brightness/set_strobe_brightness/set_strobe_timeout)。
+# 注：运行期出光仍需 mt6360_pmu_fled.c HAL，但 4.19 该 HAL 走旧 mt6360_pmu_reg_read/
+# write 核(5.10 已换 MFD/regmap 核)，故此处只补框架+torch 控制层编译，HAL 单独适配。
+CONFIG_MTK_FLASHLIGHT_MT6360=y
 
 # --- iommu / smi ---
 CONFIG_MTK_IOMMU=y

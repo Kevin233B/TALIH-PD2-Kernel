@@ -2,6 +2,8 @@
 # Flashlight device configuration
 #
 
+source "drivers/misc/mediatek/flashlight/richtek/Kconfig"
+
 config MTK_FLASHLIGHT
 	tristate "Mediatek flashlight driver"
 	help
