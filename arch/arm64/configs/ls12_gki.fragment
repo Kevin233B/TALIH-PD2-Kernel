@@ -200,6 +200,9 @@ CONFIG_MTK_THERMAL=y
 # MTK_AEE_FEATURE 门控 <aee.h>（定义 aee_kernel_exception_api 宏 + DB_OPT_* 枚举），
 # 不开则 mtk_drm_crtc.c 的 DDPAEE_1 展开报「implicit declaration」+ 未声明枚举；
 # MTK_AEE_AED 编译 aee-common.o 提供 aee_kernel_exception_api_func 定义（修链接），
-# 二者均在 4.19 能开机参照 defconfig。
+# MTK_HANG_DETECT 关闭时 aee.h 的 monitor_hang_regist_ldt #else 分支是「非 static 空函数体」，
+# 会被每个 include aee.h 的 vendor 驱动各自发射一份 → vmlinux 链接 duplicate symbol。
+# 开 =y 后 aee.h 只留声明、hang_detect.c 提供唯一实现（与 4.19 能开机 defconfig 一致）。
 CONFIG_MTK_AEE_FEATURE=y
 CONFIG_MTK_AEE_AED=y
+CONFIG_MTK_HANG_DETECT=y
