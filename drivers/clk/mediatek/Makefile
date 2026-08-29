@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0
-obj-$(CONFIG_COMMON_CLK_MEDIATEK) += clk-mtk.o clk-pll.o clk-gate.o clk-apmixed.o clk-cpumux.o reset.o clk-mux.o
+obj-$(CONFIG_COMMON_CLK_MEDIATEK) += clk-mtk.o clk-pll.o clk-gate.o clk-apmixed.o clk-cpumux.o reset.o clk-mux.o clk-fmeter.o
 
 obj-$(CONFIG_COMMON_CLK_MT6765) += clk-mt6765.o
 obj-$(CONFIG_COMMON_CLK_MT6765_AUDIOSYS) += clk-mt6765-audio.o
@@ -70,7 +70,7 @@ obj-$(CONFIG_COMMON_CLK_MT8183_VENCSYS) += clk-mt8183-venc.o
 obj-$(CONFIG_COMMON_CLK_MT8516) += clk-mt8516.o
 obj-$(CONFIG_COMMON_CLK_MT8516_AUDSYS) += clk-mt8516-aud.o
 
-obj-$(CONFIG_COMMON_CLK_MT6893) += clk-mt6893.o
+obj-$(CONFIG_COMMON_CLK_MT6893) += clk-mt6893.o clk-fmeter-mt6893.o
 obj-$(CONFIG_COMMON_CLK_MT6893_APU0) += clk-mt6893-apu0.o
 obj-$(CONFIG_COMMON_CLK_MT6893_APU1) += clk-mt6893-apu1.o
 obj-$(CONFIG_COMMON_CLK_MT6893_APU2) += clk-mt6893-apu2.o
