@@ -933,18 +933,15 @@ static void set_tc_hw_reboot_threshold(struct lvts_data *lvts_data,
 
 static void set_all_tc_hw_reboot(struct lvts_data *lvts_data)
 {
-	struct device *dev = lvts_data->dev;
 	struct tc_settings *tc = lvts_data->tc;
 	int i, trip_point;
 
 	for (i = 0; i < lvts_data->num_tc; i++) {
-		/* if high temp aging version, force trip temp = 200'C */
-		if (get_eng_version() != HIGH_TEMP_AGING) {
-			trip_point = tc[i].hw_reboot_trip_point;
-		} else {
-			trip_point = 200000;
-			dev_info(dev, "high temp aging version, force trip temp.\n");
-		}
+		/* fork 死码勘误：get_eng_version()/HIGH_TEMP_AGING 在 gki-5.10 fork 与
+		 * 4.19 main 两树均无定义（fork 从未编过此路径，CI 实测 implicit decl）。
+		 * high temp aging 是工厂老化测试版本专用——量产设备 devinfo 恒非该版本，
+		 * 且 4.19 能开机形态无此分支。恒走 hw_reboot_trip_point 对齐 4.19 行为。 */
+		trip_point = tc[i].hw_reboot_trip_point;
 
 		if (tc[i].num_sensor == 0)
 			continue;
