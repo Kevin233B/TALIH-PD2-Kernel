@@ -83,7 +83,10 @@ CONFIG_LEDS_MTK_DISP=y
 CONFIG_LEDS_MTK_PWM=y
 CONFIG_LEDS_REGULATOR_VIBRATOR=y
 CONFIG_MTK_FLASHLIGHT=y
-CONFIG_MTK_FLASHLIGHT_MT6360=y
+# richtek 闪光灯控制(flashlights-mt6360 用 flashlight_dev_register/flashlight_by_name/is_ready API)
+# 是 5.10 闭源框架(richtek/rt-flashlight.h+c 在 fork/main/oneplus 均无)，4.19 版 API 不兼容
+# (flashlight_device_register/find_flashlight_by_name)。闪光灯非 boot 关键 → defer Stage4。
+# CONFIG_MTK_FLASHLIGHT_MT6360 is not set
 
 # --- iommu / smi ---
 CONFIG_MTK_IOMMU=y
@@ -152,7 +155,9 @@ CONFIG_KEYBOARD_MTK_PMIC=y
 CONFIG_MTK_CHARGER=y
 CONFIG_MTK_CHARGER_TYPE_DETECT=y
 CONFIG_CHARGER_MT6360=y
-CONFIG_CHARGER_SC856X=y
+# sc856x 快充泵依赖 dvchg_class.h(fork/main/oneplus 均无的 5.10 闭源 direct-charger 框架)；
+# 关闭=基础充电走 mt6360 PMIC，快充泵延后 Stage4。全树仅 sc856x_charger.c 这一个消费者。
+# CONFIG_CHARGER_SC856X is not set
 CONFIG_MTK_PUMP_EXPRESS_PLUS_SUPPORT=y
 CONFIG_MTK_PUMP_EXPRESS_PLUS_20_SUPPORT=y
 CONFIG_MTK_PUMP_EXPRESS_50_SUPPORT=y

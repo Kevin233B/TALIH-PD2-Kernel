@@ -23,6 +23,7 @@ obj-$(CONFIG_MTK_ENABLE_GENIEZONE) += geniezone/
 obj-$(CONFIG_MTK_SECURITY_SW_SUPPORT) += masp/
 obj-${CONFIG_MTK_ATF_LOGGER} += atf/
 obj-$(CONFIG_MTK_USB_TYPEC) += typec/
+obj-$(CONFIG_RT_REGMAP) += rt-regmap/
 obj-$(CONFIG_MTPROF) += mtprof/
 obj-$(CONFIG_MTK_IRQ_MONITOR) += mtprof/
 obj-$(CONFIG_MTK_LOCKING_AEE) += locking/
