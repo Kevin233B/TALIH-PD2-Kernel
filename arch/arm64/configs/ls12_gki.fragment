@@ -127,8 +127,15 @@ CONFIG_MTK_CMDQ_MBOX_EXT=y
 # 缺则 DRM_MEDIATEK_V2/panel 被 Kconfig 静默丢弃 → 无显示驱动（DSI 首帧 crash 风险，同 4.19 bootloop）。
 CONFIG_DRM_MIPI_DSI=y
 CONFIG_DRM_KMS_HELPER=y
-CONFIG_DRM_KMS_FB_HELPER=y
-CONFIG_DRM_FBDEV_EMULATION=y
+# KMI 硬门禁：DRM_FBDEV_EMULATION 必须 not set（与 gki_defconfig 一致，default y 需显式压住）。
+# 它 select DRM_KMS_FB_HELPER → select FB + FB_DEFERRED_IO（连带 FRAMEBUFFER_CONSOLE/FB_SYS_*/FB_CFB_*）。
+# FB_DEFERRED_IO 在 struct fb_info 里门控 deferred_work/fbdefio 两字段 → fb_info 布局变 →
+# 经 backlight_ops.check_fb(struct fb_info*)/drm_panel.backlight 到达 fb_info 的冻结符号
+# CRC 集体漂移（实测 46 个 crc_diff：backlight_* / devm_drm_panel_bridge_add / drm_crtc_helper_*）。
+# MTK v2 显示不依赖 fbdev：mediatek_v2 Kconfig 无依赖、v2 mtk_drm_drv.c 零 fb_helper 引用，
+# Makefile 仅以 $(CONFIG_DRM_FBDEV_EMULATION) 门控 mtk_drm_fbdev.o；Android userspace 走
+# DRM native（hwcomposer/gralloc），开机 logo 由 lk 负责，内核无需 legacy fbcon。
+# CONFIG_DRM_FBDEV_EMULATION is not set
 CONFIG_DRM_PANEL=y
 CONFIG_DRM_PANEL_ORIENTATION_QUIRKS=y
 CONFIG_DRM_BRIDGE=y

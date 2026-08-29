@@ -73,14 +73,14 @@ def main():
 
     match = 0
     crc_diff = 0
+    crc_diffs = []
     missing = []
     for name, crc in sorted(abi.items()):
         if name not in build:
             missing.append(name)
         elif build[name] != crc:
             crc_diff += 1
-            if crc_diff <= 10:
-                print(f"  [CRC DIFF] {name}: abi=0x{crc:08x} build=0x{build[name]:08x}")
+            crc_diffs.append(name)
         else:
             match += 1
 
@@ -95,6 +95,12 @@ def main():
     if missing:
         print("  missing 前 20:", missing[:20])
     print(f"[kmi_probe] extra(非冻结GPL): {len(extra)}")
+
+    # 全量打印 CRC diff（不限 10 个）——46 级别的漂移须看全列表才能聚类定位根因
+    if crc_diffs:
+        print(f"  [CRC DIFF] 全部 {len(crc_diffs)} 个：")
+        for name in crc_diffs:
+            print(f"  [CRC DIFF] {name}: abi=0x{abi[name]:08x} build=0x{build[name]:08x}")
 
     if crc_diff > 0:
         print("!! FAIL: 存在同名异 CRC 符号，构建与声明 KMI 不一致")

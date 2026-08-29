@@ -102,22 +102,45 @@ jobs:
           grep -E "CONFIG_(LTO_CLANG_FULL|CFI_CLANG|KASAN_HW_TAGS|ARCH_MEDIATEK|BLK_DEV_INITRD|DEVTMPFS|COMMON_CLK_MT6893|PINCTRL_MT6885|SCSI_UFS_MEDIATEK|DRM_MEDIATEK_V2|SPMI_MTK_PMIF|MTK_DEVMPU|MTK_DEVINFO|MEDIATEK_MT635X_AUXADC)=" out_device/.config || true
           # 全量编 Image（vmlinux 链接会暴露 vendor 驱动 link 期 undefined）+ dtbs（ls12 dtb）
           make O=out_device -j"$(nproc)" Image dtbs
+          # .config 是 dotfile，upload-artifact v4 不会收录隐藏文件 → 复制非隐藏名
+          cp out_device/.config out_device/device_config.txt
 
-      # DIAGNOSTIC（查出 GOT/PLT 断言触发者后删除）：最终 -shared -Bsymbolic --no-undefined
-      # 链接里能触发 .got.plt/.plt ASSERT 的，只能是「弱未定义符号」（`lmm-nm -u` 里小写 w）。
-      # vmlinux.o 是 LTO 合并产物（最终链接的输入，链接失败也保留），从它的 .symtab 枚举命名即可。
-      - name: DIAG list weak-undefined symbols (GOT/PLT culprits)
+      # 诊断（常驻）：fragment 对纯 gki_defconfig 到底「翻转/新增」了哪些 config。
+      # 46 个 KMI CRC diff 的教训：DRM_FBDEV_EMULATION=y → select FB_DEFERRED_IO →
+      # struct fb_info 门控字段出现 → 冻结符号 CRC 漂移。核心 config 的任何翻转都可能
+      # 改变冻结结构体布局，此清单让 KMI 破坏一眼定位到 config 根因（只跑 kconfig，秒级）。
+      - name: DIAG config drift (fragment vs pure gki)
         if: always()
         run: |
-          export PATH="$PWD/prebuilts-master/clang/host/linux-x86/clang-r416183b/bin:$PATH"
-          echo "===== vmlinux.o 是否存在 ====="
-          ls -la out_device/vmlinux.o 2>&1 || echo "(no vmlinux.o)"
-          echo "===== 弱符号全量（小写 w=弱未定义，大写 W=弱已定义）====="
-          llvm-nm out_device/vmlinux.o 2>&1 | grep -E ' [wW] ' | sort | head -200 || echo "(none)"
-          echo "===== 未定义符号 llvm-nm -u（w=弱未定义是元凶；U=强未定义由 lds PROVIDE/--no-undefined 判）====="
-          llvm-nm -u out_device/vmlinux.o 2>&1 | sort | head -200 || echo "(none)"
-          echo "===== readelf WEAK 行（含 FUNC/OBJECT 类型）====="
-          llvm-readelf -sW out_device/vmlinux.o 2>&1 | grep -iE 'WEAK' | head -200 || echo "(none)"
+          set -e
+          export ARCH=arm64
+          make O=out_cfgcheck gki_defconfig >/dev/null
+          make O=out_cfgcheck olddefconfig >/dev/null
+          python3 - <<'PY'
+          def load(p):
+              d = {}
+              for line in open(p):
+                  line = line.strip()
+                  if line.startswith("CONFIG_") and "=" in line:
+                      k, v = line.split("=", 1)
+                      d[k] = v
+                  elif line.startswith("# CONFIG_") and line.endswith(" is not set"):
+                      d[line[2:-11]] = "n"
+              return d
+          a = load("out_cfgcheck/.config")   # 纯 gki_defconfig
+          b = load("out_device/.config")     # device（fragment 叠加后）
+          drift = sorted(k for k in set(a) | set(b) if a.get(k) != b.get(k))
+          added  = [k for k in drift if k not in a]
+          flipped = [k for k in drift if k in a and k in b]
+          removed = [k for k in drift if k not in b]
+          print(f"[config_drift] 新增(fragment 独有): {len(added)}  翻转(值改变): {len(flipped)}  消失: {len(removed)}")
+          if removed:
+              print("  [REMOVED]", " ".join(removed))
+          if flipped:
+              print("  [FLIPPED]（gki → device，须逐一确认不影响冻结结构体布局）")
+              for k in flipped:
+                  print(f"    {k}: {a[k]} -> {b[k]}")
+          PY
 
       - name: Verify boot artifacts
         run: |
@@ -145,5 +168,5 @@ jobs:
             out_device/arch/arm64/boot/Image
             out_device/arch/arm64/boot/dts/mediatek/ls12_mt8797_wifi_64.dtb
             out_device/arch/arm64/boot/dts/mediatek/mt6893.dtb
-            out_device/.config
+            out_device/device_config.txt
           if-no-files-found: warn
