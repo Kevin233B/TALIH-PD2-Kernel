@@ -13,7 +13,7 @@ Stage4 终点形态工具 = 同组件的 `gki/retrofit_gki.sh`（仅 android13-r
 （真机 boot_a.img header v2 硬解析 + lk 反汇编定案）：
   base=0x40000000, kernel_offset=0x80000 (0x40080000),
   ramdisk_offset=0x11100000 (0x51100000), tags_offset=0x7c80000 (0x47c80000),
-  page=2048, os_version=0x18000176,
+  page=2048, os_version=12.0.0 / os_patch_level=2023-06（打包后 header 字 0x18000176，
   cmdline='bootopt=64S3,32N2,64N2 buildvariant=user'
 
 用法（repo 根目录；.gz 件来自 CI artifact 的 Image.nobtf.gz，或裸 Image 也可）：
@@ -148,7 +148,11 @@ def main() -> int:
         # base+0x7c80000）。mkbootimg 默认 --dtb_offset 0x1f00000 会打出 0x41f00000——
         # lk 反汇编合规核验（2026-08-30 用户指令）抓出的偏差，已实测修正。
         "--dtb_offset", "0x7c80000",
-        "--os_version", "0x18000176",
+        # os 元数据与真机逐字段同构：工厂 header 字 0x18000176 = (12.0.0<<11)|(2023-06)。
+        # 注意 mkbootimg --os_version 只认 "12.0.0" 点分格式（parse_os_version 正则），
+        # 传打包后的 0x18000176 会被静默解析成 0（2026-08-30 终验抓出，旧包同病）。
+        "--os_version", "12.0.0",
+        "--os_patch_level", "2023-06",
         "--cmdline", "bootopt=64S3,32N2,64N2 buildvariant=user",
         "--kernel", kernel_gz,
         "--ramdisk", args.ramdisk,
