@@ -144,6 +144,10 @@ def main() -> int:
         "--kernel_offset", "0x80000",
         "--ramdisk_offset", "0x11100000",
         "--tags_offset", "0x7c80000",
+        # dtb 装载地址必须与真机逐字段同构：真机 header dtb_addr=0x47c80000（==tags_addr，
+        # base+0x7c80000）。mkbootimg 默认 --dtb_offset 0x1f00000 会打出 0x41f00000——
+        # lk 反汇编合规核验（2026-08-30 用户指令）抓出的偏差，已实测修正。
+        "--dtb_offset", "0x7c80000",
         "--os_version", "0x18000176",
         "--cmdline", "bootopt=64S3,32N2,64N2 buildvariant=user",
         "--kernel", kernel_gz,

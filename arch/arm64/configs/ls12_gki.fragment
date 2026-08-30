@@ -290,3 +290,21 @@ CONFIG_MTK_AEE_FEATURE=y
 CONFIG_MTK_AEE_AED=y
 CONFIG_MTK_AEE_IPANIC=y
 CONFIG_MTK_HANG_DETECT=y
+
+# --- GPU（Mali-G77 MC9，mali-valhall DDK 真机同款 r32p1）---
+# Stage 2 commit 9990004 搬入 1782 文件但默认关（保 KMI 零污染），此处首次启用。
+# VERSION 串四词有讲究（gpu/mediatek 各级 Makefile 解析）：word2=valhall → gpu_mali/
+# mali_valhall/；word3=r32p1 → 真机同款 DDK 目录（4.19 main 权威 defconfig 同版）；
+# word4=mt6893 → 顶层 Makefile 取 MTK_PLATFORM → -DCONFIG_GPU_MT6893（缺后缀则
+# 平台宏失效）。fork 参考 defconfig 原串即 "mali valhall r32p1 mt6893"。
+# 纯 vendor 增量（google 无 drivers/gpu/mediatek）→ 理论零 KMI 污染，CI 门禁验证。
+# ion/SVP 桥接已被 config 门控围住（MTK_IOMMU_V2/TRUSTED_MEMORY 均不开）零风险。
+# GPU =y 不影响 boot（显示走 DSI 不依赖 GPU），失败仅无 GPU 加速。
+# ⚠️ 勿加 CONFIG_MALI_MIDGARD 行：midgard/Kconfig 未被 source 进任何主 Kconfig 链
+# （olddefconfig 会静默丢行），真编译门控在 Kbuild 变量层——midgard/Kbuild include
+# 的 Kbuild-mtk-custom-env 里 `CONFIG_MALI_MIDGARD := $(CONFIG_MTK_GPU_SUPPORT)`、
+# `CONFIG_MALI_PLATFORM_NAME := $(MTK_PLATFORM)`（4.19 真机同机制：defconfig 无
+# MALI 行仍编入，真机 Image 实测 36 个 mali_kbase 符号 + 80 个 ged/gpufreq 符号）。
+CONFIG_MTK_GPU_SUPPORT=y
+CONFIG_MTK_GPU_VERSION="mali valhall r32p1 mt6893"
+CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT=y
