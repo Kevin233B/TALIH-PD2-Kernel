@@ -273,15 +273,20 @@ CONFIG_TOUCHSCREEN_LUSHAN12_HX83121A_SPI=y
 CONFIG_TOUCHSCREEN_HIMAX_DEBUG=y
 CONFIG_TOUCHSCREEN_HIMAX_INSPECT=y
 
-# --- 低功耗（lpm）---
-# ⚠️ MTK_LOW_POWER_MODULE 是 MTK_LPM_MT6885/6893 的 depends 前提——2026-08-30
-# 自检抓出：此前漏写导致整段被 olddefconfig 静默吃掉（device_config 两行全无，
-# 低功耗待机管理整个没编）。4.19 defconfig LOW_POWER_MODULE=y 实编，lpm 源码
-# Stage2 已搬（drivers/misc/mediatek/lpm/ 全套）。MTK_LPM_MT6885 会 select
-# MTK_LPM_DBG_COMMON。GS_DUMP（golden setting 校验）是调试增强不补。
-CONFIG_MTK_LOW_POWER_MODULE=y
-CONFIG_MTK_LPM_MT6885=y
-CONFIG_MTK_LPM_MT6893=y
+# --- 低功耗（lpm）——【2026-08-30 二轮 CI 定案：保持不启用，延后】---
+# 沿革：fragment 死行自检曾抓出 MTK_LPM_MT6885/6893 整段被吃（缺 MTK_LOW_POWER_MODULE
+# 前提），00acba1748f0 补前提复活 → CI run 33289140898 立即暴露真面目：
+# drivers/misc/mediatek/lpm/inc/lpm.h:9 无条件 #include <linux/soc/mediatek/mtk-lpm.h>，
+# 该头 fork 全树不存在（mtk_lpm_fs/mtk_lpm_sysfs 等 mtk_lpm_ 符号全是树内自带，非
+# 外部依赖）→ 新结构 lpm（76 文件）在 fork 任何平台任何 defconfig 都不可能编过，
+# MTK 发货即残缺的死码（soc_temp_lvts get_eng_version 同款）。
+# 4.19 真机实编的是【老结构】lpm（274 文件，inc/mtk_lpm.h，MTK_LPM=y 老名），只在
+# 4.19 main 树——两代源码不可用 config 对齐。「补 header 硬编」被否决：76 个从未
+# 在任何设备跑过的 CPU-idle/suspend 深度管理代码上测试机违背「保证正常开机」硬原则。
+# LPM 非 boot 关键（dts "mediatek,mtk-lpm" 节点不 probe 即可，仅影响待机功耗）。
+# 若将来要真对齐 4.19：从 4.19 main 移植老结构 274 文件（跨内核代 PM API 适配），
+# 作为独立 Stage4 课题。
+# CONFIG_MTK_LOW_POWER_MODULE is not set
 
 # --- 热管理 ---
 CONFIG_MTK_THERMAL=y

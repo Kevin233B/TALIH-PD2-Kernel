@@ -33,7 +33,7 @@
  * .264 后与本文件裸定义撞 -Werror,-Wmacro-redefined，CI run 33288339399 实证）。
  * 只加 #ifndef 不够：本头常先于 kernel.h 被 include，若 DDK 版先定义、
  * minmax.h 后到照样重定义炸——必须先引 minmax.h 让内核版就位再兜底。
- * 同树 ged/include/ged_dvfs.h、gpufreq/*/gpufreq_common.h 已是同款守卫写法。
+ * 同树 ged/include/ged_dvfs.h 与 gpufreq 各 common 头已是同款守卫写法。
  */
 #include <linux/minmax.h>
 
