@@ -104,7 +104,8 @@ CONFIG_MTK_TINYSYS_SCP_LOGGER_SUPPORT=y
 
 # --- memory（镜像 4.19：仅 MTK_DRAMC=y；HAVE_MTK_MC/MTK_EMI 保持不设 → 与 4.19 同为死码，不改行为）---
 CONFIG_MTK_DRAMC=y
-CONFIG_MTK_CACHE_PARITY_CHECK=y
+# MTK_CACHE_PARITY_CHECK depends on MTK_SDA（MTK 调试工具链基座）——4.19 defconfig
+# 同样没开 MTK_SDA，两边同为被吃死行，行为一致，保持不设（2026-08-30 自检定案）。
 
 # --- leds / 背光 / flashlight ---
 CONFIG_LEDS_MTK=y
@@ -273,6 +274,12 @@ CONFIG_TOUCHSCREEN_HIMAX_DEBUG=y
 CONFIG_TOUCHSCREEN_HIMAX_INSPECT=y
 
 # --- 低功耗（lpm）---
+# ⚠️ MTK_LOW_POWER_MODULE 是 MTK_LPM_MT6885/6893 的 depends 前提——2026-08-30
+# 自检抓出：此前漏写导致整段被 olddefconfig 静默吃掉（device_config 两行全无，
+# 低功耗待机管理整个没编）。4.19 defconfig LOW_POWER_MODULE=y 实编，lpm 源码
+# Stage2 已搬（drivers/misc/mediatek/lpm/ 全套）。MTK_LPM_MT6885 会 select
+# MTK_LPM_DBG_COMMON。GS_DUMP（golden setting 校验）是调试增强不补。
+CONFIG_MTK_LOW_POWER_MODULE=y
 CONFIG_MTK_LPM_MT6885=y
 CONFIG_MTK_LPM_MT6893=y
 
