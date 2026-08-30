@@ -174,23 +174,8 @@ jobs:
           print(f"  Image.gz = {gz/1048576:.2f} MiB（裸 {raw/1048576:.0f} MiB）")
           print(f"  boot.img 估算 = {total/1048576:.2f} MiB / 64 MiB 分区，余量 {(64*1048576-total)/1048576:+.2f} MiB")
           PY
-          # BTF 零填充刀后的预算（若 Size attribution step 产出了 Image.nobtf）
-          # ⚠️ heredoc 缩进坑（run 33279120019 实测炸点）：bash <<'PY' 的结束符必须顶格，
-          #    但本块嵌在 if 里多 2 空格缩进——YAML 剥公共缩进后 "  PY" 带 2 空格前导
-          #    → bash 不认 → heredoc 吞到文件尾 → syntax error unexpected EOF。
-          #    修法：if 块内 heredoc 的内容行/结束符在 YAML 里少写 2 空格（剥后顶格），
-          #    python 顶层语句不在乎缩进深浅。
-          if [ -f out_device/arch/arm64/boot/Image.nobtf ]; then
-            gz2=$(gzip -9 -c out_device/arch/arm64/boot/Image.nobtf | wc -c)
-            python3 - "$gz2" "$dtb" <<'PY'
-          import math, sys
-          gz, dtb, rd = int(sys.argv[1]), int(sys.argv[2]), 12239359
-          P = lambda x: math.ceil(x/2048)*2048
-          total = 4096 + P(gz) + P(rd) + P(dtb)
-          print(f"  [BTF 零填充后] Image.gz = {gz/1048576:.2f} MiB")
-          print(f"  [BTF 零填充后] boot.img 估算 = {total/1048576:.2f} MiB / 64 MiB 分区，余量 {(64*1048576-total)/1048576:+.2f} MiB")
-          PY
-          fi
+          # nobtf 预算对照已挪至 Size attribution step 末尾（本 step 在其之前跑，
+          # Image.nobtf 尚未生成，if 永假——run 33281209469 实证）。
 
       # FULL LTO 下 .o 归因无意义（单一 vmlinux.o）→ 尺寸归因只能对 vmlinux 本体做：
       # size 段分布 + nm --size-sort top 符号。刀口选择（KERNEL_ZSTD / KALLSYMS_ALL / 非 boot =y 剥离）
@@ -236,6 +221,26 @@ jobs:
           else
             echo ".BTF 不存在或为空（跳过 A/B）"
           fi
+          # 零填充后预算对照（boot 分区 64MB）——必须在本 step：Image.nobtf 刚在上方
+          # 生成；先前放在 Verify step 里因执行顺序在其前而 if 永假（run 33281209469 实证）。
+          # ⚠️ if 内 heredoc 缩进坑（run 33279120019 炸点）：内容行/结束符须在 YAML 里
+          #    少写 2 空格（剥公共缩进后顶格），否则 bash 不认 PY → 吞到文件尾 syntax error。
+          if [ -f out_device/arch/arm64/boot/Image.nobtf ]; then
+            gz2=$(gzip -9 -c out_device/arch/arm64/boot/Image.nobtf | wc -c)
+            dtb2=$(stat -c%s out_device/arch/arm64/boot/dts/mediatek/ls12_mt8797_wifi_64.dtb)
+            python3 - "$gz2" "$dtb2" <<'PY'
+          import math, sys
+          gz, dtb, rd = int(sys.argv[1]), int(sys.argv[2]), 12239359
+          P = lambda x: math.ceil(x/2048)*2048
+          total = 4096 + P(gz) + P(rd) + P(dtb)
+          print(f"  [BTF 零填充后] Image.gz = {gz/1048576:.2f} MiB")
+          print(f"  [BTF 零填充后] boot.img 估算 = {total/1048576:.2f} MiB / 64 MiB 分区，余量 {(64*1048576-total)/1048576:+.2f} MiB")
+          PY
+            # boot.img 的 kernel 段就是 gz 形态（lk 自解压链认定 gzip）→ CI 直接产出
+            # Image.nobtf.gz：artifact 从 234MB 裸件缩到 ~22MB，本地 mkbootimg 直接吃不再重压。
+            gzip -9 -c out_device/arch/arm64/boot/Image.nobtf > out_device/arch/arm64/boot/Image.nobtf.gz
+            ls -la out_device/arch/arm64/boot/Image.nobtf.gz
+          fi
 
       # Stage 3 硬门禁：device 内核（gki_defconfig + ls12 fragment）的核心冻结 KMI 仍须 0 diff。
       # fragment 只 ADD vendor 设备驱动，不改 LTO/CFI/KASAN/NR_CPUS/PREEMPT 等核心 flip，
@@ -263,8 +268,7 @@ jobs:
         with:
           name: ls12-boot
           path: |
-            out_device/arch/arm64/boot/Image
-            out_device/arch/arm64/boot/Image.nobtf
+            out_device/arch/arm64/boot/Image.nobtf.gz
             out_device/arch/arm64/boot/dts/mediatek/ls12_mt8797_wifi_64.dtb
             out_device/arch/arm64/boot/dts/mediatek/mt6893.dtb
             out_device/empty_dtbo.img

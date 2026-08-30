@@ -16,9 +16,9 @@ Stage4 终点形态工具 = 同组件的 `gki/retrofit_gki.sh`（仅 android13-r
   page=2048, os_version=0x18000176,
   cmdline='bootopt=64S3,32N2,64N2 buildvariant=user'
 
-用法（repo 根目录）：
+用法（repo 根目录；.gz 件来自 CI artifact 的 Image.nobtf.gz，或裸 Image 也可）：
   python3 .github/scripts/package_bootimg.py \
-      --kernel out_device/arch/arm64/boot/Image.nobtf \
+      --kernel out_device/arch/arm64/boot/Image.nobtf.gz \
       --dtb out_device/arch/arm64/boot/dts/mediatek/ls12_mt8797_wifi_64.dtb \
       --ramdisk assets/boot_a/ramdisk.cpio.gz
   产物 boot.img + 尺寸预算校验（boot 分区 64MiB 硬约束）。
@@ -80,10 +80,15 @@ def main() -> int:
             return 1
     mkbootimg = ensure_tool("mkbootimg.py")
 
-    # kernel 段 = gzip 的 Image（lk/kernel 自解压链认定 gzip）
-    kernel_gz = "Image.gz"
-    with open(args.kernel, "rb") as fin, gzip.open(kernel_gz, "wb", compresslevel=9) as fout:
-        shutil.copyfileobj(fin, fout)
+    # kernel 段 = gzip 的 Image（lk/kernel 自解压链认定 gzip）。
+    # CI Size attribution step 已产出 Image.nobtf.gz → .gz 输入直接用（幂等不重压，
+    # 本地打包从压 234MB 的几分钟缩到秒级）；裸 Image 输入则现场 gzip -9。
+    if args.kernel.endswith(".gz"):
+        kernel_gz = args.kernel
+    else:
+        kernel_gz = "Image.gz"
+        with open(args.kernel, "rb") as fin, gzip.open(kernel_gz, "wb", compresslevel=9) as fout:
+            shutil.copyfileobj(fin, fout)
     ksz = os.path.getsize(kernel_gz)
     dsz = os.path.getsize(args.dtb)
     rsz = os.path.getsize(args.ramdisk)
