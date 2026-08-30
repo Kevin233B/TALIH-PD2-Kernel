@@ -37,13 +37,21 @@ TOOLS = {
     "mkbootimg.py":
         "https://android.googlesource.com/platform/system/tools/mkbootimg/"
         "+/refs/heads/main/mkbootimg.py?format=TEXT",
+    # mkbootimg.py 顶层 import 的 GKI 认证封装（纯标准库 90 行，avbtool 外部调用）。
+    # 仅 boot v4 GKI 签名路径触发；我们 v2 打包不触碰——但 import 必须可解析，
+    # 否则 ModuleNotFoundError 直接拦死（实测）。PEP 420 namespace package：
+    # 落 gki/ 子目录无需 __init__.py 即可 import。
+    "gki/generate_gki_certificate.py":
+        "https://android.googlesource.com/platform/system/tools/mkbootimg/"
+        "+/refs/heads/main/gki/generate_gki_certificate.py?format=TEXT",
     # 官方 retrofit_gki.sh（仅 android13-release 分支存在，main 已删）
     "retrofit_gki.sh":
         "https://android.googlesource.com/platform/system/tools/mkbootimg/"
         "+/refs/heads/android13-release/gki/retrofit_gki.sh?format=TEXT",
 }
 
-RAMDISK_SIZE = 12239359      # 原厂 ramdisk.cpio.gz 实测
+RAMDISK_SIZE = 11936743      # 默认参照：resukisu-susfs220.img 的干净 ramdisk（无 Magisk）实
+                             # 测；实际预算按 --ramdisk 文件 stat 动态算，勿依赖此常量
 BOOT_PART = 64 * 1024 * 1024
 PAGE = 2048
 
@@ -53,9 +61,13 @@ def pages(n: int) -> int:
 
 
 def ensure_tool(name: str) -> str:
-    """.github/scripts/<name> 不在则从 AOSP 官方源拉（base64 精确解码）。"""
+    """.github/scripts/<name> 不在则从 AOSP 官方源拉（base64 精确解码）。
+    name 可含子目录（如 gki/generate_gki_certificate.py），父目录自动建。
+    mkbootimg.py 拉取后自动打 import 容错补丁（gki 认证封装仅 v4 签名路径用，
+    v2 打包零触碰；单文件部署无 gki/ 包伴随时避免 ModuleNotFoundError 拦死）。"""
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
     if not os.path.exists(path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         url = TOOLS[name]
         print(f"拉取官方工具 {name} …")
         with urllib.request.urlopen(url, timeout=60) as r:
@@ -63,7 +75,28 @@ def ensure_tool(name: str) -> str:
         with open(path, "wb") as f:
             f.write(raw)
         print(f"  → {path}（{len(raw)} bytes）")
+        if name == "mkbootimg.py":
+            _patch_mkbootimg_import(path)
     return path
+
+
+def _patch_mkbootimg_import(path: str) -> None:
+    """把裸 `from gki.generate_gki_certificate import ...` 改成容错 try/except。"""
+    with open(path, "r", encoding="utf-8") as f:
+        src = f.read()
+    bare = "from gki.generate_gki_certificate import generate_gki_certificate"
+    tolerant = (
+        "# [TALIH-PD2 补丁] 容错 import：gki 认证封装仅 v4 签名路径用（v2 不触碰），\n"
+        "# 单文件部署无 gki/ 包伴随时避免 ModuleNotFoundError 拦死。\n"
+        "try:\n"
+        "    from gki.generate_gki_certificate import generate_gki_certificate\n"
+        "except ImportError:\n"
+        "    generate_gki_certificate = None\n"
+    )
+    if bare in src and "except ImportError" not in src:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(src.replace(bare, tolerant, 1))
+        print(f"  已对 {path} 打 gki import 容错补丁")
 
 
 def main() -> int:
@@ -92,6 +125,9 @@ def main() -> int:
     ksz = os.path.getsize(kernel_gz)
     dsz = os.path.getsize(args.dtb)
     rsz = os.path.getsize(args.ramdisk)
+    # 2026-08-30 用户拍板：ramdisk 用 resukisu-susfs220.img 的干净版（无 Magisk：
+    # init 是标准符号链接、无 .backup/overlay.d/sbin）；Magisk 版（assets/boot_a/
+    # ramdisk.cpio.gz，init 被 199KB wrapper 替换）弃用
     total = PAGE + pages(ksz) + pages(rsz) + pages(dsz)
 
     print(f"kernel(gz)={ksz/1048576:.2f}MiB ramdisk={rsz/1048576:.2f}MiB dtb={dsz/1048576:.2f}MiB")
