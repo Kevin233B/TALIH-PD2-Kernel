@@ -1360,9 +1360,16 @@ static void mtk_dsi_ps_control_vact(struct mtk_dsi *dsi)
 	u32 value = 0, mask = 0;
 	u32 width, height;
 	struct mtk_panel_ext *ext = mtk_dsi_get_panel_ext(&dsi->ddp_comp);
-	struct mtk_panel_dsc_params *dsc_params = &ext->params->dsc_params;
-	struct mtk_panel_spr_params *spr_params = &ext->params->spr_params;
-	u32 dsi_buf_bpp = mtk_get_dsi_buf_bpp(dsi);
+	struct mtk_panel_dsc_params *dsc_params;
+	struct mtk_panel_spr_params *spr_params;
+	u32 dsi_buf_bpp;
+
+	/* 4.19 bootloop 前科：ext=NULL 时 ext->params 读 *(NULL+8)=0x8 崩。 */
+	if (!ext || !ext->params)
+		return;
+	dsc_params = &ext->params->dsc_params;
+	spr_params = &ext->params->spr_params;
+	dsi_buf_bpp = mtk_get_dsi_buf_bpp(dsi);
 
 	if (!dsi->is_slave) {
 		width = mtk_dsi_get_virtual_width(dsi, dsi->encoder.crtc);
@@ -1478,6 +1485,9 @@ static void mtk_dsi_rxtx_control(struct mtk_dsi *dsi)
 
 static void mtk_dsi_cmd_type1_hs(struct mtk_dsi *dsi)
 {
+	if (!dsi->ext || !dsi->ext->params)
+		return;
+
 	if (dsi->ext->params->is_cphy)
 		mtk_dsi_mask(dsi, DSI_CMD_TYPE1_HS, CMD_CPHY_6BYTE_EN, 0);
 }
@@ -1489,9 +1499,15 @@ static void mtk_dsi_tx_buf_rw(struct mtk_dsi *dsi)
 	u32 preultra_hi, preultra_lo, ultra_hi, ultra_lo, urgent_hi, urgent_lo;
 	u32 fill_rate, sodi_hi, sodi_lo;
 	struct mtk_panel_ext *ext = mtk_dsi_get_panel_ext(&dsi->ddp_comp);
-	struct mtk_panel_dsc_params *dsc_params = &ext->params->dsc_params;
+	struct mtk_panel_dsc_params *dsc_params;
 	struct mtk_drm_crtc *mtk_crtc = dsi->ddp_comp.mtk_crtc;
-	u32 dsi_buf_bpp = mtk_get_dsi_buf_bpp(dsi);
+	u32 dsi_buf_bpp;
+
+	/* 4.19 bootloop 前科：ext=NULL 时 ext->params 读 *(NULL+8)=0x8 崩。 */
+	if (!ext || !ext->params)
+		return;
+	dsc_params = &ext->params->dsc_params;
+	dsi_buf_bpp = mtk_get_dsi_buf_bpp(dsi);
 
 	if (!dsi->is_slave) {
 		width = mtk_dsi_get_virtual_width(dsi, dsi->encoder.crtc);
@@ -1631,8 +1647,9 @@ static void mtk_dsi_calc_vdo_timing(struct mtk_dsi *dsi)
 		dsi_tmp_buf_bpp = 3;
 
 	dsi->ext = find_panel_ext(dsi->panel);
-	if (!dsi->ext)
+	if (!dsi->ext || !dsi->ext->params)
 		return;
+	ext = dsi->ext;
 	spr_params = &ext->params->spr_params;
 	if (spr_params && spr_params->enable == 1 && spr_params->relay == 0
 		&& disp_spr_bypass == 0) {
@@ -2546,7 +2563,7 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi,
 {
 	int ret;
 	struct mtk_panel_ext *ext = dsi->ext;
-	struct mtk_panel_dsc_params *dsc_params = &ext->params->dsc_params;
+	struct mtk_panel_dsc_params *dsc_params;
 
 	bool new_doze_state = mtk_dsi_doze_state(dsi);
 	struct drm_crtc *crtc = dsi->encoder.crtc;
@@ -2554,6 +2571,13 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi,
 	struct mtk_crtc_state *mtk_state = to_mtk_crtc_state(crtc->state);
 	unsigned int mode_id = mtk_state->prop_val[CRTC_PROP_DISP_MODE_IDX];
 	unsigned int mode_chg_index = 0;
+
+	/* 4.19 bootloop 前科：ext=NULL 时 ext->params 读 *(NULL+8)=0x8 崩。 */
+	if (!ext || !ext->params) {
+		dev_err(dsi->dev, "DSI output enable without panel ext\n");
+		return;
+	}
+	dsc_params = &ext->params->dsc_params;
 
 	DDPINFO("%s +\n", __func__);
 
