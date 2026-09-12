@@ -105,7 +105,7 @@ config MTK_GPU_MT6879_SUPPORT
 
 config MTK_GPU_MT6893_SUPPORT
 	tristate "Specify Mediatek GPU Platform is mt6893"
-	depends on MTK_GPU_SUPPORT
+	depends on MTK_GPU_SUPPORT && MTK_GPUFREQ_V2
 	help
 	  Select MediaTek GPU Platform is mt6893.
 	  Set Y or M to select this feature for specific platform-mt6893,

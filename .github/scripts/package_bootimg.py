@@ -3,13 +3,11 @@
 
 工具链原则（用户定案）：**只用 AOSP 官方 mkbootimg 组件**，忽略 /root/kernel
 的 4.19 老 mkbootimg 二进制。本脚本首次运行会用 urllib 从
-android.googlesource.com 拉官方 `mkbootimg.py`（?format=TEXT base64 → 解码，
-字节级精确）落到 .github/scripts/，之后离线复用。
+android.googlesource.com 拉取固定提交的官方 `mkbootimg.py`（?format=TEXT
+base64 → 解码，字节级精确）落到 .github/scripts/，之后离线复用。
 
-Stage4 终点形态工具 = 同组件的 `gki/retrofit_gki.sh`（仅 android13-release
-分支有，main 已删）——把认证 GKI boot + init_boot + vendor_boot 回退合并成
-单 v2 boot.img；android12 无 init_boot，通用 ramdisk 取自 boot.img。本脚本
---retrofit 模式同样自取该官方脚本。参数依据见 memory talih-pd2-flash-guide
+本脚本当前只负责 Stage3 的单 v2 boot.img 打包，不实现 Stage4 retrofit 合并；
+Stage4 方案另行验证后再接入。参数依据见 memory talih-pd2-flash-guide
 （真机 boot_a.img header v2 硬解析 + lk 反汇编定案）：
   base=0x40000000, kernel_offset=0x80000 (0x40080000),
   ramdisk_offset=0x11100000 (0x51100000), tags_offset=0x7c80000 (0x47c80000),
@@ -26,6 +24,7 @@ Stage4 终点形态工具 = 同组件的 `gki/retrofit_gki.sh`（仅 android13-r
 import argparse
 import base64
 import gzip
+import hashlib
 import os
 import shutil
 import subprocess
@@ -33,21 +32,32 @@ import sys
 import urllib.request
 
 TOOLS = {
-    # 官方 mkbootimg.py（system/tools/mkbootimg，main 分支）
+    # 官方 mkbootimg.py（system/tools/mkbootimg，固定提交，避免分支头漂移）
     "mkbootimg.py":
         "https://android.googlesource.com/platform/system/tools/mkbootimg/"
-        "+/refs/heads/main/mkbootimg.py?format=TEXT",
+        "+/d2bb0af5ba6d3198a3e99529c97eda1be0b5a093/mkbootimg.py?format=TEXT",
     # mkbootimg.py 顶层 import 的 GKI 认证封装（纯标准库 90 行，avbtool 外部调用）。
     # 仅 boot v4 GKI 签名路径触发；我们 v2 打包不触碰——但 import 必须可解析，
     # 否则 ModuleNotFoundError 直接拦死（实测）。PEP 420 namespace package：
     # 落 gki/ 子目录无需 __init__.py 即可 import。
     "gki/generate_gki_certificate.py":
         "https://android.googlesource.com/platform/system/tools/mkbootimg/"
-        "+/refs/heads/main/gki/generate_gki_certificate.py?format=TEXT",
-    # 官方 retrofit_gki.sh（仅 android13-release 分支存在，main 已删）
-    "retrofit_gki.sh":
-        "https://android.googlesource.com/platform/system/tools/mkbootimg/"
-        "+/refs/heads/android13-release/gki/retrofit_gki.sh?format=TEXT",
+        "+/d2bb0af5ba6d3198a3e99529c97eda1be0b5a093/"
+        "gki/generate_gki_certificate.py?format=TEXT",
+}
+
+TOOL_SHA256 = {
+    "mkbootimg.py":
+        "37d84b3d162e0bc62e36c1f4e1c63c85ea0caa9f29be023eb2f8efe006ad948c",
+    "gki/generate_gki_certificate.py":
+        "1bb1feec68a13da18d581aa2c631798f86f6bc10b55d587b2dd31446a0f8a203",
+}
+
+TOOL_CACHED_SHA256 = {
+    # mkbootimg.py 下载后会打本地 import 容错补丁，缓存哈希与上游原文件不同。
+    "mkbootimg.py":
+        "38a7e5e018a9ebcd3fdff9222a0e87d88dbc91572814db495fbea2e6719e8722",
+    "gki/generate_gki_certificate.py": TOOL_SHA256["gki/generate_gki_certificate.py"],
 }
 
 RAMDISK_SIZE = 11936743      # 默认参照：resukisu-susfs220.img 的干净 ramdisk（无 Magisk）实
@@ -66,17 +76,28 @@ def ensure_tool(name: str) -> str:
     mkbootimg.py 拉取后自动打 import 容错补丁（gki 认证封装仅 v4 签名路径用，
     v2 打包零触碰；单文件部署无 gki/ 包伴随时避免 ModuleNotFoundError 拦死）。"""
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
-    if not os.path.exists(path):
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        url = TOOLS[name]
-        print(f"拉取官方工具 {name} …")
-        with urllib.request.urlopen(url, timeout=60) as r:
-            raw = base64.b64decode(r.read())
-        with open(path, "wb") as f:
-            f.write(raw)
-        print(f"  → {path}（{len(raw)} bytes）")
-        if name == "mkbootimg.py":
-            _patch_mkbootimg_import(path)
+    if os.path.exists(path):
+        with open(path, "rb") as f:
+            cached_sha256 = hashlib.sha256(f.read()).hexdigest()
+        if cached_sha256 != TOOL_CACHED_SHA256[name]:
+            raise RuntimeError(
+                f"已有 {name} 不是固定版本: {cached_sha256}；请移走后重试"
+            )
+        return path
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    url = TOOLS[name]
+    print(f"拉取官方工具 {name} …")
+    with urllib.request.urlopen(url, timeout=60) as r:
+        raw = base64.b64decode(r.read())
+    actual_sha256 = hashlib.sha256(raw).hexdigest()
+    if actual_sha256 != TOOL_SHA256[name]:
+        raise RuntimeError(f"{name} SHA-256 不匹配: {actual_sha256}")
+    with open(path, "wb") as f:
+        f.write(raw)
+    print(f"  → {path}（{len(raw)} bytes）")
+    if name == "mkbootimg.py":
+        _patch_mkbootimg_import(path)
     return path
 
 
@@ -103,7 +124,10 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--kernel", required=True, help="裸 Image（CI 产物，会自动 gzip -9）")
     ap.add_argument("--dtb", required=True, help="5.10 编译的 ls12 dtb（禁用真机 4.19 dtb）")
-    ap.add_argument("--ramdisk", default="assets/boot_a/ramdisk.cpio.gz")
+    ap.add_argument(
+        "--ramdisk", required=True,
+        help="干净 ramdisk.cpio.gz（必须显式指定；禁止回退到 assets 中的旧 Magisk 版）",
+    )
     ap.add_argument("--out", default="boot.img")
     args = ap.parse_args()
 

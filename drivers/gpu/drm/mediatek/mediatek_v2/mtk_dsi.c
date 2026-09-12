@@ -839,7 +839,8 @@ static unsigned int mtk_dsi_default_rate(struct mtk_dsi *dsi)
 	if (mtk_crtc && mtk_crtc->base.dev)
 		priv = mtk_crtc->base.dev->dev_private;
 
-	if ((priv->data->mmsys_id == MMSYS_MT6983 ||
+	if (priv && priv->data &&
+		(priv->data->mmsys_id == MMSYS_MT6983 ||
 		priv->data->mmsys_id == MMSYS_MT6895 ||
 		priv->data->mmsys_id == MMSYS_MT6879 ||
 		priv->data->mmsys_id == MMSYS_MT6855) &&
@@ -879,8 +880,8 @@ static unsigned int mtk_dsi_default_rate(struct mtk_dsi *dsi)
 			break;
 		}
 
-		if (spr_params->enable == 1 && spr_params->relay == 0
-			&& disp_spr_bypass == 0) {
+		if (spr_params && spr_params->enable == 1 &&
+			spr_params->relay == 0 && disp_spr_bypass == 0) {
 			switch (dsi->ext->params->spr_output_mode) {
 			case MTK_PANEL_PACKED_SPR_8_BITS:
 				bit_per_pixel = 16;
@@ -1076,12 +1077,38 @@ void mtk_dsi_config_null_packet(struct mtk_dsi *dsi)
 
 static int mtk_dsi_poweron(struct mtk_dsi *dsi)
 {
-	struct mtk_drm_private *priv = dsi->ddp_comp.mtk_crtc->base.dev->dev_private;
+	struct mtk_drm_private *priv;
 	struct device *dev = dsi->dev;
+	struct mtk_mipi_tx *mipi_tx;
 	int ret;
-	struct mtk_mipi_tx *mipi_tx = phy_get_drvdata(dsi->phy);
 
 	DDPDBG("%s+\n", __func__);
+
+	if (IS_ERR_OR_NULL(dsi->phy)) {
+		dev_err(dev, "DSI has no valid MIPI-DPHY\n");
+		return -ENODEV;
+	}
+
+	mipi_tx = phy_get_drvdata(dsi->phy);
+	if (!mipi_tx || !mipi_tx->driver_data) {
+		dev_err(dev, "DSI has no valid MIPI-TX data\n");
+		return -ENODEV;
+	}
+
+	/* The slave has no independent CRTC component bind. */
+	if (dsi->master_dsi)
+		dsi->ddp_comp.mtk_crtc = dsi->master_dsi->ddp_comp.mtk_crtc;
+
+	if (!dsi->ddp_comp.mtk_crtc || !dsi->ddp_comp.mtk_crtc->base.dev) {
+		dev_err(dev, "DSI has no bound CRTC\n");
+		return -ENODEV;
+	}
+
+	priv = dsi->ddp_comp.mtk_crtc->base.dev->dev_private;
+	if (!priv || !priv->data) {
+		dev_err(dev, "DSI has no DRM private data\n");
+		return -ENODEV;
+	}
 	if (disp_helper_get_stage() == DISP_HELPER_STAGE_NORMAL) {
                 if (++dsi->clk_refcnt != 1)
                         return 0;
@@ -4084,11 +4111,20 @@ int mtk_dsi_analysis(struct mtk_ddp_comp *comp)
 static void mtk_dsi_ddp_prepare(struct mtk_ddp_comp *comp)
 {
 	struct mtk_dsi *dsi = container_of(comp, struct mtk_dsi, ddp_comp);
+	int ret;
 
-	mtk_dsi_poweron(dsi);
+	ret = mtk_dsi_poweron(dsi);
+	if (ret < 0) {
+		dev_err(dsi->dev, "Failed to power on master DSI: %d\n", ret);
+		return;
+	}
 
-	if (dsi->slave_dsi)
-		mtk_dsi_poweron(dsi->slave_dsi);
+	if (dsi->slave_dsi) {
+		ret = mtk_dsi_poweron(dsi->slave_dsi);
+		if (ret < 0)
+			dev_err(dsi->slave_dsi->dev,
+				"Failed to power on slave DSI: %d\n", ret);
+	}
 }
 
 static void mtk_dsi_ddp_unprepare(struct mtk_ddp_comp *comp)
@@ -9112,8 +9148,7 @@ static int mtk_dsi_probe(struct platform_device *pdev)
 	if (IS_ERR(dsi->phy)) {
 		ret = PTR_ERR(dsi->phy);
 		dev_err(dev, "Failed to get MIPI-DPHY: %d\n", ret);
-		if (disp_helper_get_stage() == DISP_HELPER_STAGE_NORMAL)
-			goto error;
+		goto error;
 	}
 
 	comp_id = mtk_ddp_comp_get_id(dev->of_node, MTK_DSI);

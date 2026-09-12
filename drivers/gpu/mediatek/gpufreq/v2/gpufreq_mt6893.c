@@ -2559,6 +2559,8 @@ static int __gpufreq_init_mtcmos(struct platform_device *pdev)
 	g_mtcmos->mfg0_dev = dev_pm_domain_attach_by_name(dev, "pd_mfg0");
 	if (IS_ERR_OR_NULL(g_mtcmos->mfg0_dev)) {
 		ret = g_mtcmos->mfg0_dev ? PTR_ERR(g_mtcmos->mfg0_dev) : GPUFREQ_ENODEV;
+		if (ret == -EPROBE_DEFER)
+			goto done;
 		__gpufreq_abort(GPUFREQ_CCF_EXCEPTION, "fail to get mfg0_dev (%ld)", ret);
 		goto done;
 	}
@@ -2567,6 +2569,8 @@ static int __gpufreq_init_mtcmos(struct platform_device *pdev)
 	g_mtcmos->mfg1_dev = dev_pm_domain_attach_by_name(dev, "pd_mfg1");
 	if (IS_ERR_OR_NULL(g_mtcmos->mfg1_dev)) {
 		ret = g_mtcmos->mfg1_dev ? PTR_ERR(g_mtcmos->mfg1_dev) : GPUFREQ_ENODEV;
+		if (ret == -EPROBE_DEFER)
+			goto done;
 		__gpufreq_abort(GPUFREQ_CCF_EXCEPTION, "fail to get mfg1_dev (%ld)", ret);
 		goto done;
 	}
@@ -2575,6 +2579,8 @@ static int __gpufreq_init_mtcmos(struct platform_device *pdev)
 	g_mtcmos->mfg2_dev = dev_pm_domain_attach_by_name(dev, "pd_mfg2");
 	if (IS_ERR_OR_NULL(g_mtcmos->mfg2_dev)) {
 		ret = g_mtcmos->mfg2_dev ? PTR_ERR(g_mtcmos->mfg2_dev) : GPUFREQ_ENODEV;
+		if (ret == -EPROBE_DEFER)
+			goto done;
 		__gpufreq_abort(GPUFREQ_CCF_EXCEPTION, "fail to get mfg2_dev (%ld)", ret);
 		goto done;
 	}
@@ -2583,6 +2589,8 @@ static int __gpufreq_init_mtcmos(struct platform_device *pdev)
 	g_mtcmos->mfg3_dev = dev_pm_domain_attach_by_name(dev, "pd_mfg3");
 	if (IS_ERR_OR_NULL(g_mtcmos->mfg3_dev)) {
 		ret = g_mtcmos->mfg3_dev ? PTR_ERR(g_mtcmos->mfg3_dev) : GPUFREQ_ENODEV;
+		if (ret == -EPROBE_DEFER)
+			goto done;
 		__gpufreq_abort(GPUFREQ_CCF_EXCEPTION, "fail to get mfg3_dev (%ld)", ret);
 		goto done;
 	}
@@ -2591,6 +2599,8 @@ static int __gpufreq_init_mtcmos(struct platform_device *pdev)
 	g_mtcmos->mfg4_dev = dev_pm_domain_attach_by_name(dev, "pd_mfg4");
 	if (IS_ERR_OR_NULL(g_mtcmos->mfg4_dev)) {
 		ret = g_mtcmos->mfg4_dev ? PTR_ERR(g_mtcmos->mfg4_dev) : GPUFREQ_ENODEV;
+		if (ret == -EPROBE_DEFER)
+			goto done;
 		__gpufreq_abort(GPUFREQ_CCF_EXCEPTION, "fail to get mfg4_dev (%ld)", ret);
 		goto done;
 	}
@@ -2599,6 +2609,8 @@ static int __gpufreq_init_mtcmos(struct platform_device *pdev)
 	g_mtcmos->mfg5_dev = dev_pm_domain_attach_by_name(dev, "pd_mfg5");
 	if (IS_ERR_OR_NULL(g_mtcmos->mfg5_dev)) {
 		ret = g_mtcmos->mfg5_dev ? PTR_ERR(g_mtcmos->mfg5_dev) : GPUFREQ_ENODEV;
+		if (ret == -EPROBE_DEFER)
+			goto done;
 		__gpufreq_abort(GPUFREQ_CCF_EXCEPTION, "fail to get mfg5_dev (%ld)", ret);
 		goto done;
 	}
@@ -2607,6 +2619,8 @@ static int __gpufreq_init_mtcmos(struct platform_device *pdev)
 	g_mtcmos->mfg6_dev = dev_pm_domain_attach_by_name(dev, "pd_mfg6");
 	if (IS_ERR_OR_NULL(g_mtcmos->mfg6_dev)) {
 		ret = g_mtcmos->mfg6_dev ? PTR_ERR(g_mtcmos->mfg6_dev) : GPUFREQ_ENODEV;
+		if (ret == -EPROBE_DEFER)
+			goto done;
 		__gpufreq_abort(GPUFREQ_CCF_EXCEPTION, "fail to get mfg6_dev (%ld)", ret);
 		goto done;
 	}
@@ -2633,33 +2647,41 @@ static int __gpufreq_init_clk(struct platform_device *pdev)
 
 	g_clk->clk_mux = devm_clk_get(&pdev->dev, "clk_mux");
 	if (IS_ERR(g_clk->clk_mux)) {
-		__gpufreq_abort(GPUFREQ_CCF_EXCEPTION,
-			"fail to get clk_mux (%ld)", PTR_ERR(g_clk->clk_mux));
 		ret = PTR_ERR(g_clk->clk_mux);
+		if (ret == -EPROBE_DEFER)
+			goto done;
+		__gpufreq_abort(GPUFREQ_CCF_EXCEPTION,
+			"fail to get clk_mux (%ld)", ret);
 		goto done;
 	}
 
 	g_clk->clk_main_parent = devm_clk_get(&pdev->dev, "clk_main_parent");
 	if (IS_ERR(g_clk->clk_main_parent)) {
-		__gpufreq_abort(GPUFREQ_CCF_EXCEPTION,
-			"fail to get clk_main_parent (%ld)", PTR_ERR(g_clk->clk_main_parent));
 		ret = PTR_ERR(g_clk->clk_main_parent);
+		if (ret == -EPROBE_DEFER)
+			goto done;
+		__gpufreq_abort(GPUFREQ_CCF_EXCEPTION,
+			"fail to get clk_main_parent (%ld)", ret);
 		goto done;
 	}
 
 	g_clk->clk_sub_parent = devm_clk_get(&pdev->dev, "clk_sub_parent");
 	if (IS_ERR(g_clk->clk_sub_parent)) {
-		__gpufreq_abort(GPUFREQ_CCF_EXCEPTION,
-			"fail to get clk_sub_parent (%ld)", PTR_ERR(g_clk->clk_sub_parent));
 		ret = PTR_ERR(g_clk->clk_sub_parent);
+		if (ret == -EPROBE_DEFER)
+			goto done;
+		__gpufreq_abort(GPUFREQ_CCF_EXCEPTION,
+			"fail to get clk_sub_parent (%ld)", ret);
 		goto done;
 	}
 
 	g_clk->subsys_mfg_cg = devm_clk_get(&pdev->dev, "subsys_mfg_cg");
 	if (IS_ERR(g_clk->subsys_mfg_cg)) {
-		__gpufreq_abort(GPUFREQ_CCF_EXCEPTION,
-			"fail to get subsys_mfg_cg (%ld)", PTR_ERR(g_clk->subsys_mfg_cg));
 		ret = PTR_ERR(g_clk->subsys_mfg_cg);
+		if (ret == -EPROBE_DEFER)
+			goto done;
+		__gpufreq_abort(GPUFREQ_CCF_EXCEPTION,
+			"fail to get subsys_mfg_cg (%ld)", ret);
 		goto done;
 	}
 
@@ -2686,8 +2708,9 @@ static int __gpufreq_init_pmic(struct platform_device *pdev)
 		regulator_get_optional(&pdev->dev, "_vgpu");
 	if (IS_ERR(g_pmic->reg_vgpu)) {
 		ret = PTR_ERR(g_pmic->reg_vgpu);
-		__gpufreq_abort(GPUFREQ_PMIC_EXCEPTION, "fail to get VGPU (%ld)",
-			PTR_ERR(g_pmic->reg_vgpu));
+		if (ret == -EPROBE_DEFER)
+			goto done;
+		__gpufreq_abort(GPUFREQ_PMIC_EXCEPTION, "fail to get VGPU (%ld)", ret);
 		goto done;
 	}
 
@@ -2695,8 +2718,9 @@ static int __gpufreq_init_pmic(struct platform_device *pdev)
 		regulator_get_optional(&pdev->dev, "_vsram_gpu");
 	if (IS_ERR(g_pmic->reg_vsram)) {
 		ret = PTR_ERR(g_pmic->reg_vsram);
-		__gpufreq_abort(GPUFREQ_PMIC_EXCEPTION, "fail to get VSRAM (%ld)",
-			PTR_ERR(g_pmic->reg_vsram));
+		if (ret == -EPROBE_DEFER)
+			goto done;
+		__gpufreq_abort(GPUFREQ_PMIC_EXCEPTION, "fail to get VSRAM (%ld)", ret);
 		goto done;
 	}
 
@@ -2920,21 +2944,22 @@ static int __gpufreq_pdrv_probe(struct platform_device *pdev)
 register_fp:
 	/*
 	 * GPUFREQ PLATFORM INIT DONE
-	 * register platform function pointer to wrapper in both AP and EB mode
+	 * init gpu dfd before publishing the platform fp, so a dfd failure
+	 * cannot leave a stale platform function table behind
 	 */
-	gpufreq_register_gpufreq_fp(&platform_fp);
-
-	/* init gpu ppm */
-	ret = gpuppm_init(TARGET_GPU, g_gpueb_support, 0);
-	if (unlikely(ret)) {
-		GPUFREQ_LOGE("fail to init gpuppm (%d)", ret);
-		goto done;
-	}
-
-	/* init gpu dfd */
 	ret = gpudfd_init(pdev);
 	if (unlikely(ret)) {
 		GPUFREQ_LOGE("fail to init gpudfd (%d)", ret);
+		goto done;
+	}
+
+	/* register platform function pointer to wrapper in both AP and EB mode */
+	gpufreq_register_gpufreq_fp(&platform_fp);
+
+	/* init gpu ppm (consumes the published platform fp) */
+	ret = gpuppm_init(TARGET_GPU, g_gpueb_support, 0);
+	if (unlikely(ret)) {
+		GPUFREQ_LOGE("fail to init gpuppm (%d)", ret);
 		goto done;
 	}
 

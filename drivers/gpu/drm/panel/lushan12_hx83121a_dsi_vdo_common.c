@@ -340,14 +340,19 @@ static int lcm_prepare(struct drm_panel *panel)
 	if (ctx->slept) {
 		ret = lcm_dcs_write(ctx, hx83121a_cdot_csot_sleep_out_seq,
 				    HX83121A_CDOT_CSOT_SLEEP_OUT_SEQ_LEN);
-		if (ret < 0)
+		if (ret < 0) {
 			dev_err(ctx->dev, "%s: sleep out failed: %d\n",
 				__func__, ret);
+			return ret;
+		}
+
 		ret = lcm_dcs_write(ctx, hx83121a_cdot_csot_display_on_seq,
 				    HX83121A_CDOT_CSOT_DISPLAY_ON_SEQ_LEN);
-		if (ret < 0)
+		if (ret < 0) {
 			dev_err(ctx->dev, "%s: display on failed: %d\n",
 				__func__, ret);
+			return ret;
+		}
 		mdelay(30);
 
 		/* 未开双击唤醒时触摸在 unprepare 已挂起, 这里恢复 */
@@ -365,10 +370,10 @@ static int lcm_prepare(struct drm_panel *panel)
 	lcm_panel_init(ctx);
 	ret = ctx->error;
 	if (ret < 0)
-		lcm_unprepare(panel);
+		return ret;
 
 	ctx->prepared = true;
-	return ret;
+	return 0;
 }
 
 static int lcm_enable(struct drm_panel *panel)
@@ -653,14 +658,27 @@ static int lcm_probe(struct mipi_dsi_device *dsi)
 	/* ESD TE pins, requested as inputs for future ESD support */
 	ctx->esd_te_master = of_get_named_gpio(dev->of_node,
 					       "tct_esd_te_master", 0);
-	if (gpio_is_valid(ctx->esd_te_master))
-		gpio_request_one(ctx->esd_te_master, GPIOF_IN,
-				 "lcm_esd_te_master");
+	if (ctx->esd_te_master == -EPROBE_DEFER)
+		return -EPROBE_DEFER;
+	if (gpio_is_valid(ctx->esd_te_master)) {
+		ret = devm_gpio_request_one(dev, ctx->esd_te_master, GPIOF_IN,
+					    "lcm_esd_te_master");
+		if (ret < 0)
+			dev_warn(dev, "%s: cannot request ESD TE master: %d\n",
+				 __func__, ret);
+	}
+
 	ctx->esd_te_slave = of_get_named_gpio(dev->of_node,
 					      "tct_esd_te_slave", 0);
-	if (gpio_is_valid(ctx->esd_te_slave))
-		gpio_request_one(ctx->esd_te_slave, GPIOF_IN,
-				 "lcm_esd_te_slave");
+	if (ctx->esd_te_slave == -EPROBE_DEFER)
+		return -EPROBE_DEFER;
+	if (gpio_is_valid(ctx->esd_te_slave)) {
+		ret = devm_gpio_request_one(dev, ctx->esd_te_slave, GPIOF_IN,
+					    "lcm_esd_te_slave");
+		if (ret < 0)
+			dev_warn(dev, "%s: cannot request ESD TE slave: %d\n",
+				 __func__, ret);
+	}
 
 	drm_panel_init(&ctx->panel, dev, &lcm_drm_funcs, DRM_MODE_CONNECTOR_DSI);
 	drm_panel_add(&ctx->panel);
@@ -678,6 +696,8 @@ static int lcm_probe(struct mipi_dsi_device *dsi)
 	if (ret < 0) {
 		dev_err(dev, "%s: mtk_panel_ext_create failed: %d\n",
 			__func__, ret);
+		mipi_dsi_detach(dsi);
+		drm_panel_remove(&ctx->panel);
 		return ret;
 	}
 #endif
