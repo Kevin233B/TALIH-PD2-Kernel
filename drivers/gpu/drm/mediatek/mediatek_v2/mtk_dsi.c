@@ -1055,7 +1055,12 @@ static int mtk_dsi_set_data_rate(struct mtk_dsi *dsi)
 
 void mtk_dsi_config_null_packet(struct mtk_dsi *dsi)
 {
-	u32 null_packet_len = dsi->ext->params->cmd_null_pkt_len;
+	u32 null_packet_len;
+
+	if (!dsi->ext || !dsi->ext->params)
+		return;
+
+	null_packet_len = dsi->ext->params->cmd_null_pkt_len;
 	if(!dsi->ext->params->lp_perline_en &&
 		mtk_dsi_is_cmd_mode(&dsi->ddp_comp) &&
 		dsi->ext->params->cmd_null_pkt_en) {
@@ -4146,7 +4151,15 @@ static void mtk_dsi_config_trigger(struct mtk_ddp_comp *comp,
 	struct mtk_panel_ext *ext = dsi->ext;
 	struct mtk_drm_private *priv = NULL;
 
-	if (mtk_crtc && mtk_crtc->base.dev)
+	/* 4.19 bootloop 前科：ext=NULL 时 ext->params 读 *(NULL+8)=0x8 崩。 */
+	if (!ext || !ext->params || !mtk_crtc) {
+		dev_err(dsi->dev, "DSI trigger skipped: %s\n",
+			!ext ? "panel ext NULL" :
+			!ext->params ? "panel params NULL" : "CRTC NULL");
+		return;
+	}
+
+	if (mtk_crtc->base.dev)
 		priv = mtk_crtc->base.dev->dev_private;
 	switch (flag) {
 	case MTK_TRIG_FLAG_TRIGGER:
