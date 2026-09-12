@@ -221,6 +221,6 @@ static int __init cmdq_platform_init(void)
 	cmdq_util_set_fp(&platform_fp);
 	return 0;
 }
-module_init(cmdq_platform_init);
+postcore_initcall(cmdq_platform_init);
 
 MODULE_LICENSE("GPL v2");

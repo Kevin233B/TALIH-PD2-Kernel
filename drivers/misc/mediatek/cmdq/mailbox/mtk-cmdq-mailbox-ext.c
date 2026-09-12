@@ -2971,6 +2971,7 @@ void cmdq_set_outpin_event(struct cmdq_client *cl, bool ena)
 }
 EXPORT_SYMBOL(cmdq_set_outpin_event);
 
-module_init(cmdq_drv_init);
+/* DRM is linked before misc; register GCE before device-init consumers. */
+subsys_initcall(cmdq_drv_init);
 
 MODULE_LICENSE("GPL v2");
