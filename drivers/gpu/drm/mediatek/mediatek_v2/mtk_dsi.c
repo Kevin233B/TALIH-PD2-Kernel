@@ -7850,6 +7850,7 @@ static int mtk_dsi_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 		/*leave idle need keep msync status*/
 		 if (mtk_drm_helper_get_opt(priv->helper_opt,
 					   MTK_DRM_OPT_MSYNC2_0)
+			&& panel_ext && panel_ext->params
 			&& panel_ext->params->msync2_enable) {
 			if (state->prop_val[CRTC_PROP_MSYNC2_0_ENABLE] != 0) {
 				DDPDBG("[Msync]%s,%d\n", __func__, __LINE__);
@@ -7865,7 +7866,8 @@ static int mtk_dsi_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 
 		DDPINFO("vfront_porch=%d\n", vfront_porch);
 
-		if (panel_ext->params->wait_sof_before_dec_vfp) {
+		if (panel_ext && panel_ext->params
+			&& panel_ext->params->wait_sof_before_dec_vfp) {
 			cmdq_pkt_clear_event(handle,
 				crtc->gce_obj.event[EVENT_DSI0_SOF]);
 			cmdq_pkt_wait_no_clear(handle,
