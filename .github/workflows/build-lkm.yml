@@ -174,11 +174,7 @@ jobs:
           check_ko pathmask.ko register_kprobe register_kretprobe unregister_kprobe unregister_kretprobe
           check_ko procguard.ko register_kretprobe unregister_kretprobe
           check_ko hma_uidfake.ko get_task_cred find_user free_uid
-          if [ -f modules-out/kasumi_lkm.ko ]; then
-            check_ko kasumi_lkm.ko register_kprobe
-          else
-            echo "::warning::kasumi_lkm.ko 仍未编出（WIP），其门禁检查跳过"
-          fi
+          check_ko kasumi_lkm.ko register_kprobe register_kretprobe
           if [ "$fail" -ne 0 ]; then
             echo "::error::可加载性门禁失败（详见上方 ::error 行）"
             exit 1
