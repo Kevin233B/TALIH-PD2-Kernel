@@ -2,11 +2,11 @@ name: Build LKM Modules
 
 on:
   push:
-    branches: [ main, resukisu-susfs, susfs-v2.2.0, sukisu-ultra-susfs-v2.2.0, twrp ]
+    branches: [ main, resukisu-susfs ]
   workflow_dispatch:
     inputs:
       branch:
-        description: '内核分支（all = 全部 5 个）'
+        description: '内核分支（all = main + resukisu-susfs）'
         required: false
         default: 'all'
         type: choice
@@ -14,9 +14,6 @@ on:
           - all
           - main
           - resukisu-susfs
-          - susfs-v2.2.0
-          - sukisu-ultra-susfs-v2.2.0
-          - twrp
 
 jobs:
   select:
@@ -30,7 +27,7 @@ jobs:
           if [ "${{ github.event_name }}" = "push" ]; then
             echo 'branches=["${{ github.ref_name }}"]' >> "$GITHUB_OUTPUT"
           elif [ "${{ github.event.inputs.branch }}" = "all" ] || [ -z "${{ github.event.inputs.branch }}" ]; then
-            echo 'branches=["main","resukisu-susfs","susfs-v2.2.0","sukisu-ultra-susfs-v2.2.0","twrp"]' >> "$GITHUB_OUTPUT"
+            echo 'branches=["main","resukisu-susfs"]' >> "$GITHUB_OUTPUT"
           else
             echo 'branches=["${{ github.event.inputs.branch }}"]' >> "$GITHUB_OUTPUT"
           fi
@@ -55,19 +52,12 @@ jobs:
       - name: Integrate SU + SUSFS (mirror per-branch build.yml)
         run: |
           case "${{ matrix.branch }}" in
-            resukisu-susfs|twrp|susfs-v2.2.0)
+            resukisu-susfs)
               rm -rf KernelSU drivers/kernelsu
               git checkout -- drivers/Makefile drivers/Kconfig
               curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
               patch -p1 < patch/50_add_susfs_in_kernel-4.19.patch
               patch -p1 < patch/55_resukisu_susfs_abi_compat.patch
-              ;;
-            sukisu-ultra-susfs-v2.2.0)
-              rm -rf KernelSU drivers/kernelsu
-              git checkout -- drivers/Makefile drivers/Kconfig
-              curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s builtin
-              patch -p1 < patch/10_fix_sukisu_4.19_compat.patch
-              patch -p1 < patch/50_add_susfs_in_kernel-4.19.patch
               ;;
             main)
               echo "main 分支：无 SU/SUSFS 集成，直接编内核"
@@ -86,6 +76,7 @@ jobs:
         continue-on-error: true
         run: |
           git clone --depth 1 https://github.com/CrackerCat/LKM-PathMask lkms/LKM-PathMask
+          patch -p1 -d lkms/LKM-PathMask < patch/lkm/pathmask_4.19_compat.patch
           CLANG_PATH="$PWD/prebuilts/clang/host/linux-x86/clang-r383902"
           CLANG_BIN="$CLANG_PATH/bin"
           make O=out ARCH=arm64 \
@@ -99,6 +90,7 @@ jobs:
         continue-on-error: true
         run: |
           git clone --depth 1 https://github.com/KodateMitsuru/hma-uidfake lkms/hma-uidfake
+          patch -p1 -d lkms/hma-uidfake < patch/lkm/hma_uidfake_4.19_compat.patch
           CLANG_PATH="$PWD/prebuilts/clang/host/linux-x86/clang-r383902"
           CLANG_BIN="$CLANG_PATH/bin"
           make O=out ARCH=arm64 \
@@ -112,6 +104,7 @@ jobs:
         continue-on-error: true
         run: |
           git clone --depth 1 https://github.com/Rouyashiki/Kasumi lkms/Kasumi
+          patch -p1 -d lkms/Kasumi < patch/lkm/kasumi_4.19_compat.patch
           CLANG_PATH="$PWD/prebuilts/clang/host/linux-x86/clang-r383902"
           CLANG_BIN="$CLANG_PATH/bin"
           make O=out ARCH=arm64 \

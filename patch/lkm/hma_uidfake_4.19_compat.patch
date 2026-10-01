@@ -1,0 +1,18 @@
+--- a/src/patch.c
++++ b/src/patch.c
+@@ -26,6 +26,15 @@
+ 
+ #include "uidfake.h"
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
++/*
++ * pud_leaf()/pmd_leaf() only exist from 5.10 (generic pgtable helpers); on
++ * arm64 4.19 the block/"section" entry tests are pud_sect()/pmd_sect().
++ */
++#define pud_leaf(pud) (pud_sect(pud))
++#define pmd_leaf(pmd) (pmd_sect(pmd))
++#endif
++
+ static int probe_noop(struct kprobe *p, struct pt_regs *r)
+ {
+ 	return 0;
