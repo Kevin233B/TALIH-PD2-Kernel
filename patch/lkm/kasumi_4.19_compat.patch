@@ -51,6 +51,21 @@
  #include <linux/vmalloc.h>
  #include <linux/jhash.h>
  #include <linux/file.h>
+@@ -98,7 +103,13 @@
+ {
+ 	struct kasumi_getfd_task_work *tw;
+ 
+-	if (!outp || !access_ok(outp, sizeof(*outp)))
++	if (!outp ||
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0)
++	    /* 4.19: access_ok() takes a type argument; arm64 ignores it. */
++	    !access_ok(VERIFY_WRITE, outp, sizeof(*outp)))
++#else
++	    !access_ok(outp, sizeof(*outp)))
++#endif
+ 		return -EFAULT;
+ 	if (!atomic_read_acquire(&kasumi_getfd_accepting))
+ 		return -ESHUTDOWN;
 --- a/src/core/kasumi_dirhijack.c
 +++ b/src/core/kasumi_dirhijack.c
 @@ -1047,10 +1047,16 @@
@@ -195,6 +210,163 @@
  		atomic_dec(&hide_jobs);
  	if (atomic_read(&hide_jobs))
  		return false;
+--- a/src/policy/kasumi_path_policy.c
++++ b/src/policy/kasumi_path_policy.c
+@@ -43,6 +43,48 @@
+ #include <linux/rcupdate.h>
+ #include <linux/sched.h>
+ #include <linux/xarray.h>
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 20, 0)
++/* 4.19 predates the xarray API (added in 4.20). The policy uid sets
++ * are plain uid -> marker maps, so back them with the idr API via
++ * same-named local helpers; the 4.19 xarray.h stub declares none of
++ * these symbols, so there is no collision. */
++#include <linux/idr.h>
++static inline void xa_init(struct idr *xa)
++{
++	idr_init(xa);
++}
++static inline void xa_destroy(struct idr *xa)
++{
++	idr_destroy(xa);
++}
++static inline void *xa_load(struct idr *xa, u32 uid)
++{
++	return idr_find(xa, uid);
++}
++static inline void *xa_store(struct idr *xa, u32 uid, void *val,
++			      gfp_t gfp)
++{
++	u32 id = uid;
++	int ret = idr_alloc_u32(xa, val, &id, uid, gfp);
++
++	return ret < 0 ? ERR_PTR(ret) : val;
++}
++static inline int xa_err(void *entry)
++{
++	return IS_ERR_VALUE((unsigned long)entry) ? (int)(long)entry : 0;
++}
++#endif
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 6, 0)
++/* openat2-style LOOKUP_ flags (added with openat2 in 5.6). They are
++ * carried in kasumi's own resolver flag space and do not collide
++ * with any 4.19 LOOKUP_ bit (4.19's highest is LOOKUP_DOWN 0x8000),
++ * so define the mainline values for older kernels. */
++#define LOOKUP_NO_SYMLINKS	0x010000
++#define LOOKUP_NO_MAGICLINKS	0x020000
++#define LOOKUP_BENEATH		0x080000
++#define LOOKUP_IN_ROOT		0x100000
++#define LOOKUP_CACHED		0x200000
++#endif
+ #include <uapi/linux/magic.h>
+ #ifndef EROFS_SUPER_MAGIC
+ #define EROFS_SUPER_MAGIC 0xe0f5e1e2
+@@ -107,8 +149,13 @@
+ 	u32 flags;
+ 	u32 allow_count;
+ 	u32 deny_count;
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 20, 0)
++	struct idr allow_uids;
++	struct idr deny_uids;
++#else
+ 	struct xarray allow_uids;
+ 	struct xarray deny_uids;
++#endif
+ 	u32 *allow_uid_list;
+ 	u32 *deny_uid_list;
+ };
+@@ -274,7 +321,12 @@
+ 	kasumi_policy_snapshot_destroy(policy);
+ }
+ 
+-static int kasumi_policy_build_uid_list(struct xarray *xa, u32 **snapshot,
++static int kasumi_policy_build_uid_list(
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 20, 0)
++	struct idr *xa, u32 **snapshot,
++#else
++	struct xarray *xa, u32 **snapshot,
++#endif
+ 					u32 *snapshot_count, const u32 *uids,
+ 					u32 count)
+ {
+--- a/src/features/kasumi_owner.c
++++ b/src/features/kasumi_owner.c
+@@ -228,8 +228,41 @@
+ 	kfree(mark);
+ }
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 1, 0)
++/*
++ * 4.19: fsnotify_ops has only ->handle_event(), whose file_name is a
++ * raw (const unsigned char *); translate to the handle_inode_event()
++ * shape kasumi_owner_event() is written for.
++ */
++static int kasumi_owner_handle_event(struct fsnotify_group *group,
++				     struct inode *inode, u32 mask,
++				     const void *data, int data_type,
++				     const unsigned char *file_name, u32 cookie,
++				     struct fsnotify_iter_info *iter_info)
++{
++	struct fsnotify_mark *mark =
++		iter_info->marks[FSNOTIFY_OBJ_TYPE_INODE];
++	struct qstr name;
++
++	if (!mark)
++		return 0;
++	if (file_name) {
++		name.name = file_name;
++		name.len = (unsigned int)strlen((const char *)file_name);
++		return kasumi_owner_event(mark, mask, inode, NULL,
++					    &name, cookie);
++	}
++	return kasumi_owner_event(mark, mask, inode, NULL, NULL,
++				      cookie);
++}
++#endif
++
+ static const struct fsnotify_ops kasumi_owner_notify_ops = {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 1, 0)
++    .handle_event = kasumi_owner_handle_event,
++#else
+     .handle_inode_event = kasumi_owner_event,
++#endif
+     .free_mark = kasumi_owner_mark_free,
+ };
+ 
+@@ -299,6 +332,11 @@
+ 	ret =
+ 	    owner_add_mark(mark, file_inode(file), FSNOTIFY_OBJ_TYPE_INODE, 0);
+ #else
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 9, 0)
++	/* 4.19: fsnotify_add_mark(mark, connp, type, allow_dups). */
++	ret = owner_add_mark(mark, &file_inode(file)->i_fsnotify_marks,
++			     FSNOTIFY_OBJ_TYPE_INODE, 1);
++#else
+ 	ret = owner_add_mark(mark, &file_inode(file)->i_fsnotify_marks,
+ 			     FSNOTIFY_OBJ_TYPE_INODE,
+ #ifdef FSNOTIFY_GROUP_DUPS
+@@ -308,6 +346,7 @@
+ #endif
+ 			     NULL);
+ #endif
++#endif
+ 	owner_fput_sync(file);
+ 	if (ret)
+ 		owner_put_mark(mark);
+--- a/src/hooks/kasumi_ftrace_hooks.c
++++ b/src/hooks/kasumi_ftrace_hooks.c
+@@ -25,6 +25,11 @@
+ 
+ #include "kasumi_entrypoints.h"
+ #include "kasumi_ftrace_hooks.h"
++/* kasumi_krp_* / kasumi_kp_* handlers are declared in
++ * kasumi_vfs_hooks.h; without this include they are only implicitly
++ * declared (tolerated by GCC as int(), an error under clang 16+ and
++ * under the -Werror-implicit-function-declaration kernels). */
++#include "kasumi_vfs_hooks.h"
+ 
+ #define KASUMI_FTRACE_SLOT_DEPTH 16
+ 
 --- a/src/features/kasumi_fake_mountinfo.c
 +++ b/src/features/kasumi_fake_mountinfo.c
 @@ -30,6 +30,7 @@
