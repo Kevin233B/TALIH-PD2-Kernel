@@ -1,0 +1,53 @@
+--- a/src/core/kasumi_runtime.h
++++ b/src/core/kasumi_runtime.h
+@@ -251,9 +251,17 @@
+ extern long (*kasumi_strncpy_from_user_nofault)(char *dst, const void __user *src, long count);
+ extern long (*kasumi_copy_from_user_nofault)(void *dst, const void __user *src, size_t size);
+ extern long (*kasumi_copy_to_user_nofault)(void __user *dst, const void *src, size_t size);
++#include <linux/version.h>
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
+ extern int (*kasumi_task_work_add_ptr)(struct task_struct *task,
+ 				       struct callback_head *work,
+ 				       enum task_work_notify_mode notify);
++#else
++/* 4.19: int task_work_add(struct task_struct *, struct callback_head *, bool notify) */
++extern int (*kasumi_task_work_add_ptr)(struct task_struct *task,
++				       struct callback_head *work,
++				       bool notify);
++#endif
+ extern struct llist_node *(*kasumi_llist_del_first_ptr)(
+ 	struct llist_head *head);
+ struct llist_node *kasumi_llist_del_first(struct llist_head *head);
+--- a/src/core/kasumi_runtime.c
++++ b/src/core/kasumi_runtime.c
+@@ -469,9 +469,16 @@
+ long (*kasumi_strncpy_from_user_nofault)(char *dst, const void __user *src, long count);
+ long (*kasumi_copy_from_user_nofault)(void *dst, const void __user *src, size_t size);
+ long (*kasumi_copy_to_user_nofault)(void __user *dst, const void *src, size_t size);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
+ int (*kasumi_task_work_add_ptr)(struct task_struct *task,
+ 				struct callback_head *work,
+ 				enum task_work_notify_mode notify);
++#else
++/* 4.19: task_work_add() takes a bool notify argument */
++int (*kasumi_task_work_add_ptr)(struct task_struct *task,
++				struct callback_head *work,
++				bool notify);
++#endif
+ struct llist_node *(*kasumi_llist_del_first_ptr)(struct llist_head *head);
+ ssize_t (*kasumi_seq_read_iter_ptr)(struct kiocb *iocb,
+ 				    struct iov_iter *iter);
+--- a/src/hooks/kasumi_proc_hooks.c
++++ b/src/hooks/kasumi_proc_hooks.c
+@@ -19,6 +19,11 @@
+ #include <linux/string.h>
+ #include <linux/slab.h>
+ #include <linux/task_work.h>
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
++/* 4.19: task_work_add() takes a bool notify argument; TWA_RESUME just means
++ * "notify the task so the work runs before it returns to userspace". */
++#define TWA_RESUME true
++#endif
+ #include <linux/vmalloc.h>
+ #include <linux/jhash.h>
+ #include <linux/file.h>
