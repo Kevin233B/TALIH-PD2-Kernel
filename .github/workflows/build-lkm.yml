@@ -129,6 +129,62 @@ jobs:
           ls -la modules-out/
           echo "共编出 $found 个 .ko"
 
+      - name: Loadability gate (config + mechanism imports + symvers resolution)
+        run: |
+          fail=0
+          # 1) 内核侧硬前提：KPROBES + FUNCTION_TRACER（缺失 = 4.19 头文件 inline 桩路线，insmod 必失败）
+          for cfg in CONFIG_KPROBES CONFIG_FUNCTION_TRACER; do
+            if ! grep -q "^${cfg}=y$" out/.config; then
+              echo "::error::out/.config 缺少 ${cfg}=y —— kprobe/ftrace 机制会被内核头文件的 inline 桩消除，模块 insmod 必失败"
+              fail=1
+            else
+              echo "config OK: ${cfg}=y"
+            fi
+          done
+          # 2) 每个 .ko：核心机制导入必须在（防死代码消除假绿）+ 全部强未定义导入必须能在 out/Module.symvers 解析
+          check_ko() {
+            ko=$1; shift
+            if [ ! -f "modules-out/$ko" ]; then
+              echo "::error::modules-out/$ko 缺失"
+              fail=1
+              return 0
+            fi
+            und=$(nm "modules-out/$ko" | awk '$1=="U"{print $2}' | sort -u)
+            for sym in "$@"; do
+              if ! printf '%s\n' "$und" | grep -qx "$sym"; then
+                echo "::error::$ko 缺少核心机制导入 $sym —— 机制被编译器当死代码消除或内核 CONFIG 未开，insmod 后功能不成立"
+                fail=1
+              fi
+            done
+            miss=0
+            while IFS= read -r s; do
+              [ -n "$s" ] || continue
+              if ! awk -v s="$s" '$2==s{f=1} END{exit !f}' out/Module.symvers; then
+                echo "::error::$ko 导入 $s 无法在 out/Module.symvers 解析 —— insmod 会报 Unknown symbol"
+                miss=1
+                fail=1
+              fi
+            done <<< "$und"
+            if [ "$miss" -eq 0 ]; then
+              echo "$ko: 核心导入齐全，全部 $(printf '%s\n' "$und" | wc -l) 个 UND 导入解析 OK"
+            fi
+            v=$(readelf -p .modinfo "modules-out/$ko" 2>/dev/null | sed -n 's/.*vermagic=//p' | head -1)
+            echo "  $ko vermagic: $v"
+          }
+          check_ko pathmask.ko register_kprobe register_kretprobe unregister_kprobe unregister_kretprobe
+          check_ko procguard.ko register_kretprobe unregister_kretprobe
+          check_ko hma_uidfake.ko get_task_cred find_user free_uid
+          if [ -f modules-out/kasumi_lkm.ko ]; then
+            check_ko kasumi_lkm.ko register_kprobe
+          else
+            echo "::warning::kasumi_lkm.ko 仍未编出（WIP），其门禁检查跳过"
+          fi
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::可加载性门禁失败（详见上方 ::error 行）"
+            exit 1
+          fi
+          echo "可加载性门禁通过：内核 CONFIG 前提 + 机制导入 + 全符号解析全部 OK"
+
       - name: Upload LKMs (${{ matrix.branch }})
         uses: actions/upload-artifact@v4
         with:
