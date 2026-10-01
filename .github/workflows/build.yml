@@ -27,6 +27,7 @@ jobs:
       - name: Apply SUSFS kernel patch (4.19, non-GKI)
         run: |
           patch -p1 < patch/50_add_susfs_in_kernel-4.19.patch
+          patch -p1 < patch/55_resukisu_susfs_abi_compat.patch
 
       - name: Build kernel
         run: |
@@ -36,6 +37,13 @@ jobs:
           export CROSS_COMPILE=aarch64-linux-gnu-
           ./download_clang.sh
           ./build-mt8797.sh
+
+      - name: Verify SUSFS integration
+        run: |
+          grep -q '^CONFIG_KSU_SUSFS=y' out/.config || { echo "::error::CONFIG_KSU_SUSFS 未在最终 .config 中启用（kconfig 丢弃了该选项）"; exit 1; }
+          [ -f out/fs/susfs.o ] || { echo "::error::out/fs/susfs.o 未编译，SUSFS 内核侧缺失"; exit 1; }
+          grep -q 'susfs_show_version' out/System.map || { echo "::error::System.map 中无 susfs_show_version，链接产物缺 SUSFS"; exit 1; }
+          echo "SUSFS 验证通过：CONFIG_KSU_SUSFS=y、fs/susfs.o、System.map 符号齐全"
 
       - name: Upload Image.gz
         uses: actions/upload-artifact@v4
