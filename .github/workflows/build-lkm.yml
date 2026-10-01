@@ -1,0 +1,145 @@
+name: Build LKM Modules
+
+on:
+  push:
+    branches: [ main, resukisu-susfs, susfs-v2.2.0, sukisu-ultra-susfs-v2.2.0, twrp ]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: '内核分支（all = 全部 5 个）'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - main
+          - resukisu-susfs
+          - susfs-v2.2.0
+          - sukisu-ultra-susfs-v2.2.0
+          - twrp
+
+jobs:
+  select:
+    runs-on: ubuntu-latest
+    outputs:
+      branches: ${{ steps.set.outputs.branches }}
+    steps:
+      - name: Select target branches
+        id: set
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo 'branches=["${{ github.ref_name }}"]' >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.inputs.branch }}" = "all" ] || [ -z "${{ github.event.inputs.branch }}" ]; then
+            echo 'branches=["main","resukisu-susfs","susfs-v2.2.0","sukisu-ultra-susfs-v2.2.0","twrp"]' >> "$GITHUB_OUTPUT"
+          else
+            echo 'branches=["${{ github.event.inputs.branch }}"]' >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: select
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        branch: ${{ fromJson(needs.select.outputs.branches) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.branch }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc bison flex libssl-dev libelf-dev libc6-dev linux-libc-dev device-tree-compiler cpio gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf git wget xz-utils python3 python3-pip patch
+
+      - name: Integrate SU + SUSFS (mirror per-branch build.yml)
+        run: |
+          case "${{ matrix.branch }}" in
+            resukisu-susfs|twrp|susfs-v2.2.0)
+              rm -rf KernelSU drivers/kernelsu
+              git checkout -- drivers/Makefile drivers/Kconfig
+              curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
+              patch -p1 < patch/50_add_susfs_in_kernel-4.19.patch
+              patch -p1 < patch/55_resukisu_susfs_abi_compat.patch
+              ;;
+            sukisu-ultra-susfs-v2.2.0)
+              rm -rf KernelSU drivers/kernelsu
+              git checkout -- drivers/Makefile drivers/Kconfig
+              curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s builtin
+              patch -p1 < patch/10_fix_sukisu_4.19_compat.patch
+              patch -p1 < patch/50_add_susfs_in_kernel-4.19.patch
+              ;;
+            main)
+              echo "main 分支：无 SU/SUSFS 集成，直接编内核"
+              ;;
+          esac
+
+      - name: Build kernel (full build for out/Module.symvers)
+        run: |
+          chmod +x build-mt8797.sh download_clang.sh
+          export ARCH=arm64
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          ./download_clang.sh
+          ./build-mt8797.sh
+
+      - name: Build LKM-PathMask (pathmask.ko + procguard.ko)
+        continue-on-error: true
+        run: |
+          git clone --depth 1 https://github.com/CrackerCat/LKM-PathMask lkms/LKM-PathMask
+          CLANG_PATH="$PWD/prebuilts/clang/host/linux-x86/clang-r383902"
+          CLANG_BIN="$CLANG_PATH/bin"
+          make O=out ARCH=arm64 \
+            CC=$CLANG_BIN/clang LD=$CLANG_BIN/ld.lld AR=$CLANG_BIN/llvm-ar NM=$CLANG_BIN/llvm-nm \
+            OBJCOPY=$CLANG_BIN/llvm-objcopy OBJDUMP=$CLANG_BIN/llvm-objdump READELF=$CLANG_BIN/llvm-readelf \
+            OBJSIZE=$CLANG_BIN/llvm-size STRIP=$CLANG_BIN/llvm-strip \
+            CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1 \
+            M=$PWD/lkms/LKM-PathMask/kernel modules
+
+      - name: Build hma-uidfake (hma_uidfake.ko)
+        continue-on-error: true
+        run: |
+          git clone --depth 1 https://github.com/KodateMitsuru/hma-uidfake lkms/hma-uidfake
+          CLANG_PATH="$PWD/prebuilts/clang/host/linux-x86/clang-r383902"
+          CLANG_BIN="$CLANG_PATH/bin"
+          make O=out ARCH=arm64 \
+            CC=$CLANG_BIN/clang LD=$CLANG_BIN/ld.lld AR=$CLANG_BIN/llvm-ar NM=$CLANG_BIN/llvm-nm \
+            OBJCOPY=$CLANG_BIN/llvm-objcopy OBJDUMP=$CLANG_BIN/llvm-objdump READELF=$CLANG_BIN/llvm-readelf \
+            OBJSIZE=$CLANG_BIN/llvm-size STRIP=$CLANG_BIN/llvm-strip \
+            CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1 \
+            M=$PWD/lkms/hma-uidfake/src modules
+
+      - name: Build Kasumi (kasumi_lkm.ko)
+        continue-on-error: true
+        run: |
+          git clone --depth 1 https://github.com/Rouyashiki/Kasumi lkms/Kasumi
+          CLANG_PATH="$PWD/prebuilts/clang/host/linux-x86/clang-r383902"
+          CLANG_BIN="$CLANG_PATH/bin"
+          make O=out ARCH=arm64 \
+            CC=$CLANG_BIN/clang LD=$CLANG_BIN/ld.lld AR=$CLANG_BIN/llvm-ar NM=$CLANG_BIN/llvm-nm \
+            OBJCOPY=$CLANG_BIN/llvm-objcopy OBJDUMP=$CLANG_BIN/llvm-objdump READELF=$CLANG_BIN/llvm-readelf \
+            OBJSIZE=$CLANG_BIN/llvm-size STRIP=$CLANG_BIN/llvm-strip \
+            CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1 \
+            M=$PWD/lkms/Kasumi/src modules
+
+      - name: Collect and report LKMs
+        run: |
+          mkdir -p modules-out
+          found=0
+          while IFS= read -r ko; do
+            cp "$ko" modules-out/
+            found=$((found+1))
+          done < <(find lkms -name '*.ko' -type f)
+          if [ "$found" -eq 0 ]; then
+            echo "::error::没有任何 LKM 编译成功（.ko 数量为 0）"
+            exit 1
+          fi
+          ls -la modules-out/
+          echo "共编出 $found 个 .ko"
+
+      - name: Upload LKMs (${{ matrix.branch }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: lkm-modules-${{ matrix.branch }}
+          path: modules-out/*.ko
+          retention-days: 14
+          if-no-files-found: error
