@@ -1,0 +1,54 @@
+--- a/include/linux/susfs_def.h
++++ b/include/linux/susfs_def.h
+@@ -58,6 +58,35 @@
+ 
+ #define TASK_STRUCT_NON_ROOT_USER_APP_PROC BIT(24)
+ #define TASK_STRUCT_PROC_UMOUNTED BIT(25)
++#define TASK_STRUCT_PROC_UMOUNTED_FOR_ZYGOTE_NEXT BIT(26)
++
++#if defined(CONFIG_KSU_SUSFS)
++#include <linux/types.h>
++#include <linux/sched.h>
++
++/* ReSukiSU 内核侧 ABI 兼容（susfs v1.5.5 时代 -> 新版 KSU 驱动）：
++ * setuid/sucompat hook 会调用以下 inline；no_su 直接映射到老机制
++ * “非特权用户进程”任务态位——正是本补丁所有隐藏钩子的总开关。 */
++static inline void susfs_set_current_proc_no_su(void)
++{
++	current->susfs_task_state |= TASK_STRUCT_NON_ROOT_USER_APP_PROC;
++}
++
++static inline void susfs_clear_current_proc_no_su(void)
++{
++	current->susfs_task_state &= ~TASK_STRUCT_NON_ROOT_USER_APP_PROC;
++}
++
++static inline bool susfs_is_current_proc_no_su(void)
++{
++	return !!(current->susfs_task_state & TASK_STRUCT_NON_ROOT_USER_APP_PROC);
++}
++
++static inline void susfs_set_current_proc_umounted_for_zygote_next(void)
++{
++	current->susfs_task_state |= TASK_STRUCT_PROC_UMOUNTED_FOR_ZYGOTE_NEXT;
++}
++#endif // #if defined(CONFIG_KSU_SUSFS)
+ 
+ #define MAGIC_MOUNT_WORKDIR "/debug_ramdisk/workdir"
+ #define DATA_ADB_UMOUNT_FOR_ZYGOTE_SYSTEM_PROCESS "/data/adb/susfs_umount_for_zygote_system_process"
+--- a/kernel/reboot.c
++++ b/kernel/reboot.c
+@@ -318,7 +318,12 @@
+ 	int ret = 0;
+ 
+ #ifdef CONFIG_KSU
+-	ksu_handle_sys_reboot(magic1, magic2, cmd, &arg);
++	ret = ksu_handle_sys_reboot(magic1, magic2, cmd, &arg);
++	if (ret) {
++		goto orig_flow;
++	}
++	return ret;
++orig_flow:
+ #endif
+ 
+ 	/* We only trust the superuser with rebooting the system. */
