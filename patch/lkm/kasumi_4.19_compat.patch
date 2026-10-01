@@ -51,3 +51,113 @@
  #include <linux/vmalloc.h>
  #include <linux/jhash.h>
  #include <linux/file.h>
+--- a/src/core/kasumi_dirhijack.c
++++ b/src/core/kasumi_dirhijack.c
+@@ -1047,10 +1047,16 @@
+ {
+ 	if (kasumi_vnode_is_ours(inode))
+ 		kasumi_vnode_free_info(inode);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
+ 	if (orig && orig->free_inode)
+ 		orig->free_inode(inode);
+ 	else if (kasumi_free_inode_nonrcu_ptr)
+ 		kasumi_free_inode_nonrcu_ptr(inode);
++#else
++	/* 4.19: no ->free_inode member; ->destroy_inode owns inode freeing. */
++	if (orig && orig->destroy_inode)
++		orig->destroy_inode(inode);
++#endif
+ }
+ 
+ void KASUMI_NOCFI kasumi_dh_reclaim_evict_inode(struct inode *inode,
+--- a/src/core/kasumi_sop_shadow.c
++++ b/src/core/kasumi_sop_shadow.c
+@@ -25,6 +25,7 @@
+ #include <linux/rcupdate.h>
+ #include <linux/slab.h>
+ #include <linux/spinlock.h>
++#include <linux/version.h>
+ #include <linux/wait.h>
+ #include <linux/workqueue.h>
+ 
+@@ -219,8 +220,15 @@
+ 	spare->sb_active_held = true;
+ 	spare->module_pin_held = true;
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
+ 	if (!orig->destroy_inode && !orig->free_inode &&
+ 	    !kasumi_free_inode_nonrcu_ptr) {
++#else
++	/* 4.19: no ->free_inode member; ->destroy_inode owns inode
++	 * freeing, so without an original ->destroy_inode there is
++	 * nothing to hand the inode free on to. */
++	if (!orig->destroy_inode) {
++#endif
+ 		ret = -EOPNOTSUPP;
+ 		goto out_s_umount;
+ 	}
+@@ -234,8 +242,10 @@
+ 	 * ever stored in inode->free_inode.
+ 	 */
+ 	spare->shadow_sop.destroy_inode = kasumi_sop_destroy_inode;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
+ 	if (!orig->destroy_inode && !orig->free_inode)
+ 		spare->shadow_sop.free_inode = kasumi_free_inode_nonrcu_ptr;
++#endif
+ 	spare->shadow_sop.evict_inode = kasumi_sop_evict_inode;
+ 	spare->shadow_sop.drop_inode = kasumi_sop_drop_inode;
+ 
+--- a/src/features/kasumi_fake_mountinfo.c
++++ b/src/features/kasumi_fake_mountinfo.c
+@@ -30,6 +30,7 @@
+ #include <linux/slab.h>
+ #include <linux/sort.h>
+ #include <linux/uio.h>
++#include <linux/version.h>
+ #include <linux/vmalloc.h>
+ 
+ static typeof(copy_mnt_ns) *kasumi_copy_mnt_ns;
+@@ -257,11 +258,13 @@
+ 
+ 	(*length) = 0;
+ 	for (;;) {
+-		struct kiocb iocb;
+-		struct iov_iter iter;
+ 		struct kvec vec;
+ 		char overflow;
+ 		ssize_t ret;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
++		struct kiocb iocb;
++		struct iov_iter iter;
++#endif
+ 
+ 		if ((*length) == *capacity && *capacity < KASUMI_MI_MAX_SIZE) {
+ 			size_t size =
+@@ -279,6 +282,7 @@
+ 		    (*length) == *capacity ? &overflow : (*buffer) + (*length);
+ 		vec.iov_len =
+ 		    (*length) == *capacity ? 1 : *capacity - (*length);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
+ 		iov_iter_kvec(&iter, READ, &vec, 1, vec.iov_len);
+ 		init_sync_kiocb(&iocb, file);
+ 		iocb.ki_pos = pos;
+@@ -294,6 +298,19 @@
+ 			return -EIO;
+ 		(*length) += ret;
+ 		pos = iocb.ki_pos;
++#else
++		/* 4.19: seq files serve ->read (seq_read), not ->read_iter, and
++		 * seq_read_iter() does not exist; read the way kernel-space code
++		 * of that era does, with kernel_read(). */
++		ret = kernel_read(file, vec.iov_base, vec.iov_len, &pos);
++		if (ret < 0)
++			return ret;
++		if (!ret)
++			return (*length) ? 0 : -EIO;
++		if ((*length) == *capacity)
++			return -EFBIG;
++		(*length) += ret;
++#endif
+ 	}
+ }
+ 
