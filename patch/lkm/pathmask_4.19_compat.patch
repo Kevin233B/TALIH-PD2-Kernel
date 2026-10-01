@@ -16,3 +16,22 @@
  #define PM_LOG_PREFIX "pathmask: "
  #define MAX_HIDE_TARGETS 64
  #define MAX_DENY_UIDS 1024
+--- a/kernel/procguard.c
++++ b/kernel/procguard.c
+@@ -53,6 +53,16 @@
+ #include <linux/uidgid.h>
+ #include <linux/atomic.h>
+ #include <asm/ptrace.h>
++#include <linux/version.h>
++
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 9, 0)
++/*
++ * regs_set_return_value() only exists from 5.9; before that the arm64
++ * syscall return value lives in pt_regs->regs[0], which is exactly what
++ * the helper writes.
++ */
++#define regs_set_return_value(regs, val) ((regs)->regs[0] = (val))
++#endif
+ 
+ #define PG_LOG_PREFIX "procguard: "
+ 
