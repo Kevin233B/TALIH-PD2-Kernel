@@ -56,6 +56,9 @@ jobs:
               rm -rf KernelSU drivers/kernelsu
               git checkout -- drivers/Makefile drivers/Kconfig
               curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
+              # 4.19 inline ABI 兼容（同 build.yml：防 main 驱动 SUSFS 变体二次解引用变砖）
+              cat patch/56_resukisu_sucompat_4_19_inline_abi.fragment.c >> KernelSU/kernel/feature/sucompat.c
+              grep -q "ksu_handle_faccessat_4_19" KernelSU/kernel/feature/sucompat.c || { echo "::error::patch/56 片段追加失败"; exit 1; }
               patch -p1 < patch/50_add_susfs_in_kernel-4.19.patch
               patch -p1 < patch/55_resukisu_susfs_abi_compat.patch
               ;;

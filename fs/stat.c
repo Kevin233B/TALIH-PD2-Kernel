@@ -149,7 +149,8 @@ int vfs_statx_fd(unsigned int fd, struct kstat *stat,
 EXPORT_SYMBOL(vfs_statx_fd);
 
 #ifdef CONFIG_KSU
-extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
+/* 4.19 调用点：char ** ABI（同 fs/open.c，走 patch/56 的 _4_19 兼容函数） */
+extern int ksu_handle_stat_4_19(int *dfd, const char __user **filename_user, int *flags);
 #endif
 
 
@@ -176,7 +177,7 @@ int vfs_statx(int dfd, const char __user *filename, int flags,
 	unsigned int lookup_flags = LOOKUP_FOLLOW | LOOKUP_AUTOMOUNT;
 
    #ifdef CONFIG_KSU
-	ksu_handle_stat(&dfd, &filename, &flags);
+	ksu_handle_stat_4_19(&dfd, &filename, &flags);
    #endif
 	if ((flags & ~(AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT |
 		       AT_EMPTY_PATH | KSTAT_QUERY_FLAGS)) != 0)
