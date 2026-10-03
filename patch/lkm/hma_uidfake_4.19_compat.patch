@@ -1,0 +1,146 @@
+--- a/src/patch.c
++++ b/src/patch.c
+@@ -26,6 +26,15 @@
+ 
+ #include "uidfake.h"
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
++/*
++ * pud_leaf()/pmd_leaf() only exist from 5.10 (generic pgtable helpers); on
++ * arm64 4.19 the block/"section" entry tests are pud_sect()/pmd_sect().
++ */
++#define pud_leaf(pud) (pud_sect(pud))
++#define pmd_leaf(pmd) (pmd_sect(pmd))
++#endif
++
+ static int probe_noop(struct kprobe *p, struct pt_regs *r)
+ {
+ 	return 0;
+--- a/src/patch.c
++++ b/src/patch.c
+@@ -394,6 +394,16 @@
+ 	if (!g_copy_from_nofault_addr)
+ 		g_copy_from_nofault_addr =
+ 			uidfake_lookup("__copy_from_kernel_nofault");
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 8, 0)
++	/*
++	 * 5.8 renamed the nofault copies. On an older tree the pre-rename
++	 * spellings are the same API and are what the running kernel has.
++	 */
++	if (!g_copy_nofault_addr)
++		g_copy_nofault_addr = uidfake_lookup("probe_kernel_write");
++	if (!g_copy_from_nofault_addr)
++		g_copy_from_nofault_addr = uidfake_lookup("probe_kernel_read");
++#endif
+ 	/* Stable arm64 signature across supported ACK trees; the implementation
+ 	 * owns its fixmap geometry, lock and instruction cache maintenance. */
+ 	g_patch_insn_addr = uidfake_lookup("aarch64_insn_patch_text_nosync");
+
+--- a/src/policy.c
++++ b/src/policy.c
+@@ -15,6 +15,7 @@
+  * callers, but not for one caller.
+  */
+ #include <linux/atomic.h>
++#include <linux/cred.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/rcupdate.h>
+@@ -26,6 +27,11 @@
+ #ifndef UIDFAKE_HOST_BUILD
+ struct cred;
+ extern void security_cred_getsecid(const struct cred *cred, u32 *secid);
++/*
++ * 4.19 declares find_user() in sched/user.h, which this file does not
++ * pull in; the address is taken to read the hash formula out of its code.
++ */
++extern struct user_struct *find_user(kuid_t);
+ #endif
+ #include <linux/slab.h>
+ #include <linux/spinlock.h>
+
+--- a/src/inline_alloc.c
++++ b/src/inline_alloc.c
+@@ -15,6 +15,15 @@
+ #include "uidfake.h"
+ #include "inline_alloc.h"
+ 
++#ifndef VM_FLUSH_RESET_PERMS
++/*
++ * 4.19's __vmalloc_node_range predates the perm-reset flag: vfree on this
++ * tree has no reset path to trigger, and 0 is exactly this tree's native
++ * behavior.
++ */
++#define VM_FLUSH_RESET_PERMS 0
++#endif
++
+ #define UF_BRANCH_REACH (128UL * 1024 * 1024)
+ 
+ typedef void *(*uf_vmalloc_range_t)(unsigned long, unsigned long, unsigned long,
+
+--- a/src/inline_hooks.c
++++ b/src/inline_hooks.c
+@@ -6,6 +6,7 @@
+ #include <linux/string.h>
+ #include <linux/uidgid.h>
+ #include <linux/user.h>
++#include <linux/version.h>
+ 
+ #include "uidfake.h"
+ #include "kaux.h"
+@@ -19,6 +20,24 @@
+ #define UF_PACIASP 0xd503233fu
+ #define UF_PACIBSP 0xd503237fu
+ 
++/*
++ * 4.19: the kernel emits no BTI or PAC entry instructions, the CPU decodes
++ * neither (ARMv8.0), and the assembler rejects the instructions without
++ * branch-protection target features. The landing hint stays exact -- BTI
++ * is a NOP on hardware without it -- and the auth stubs are entered only
++ * from a PACIASP/PACIBSP entry word (inline_install), which this kernel
++ * never emits, so NOPs keep every trampoline branch-only.
++ */
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
++#define UF_STUB_LANDING "\tnop\n"
++#define UF_STUB_AUTH_A "\tnop\n"
++#define UF_STUB_AUTH_B "\tnop\n"
++#else
++#define UF_STUB_LANDING "\tbti jc\n"
++#define UF_STUB_AUTH_A "\tautiasp\n"
++#define UF_STUB_AUTH_B "\tautibsp\n"
++#endif
++
+ /* Assembly objects have instruction alignment, not unsigned-long alignment. */
+ extern u32 g_find_user_copy[], g_setuid_copy[];
+ /* Typed function aliases at the same RX addresses: direct calls need no CFI
+@@ -38,7 +57,7 @@
+ /* RX storage avoids STRICT_MODULE_RWX rejecting writable executable arrays. */
+ #define UF_ASM_STUB(name, auth, hook)                                   \
+ 	".balign 4\n.global " name "\n.type " name ", %function\n" name \
+-	":\n\tbti jc\n" auth "\tb " hook "\n"                           \
++	":\n" UF_STUB_LANDING auth "\tb " hook "\n"                           \
+ 	".size " name ", . - " name "\n"
+ #define UF_ASM_COPY(name, original)                                           \
+ 	".balign 16\n.global " name "\n.type " name ", %object\n"             \
+@@ -55,17 +74,17 @@
+ 	"uf_find_user_orig") UF_ASM_STUB("uf_find_user_stub", "",
+ 					 "uf_find_user_hook")
+ 	    UF_ASM_STUB(
+-		    "uf_find_user_pacia_stub", "\tautiasp\n",
++		    "uf_find_user_pacia_stub", UF_STUB_AUTH_A,
+ 		    "uf_find_user_hook") UF_ASM_STUB("uf_find_user_pacib_stub",
+-						     "\tautibsp\n",
++						     UF_STUB_AUTH_B,
+ 						     "uf_find_user_hook")
+ 		    UF_ASM_COPY("g_setuid_copy", "uf_setuid_orig") UF_ASM_STUB(
+ 			    "uf_setuid_stub", "", "uf_setuid_inline_hook")
+-			    UF_ASM_STUB("uf_setuid_pacia_stub", "\tautiasp\n",
++			    UF_ASM_STUB("uf_setuid_pacia_stub", UF_STUB_AUTH_A,
+ 					"uf_setuid_inline_hook")
+ 				    UF_ASM_STUB(
+ 					    "uf_setuid_pacib_stub",
+-					    "\tautibsp\n",
++					    UF_STUB_AUTH_B,
+ 					    "uf_setuid_inline_hook") ".popsection\n");
+ 
+ __attribute__((hot)) noinline struct user_struct *uf_find_user_hook(kuid_t uid)

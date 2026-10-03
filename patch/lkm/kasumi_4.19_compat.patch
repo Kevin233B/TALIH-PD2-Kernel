@@ -1,0 +1,423 @@
+--- a/src/core/kasumi_runtime.h
++++ b/src/core/kasumi_runtime.h
+@@ -251,9 +251,17 @@
+ extern long (*kasumi_strncpy_from_user_nofault)(char *dst, const void __user *src, long count);
+ extern long (*kasumi_copy_from_user_nofault)(void *dst, const void __user *src, size_t size);
+ extern long (*kasumi_copy_to_user_nofault)(void __user *dst, const void *src, size_t size);
++#include <linux/version.h>
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
+ extern int (*kasumi_task_work_add_ptr)(struct task_struct *task,
+ 				       struct callback_head *work,
+ 				       enum task_work_notify_mode notify);
++#else
++/* 4.19: int task_work_add(struct task_struct *, struct callback_head *, bool notify) */
++extern int (*kasumi_task_work_add_ptr)(struct task_struct *task,
++				       struct callback_head *work,
++				       bool notify);
++#endif
+ extern struct llist_node *(*kasumi_llist_del_first_ptr)(
+ 	struct llist_head *head);
+ struct llist_node *kasumi_llist_del_first(struct llist_head *head);
+--- a/src/core/kasumi_runtime.c
++++ b/src/core/kasumi_runtime.c
+@@ -469,9 +469,16 @@
+ long (*kasumi_strncpy_from_user_nofault)(char *dst, const void __user *src, long count);
+ long (*kasumi_copy_from_user_nofault)(void *dst, const void __user *src, size_t size);
+ long (*kasumi_copy_to_user_nofault)(void __user *dst, const void *src, size_t size);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
+ int (*kasumi_task_work_add_ptr)(struct task_struct *task,
+ 				struct callback_head *work,
+ 				enum task_work_notify_mode notify);
++#else
++/* 4.19: task_work_add() takes a bool notify argument */
++int (*kasumi_task_work_add_ptr)(struct task_struct *task,
++				struct callback_head *work,
++				bool notify);
++#endif
+ struct llist_node *(*kasumi_llist_del_first_ptr)(struct llist_head *head);
+ ssize_t (*kasumi_seq_read_iter_ptr)(struct kiocb *iocb,
+ 				    struct iov_iter *iter);
+--- a/src/hooks/kasumi_proc_hooks.c
++++ b/src/hooks/kasumi_proc_hooks.c
+@@ -19,6 +19,11 @@
+ #include <linux/string.h>
+ #include <linux/slab.h>
+ #include <linux/task_work.h>
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
++/* 4.19: task_work_add() takes a bool notify argument; TWA_RESUME just means
++ * "notify the task so the work runs before it returns to userspace". */
++#define TWA_RESUME true
++#endif
+ #include <linux/vmalloc.h>
+ #include <linux/jhash.h>
+ #include <linux/file.h>
+@@ -98,7 +103,13 @@
+ {
+ 	struct kasumi_getfd_task_work *tw;
+ 
+-	if (!outp || !access_ok(outp, sizeof(*outp)))
++	if (!outp ||
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0)
++	    /* 4.19: access_ok() takes a type argument; arm64 ignores it. */
++	    !access_ok(VERIFY_WRITE, outp, sizeof(*outp)))
++#else
++	    !access_ok(outp, sizeof(*outp)))
++#endif
+ 		return -EFAULT;
+ 	if (!atomic_read_acquire(&kasumi_getfd_accepting))
+ 		return -ESHUTDOWN;
+--- a/src/core/kasumi_dirhijack.c
++++ b/src/core/kasumi_dirhijack.c
+@@ -1047,10 +1047,16 @@
+ {
+ 	if (kasumi_vnode_is_ours(inode))
+ 		kasumi_vnode_free_info(inode);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
+ 	if (orig && orig->free_inode)
+ 		orig->free_inode(inode);
+ 	else if (kasumi_free_inode_nonrcu_ptr)
+ 		kasumi_free_inode_nonrcu_ptr(inode);
++#else
++	/* 4.19: no ->free_inode member; ->destroy_inode owns inode freeing. */
++	if (orig && orig->destroy_inode)
++		orig->destroy_inode(inode);
++#endif
+ }
+ 
+ void KASUMI_NOCFI kasumi_dh_reclaim_evict_inode(struct inode *inode,
+--- a/src/core/kasumi_sop_shadow.c
++++ b/src/core/kasumi_sop_shadow.c
+@@ -25,6 +25,7 @@
+ #include <linux/rcupdate.h>
+ #include <linux/slab.h>
+ #include <linux/spinlock.h>
++#include <linux/version.h>
+ #include <linux/wait.h>
+ #include <linux/workqueue.h>
+ 
+@@ -219,8 +220,15 @@
+ 	spare->sb_active_held = true;
+ 	spare->module_pin_held = true;
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
+ 	if (!orig->destroy_inode && !orig->free_inode &&
+ 	    !kasumi_free_inode_nonrcu_ptr) {
++#else
++	/* 4.19: no ->free_inode member; ->destroy_inode owns inode
++	 * freeing, so without an original ->destroy_inode there is
++	 * nothing to hand the inode free on to. */
++	if (!orig->destroy_inode) {
++#endif
+ 		ret = -EOPNOTSUPP;
+ 		goto out_s_umount;
+ 	}
+@@ -234,8 +242,10 @@
+ 	 * ever stored in inode->free_inode.
+ 	 */
+ 	spare->shadow_sop.destroy_inode = kasumi_sop_destroy_inode;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
+ 	if (!orig->destroy_inode && !orig->free_inode)
+ 		spare->shadow_sop.free_inode = kasumi_free_inode_nonrcu_ptr;
++#endif
+ 	spare->shadow_sop.evict_inode = kasumi_sop_evict_inode;
+ 	spare->shadow_sop.drop_inode = kasumi_sop_drop_inode;
+ 
+--- a/src/core/kasumi_hide_events.c
++++ b/src/core/kasumi_hide_events.c
+@@ -50,8 +50,41 @@
+ 	kfree(container_of(mark, struct kasumi_hide_watch, mark));
+ }
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 1, 0)
++/*
++ * 4.19: fsnotify_ops has only ->handle_event(), whose file_name is a
++ * raw (const unsigned char *); translate to the handle_inode_event()
++ * shape hide_directory_event() is written for.
++ */
++static int hide_handle_event(struct fsnotify_group *group,
++			     struct inode *inode, u32 mask,
++			     const void *data, int data_type,
++			     const unsigned char *file_name, u32 cookie,
++			     struct fsnotify_iter_info *iter_info)
++{
++	struct fsnotify_mark *mark =
++		iter_info->marks[FSNOTIFY_OBJ_TYPE_INODE];
++	struct qstr name;
++
++	if (!mark)
++		return 0;
++	if (file_name) {
++		name.name = file_name;
++		name.len = (unsigned int)strlen((const char *)file_name);
++		return hide_directory_event(mark, mask, inode, NULL,
++					    &name, cookie);
++	}
++	return hide_directory_event(mark, mask, inode, NULL, NULL,
++				      cookie);
++}
++#endif
++
+ static const struct fsnotify_ops hide_directory_ops = {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 1, 0)
++    .handle_event = hide_handle_event,
++#else
+     .handle_inode_event = hide_directory_event,
++#endif
+     .free_mark = hide_free_mark,
+ };
+ 
+@@ -76,6 +109,11 @@
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
+ 	ret = hide_add_mark(&watch->mark, inode, FSNOTIFY_OBJ_TYPE_INODE, 0);
+ #else
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 9, 0)
++	/* 4.19: fsnotify_add_mark(mark, connp, type, allow_dups). */
++	ret = hide_add_mark(&watch->mark, &inode->i_fsnotify_marks,
++			    FSNOTIFY_OBJ_TYPE_INODE, 1);
++#else
+ 	ret = hide_add_mark(&watch->mark, &inode->i_fsnotify_marks,
+ 			    FSNOTIFY_OBJ_TYPE_INODE,
+ #ifdef FSNOTIFY_GROUP_DUPS
+@@ -85,6 +123,7 @@
+ #endif
+ 			    NULL);
+ #endif
++#endif
+ 	if (ret) {
+ 		hide_put_mark(&watch->mark);
+ 		return ret;
+--- a/src/core/kasumi_hide_rules.c
++++ b/src/core/kasumi_hide_rules.c
+@@ -2,6 +2,7 @@
+ #include <linux/slab.h>
+ #include <linux/uaccess.h>
+ #include <linux/workqueue.h>
++#include <linux/version.h>
+ 
+ #include "kasumi_dirhijack.h"
+ #include "kasumi_hide_events.h"
+@@ -245,7 +246,13 @@
+ bool kasumi_hide_rules_quiesce(void)
+ {
+ 	hide_stop_new();
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 0, 0)
++	/* 4.19: no non-blocking cancel_work(); cancel_work_sync() also
++	 * drains an executing hide_workfn(), which suits quiesce(). */
++	if (cancel_work_sync(&hide_work))
++#else
+ 	if (cancel_work(&hide_work))
++#endif
+ 		atomic_dec(&hide_jobs);
+ 	if (atomic_read(&hide_jobs))
+ 		return false;
+--- a/src/policy/kasumi_path_policy.c
++++ b/src/policy/kasumi_path_policy.c
+@@ -43,6 +43,48 @@
+ #include <linux/rcupdate.h>
+ #include <linux/sched.h>
+ #include <linux/xarray.h>
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 20, 0)
++/* 4.19 predates the xarray API (added in 4.20). The policy uid sets
++ * are plain uid -> marker maps, so back them with the idr API via
++ * same-named local helpers; the 4.19 xarray.h stub declares none of
++ * these symbols, so there is no collision. */
++#include <linux/idr.h>
++static inline void xa_init(struct idr *xa)
++{
++	idr_init(xa);
++}
++static inline void xa_destroy(struct idr *xa)
++{
++	idr_destroy(xa);
++}
++static inline void *xa_load(struct idr *xa, u32 uid)
++{
++	return idr_find(xa, uid);
++}
++static inline void *xa_store(struct idr *xa, u32 uid, void *val,
++			      gfp_t gfp)
++{
++	u32 id = uid;
++	int ret = idr_alloc_u32(xa, val, &id, uid, gfp);
++
++	return ret < 0 ? ERR_PTR(ret) : val;
++}
++static inline int xa_err(void *entry)
++{
++	return IS_ERR_VALUE((unsigned long)entry) ? (int)(long)entry : 0;
++}
++#endif
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 6, 0)
++/* openat2-style LOOKUP_ flags (added with openat2 in 5.6). They are
++ * carried in kasumi's own resolver flag space and do not collide
++ * with any 4.19 LOOKUP_ bit (4.19's highest is LOOKUP_DOWN 0x8000),
++ * so define the mainline values for older kernels. */
++#define LOOKUP_NO_SYMLINKS	0x010000
++#define LOOKUP_NO_MAGICLINKS	0x020000
++#define LOOKUP_BENEATH		0x080000
++#define LOOKUP_IN_ROOT		0x100000
++#define LOOKUP_CACHED		0x200000
++#endif
+ #include <uapi/linux/magic.h>
+ #ifndef EROFS_SUPER_MAGIC
+ #define EROFS_SUPER_MAGIC 0xe0f5e1e2
+@@ -107,8 +149,13 @@
+ 	u32 flags;
+ 	u32 allow_count;
+ 	u32 deny_count;
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 20, 0)
++	struct idr allow_uids;
++	struct idr deny_uids;
++#else
+ 	struct xarray allow_uids;
+ 	struct xarray deny_uids;
++#endif
+ 	u32 *allow_uid_list;
+ 	u32 *deny_uid_list;
+ };
+@@ -274,7 +321,12 @@
+ 	kasumi_policy_snapshot_destroy(policy);
+ }
+ 
+-static int kasumi_policy_build_uid_list(struct xarray *xa, u32 **snapshot,
++static int kasumi_policy_build_uid_list(
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 20, 0)
++	struct idr *xa, u32 **snapshot,
++#else
++	struct xarray *xa, u32 **snapshot,
++#endif
+ 					u32 *snapshot_count, const u32 *uids,
+ 					u32 count)
+ {
+--- a/src/features/kasumi_owner.c
++++ b/src/features/kasumi_owner.c
+@@ -228,8 +228,41 @@
+ 	kfree(mark);
+ }
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 1, 0)
++/*
++ * 4.19: fsnotify_ops has only ->handle_event(), whose file_name is a
++ * raw (const unsigned char *); translate to the handle_inode_event()
++ * shape kasumi_owner_event() is written for.
++ */
++static int kasumi_owner_handle_event(struct fsnotify_group *group,
++				     struct inode *inode, u32 mask,
++				     const void *data, int data_type,
++				     const unsigned char *file_name, u32 cookie,
++				     struct fsnotify_iter_info *iter_info)
++{
++	struct fsnotify_mark *mark =
++		iter_info->marks[FSNOTIFY_OBJ_TYPE_INODE];
++	struct qstr name;
++
++	if (!mark)
++		return 0;
++	if (file_name) {
++		name.name = file_name;
++		name.len = (unsigned int)strlen((const char *)file_name);
++		return kasumi_owner_event(mark, mask, inode, NULL,
++					    &name, cookie);
++	}
++	return kasumi_owner_event(mark, mask, inode, NULL, NULL,
++				      cookie);
++}
++#endif
++
+ static const struct fsnotify_ops kasumi_owner_notify_ops = {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 1, 0)
++    .handle_event = kasumi_owner_handle_event,
++#else
+     .handle_inode_event = kasumi_owner_event,
++#endif
+     .free_mark = kasumi_owner_mark_free,
+ };
+ 
+@@ -299,6 +332,11 @@
+ 	ret =
+ 	    owner_add_mark(mark, file_inode(file), FSNOTIFY_OBJ_TYPE_INODE, 0);
+ #else
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 9, 0)
++	/* 4.19: fsnotify_add_mark(mark, connp, type, allow_dups). */
++	ret = owner_add_mark(mark, &file_inode(file)->i_fsnotify_marks,
++			     FSNOTIFY_OBJ_TYPE_INODE, 1);
++#else
+ 	ret = owner_add_mark(mark, &file_inode(file)->i_fsnotify_marks,
+ 			     FSNOTIFY_OBJ_TYPE_INODE,
+ #ifdef FSNOTIFY_GROUP_DUPS
+@@ -308,6 +346,7 @@
+ #endif
+ 			     NULL);
+ #endif
++#endif
+ 	owner_fput_sync(file);
+ 	if (ret)
+ 		owner_put_mark(mark);
+--- a/src/hooks/kasumi_ftrace_hooks.c
++++ b/src/hooks/kasumi_ftrace_hooks.c
+@@ -25,6 +25,11 @@
+ 
+ #include "kasumi_entrypoints.h"
+ #include "kasumi_ftrace_hooks.h"
++/* kasumi_krp_* / kasumi_kp_* handlers are declared in
++ * kasumi_vfs_hooks.h; without this include they are only implicitly
++ * declared (tolerated by GCC as int(), an error under clang 16+ and
++ * under the -Werror-implicit-function-declaration kernels). */
++#include "kasumi_vfs_hooks.h"
+ 
+ #define KASUMI_FTRACE_SLOT_DEPTH 16
+ 
+--- a/src/features/kasumi_fake_mountinfo.c
++++ b/src/features/kasumi_fake_mountinfo.c
+@@ -30,6 +30,7 @@
+ #include <linux/slab.h>
+ #include <linux/sort.h>
+ #include <linux/uio.h>
++#include <linux/version.h>
+ #include <linux/vmalloc.h>
+ 
+ static typeof(copy_mnt_ns) *kasumi_copy_mnt_ns;
+@@ -257,11 +258,13 @@
+ 
+ 	(*length) = 0;
+ 	for (;;) {
+-		struct kiocb iocb;
+-		struct iov_iter iter;
+ 		struct kvec vec;
+ 		char overflow;
+ 		ssize_t ret;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
++		struct kiocb iocb;
++		struct iov_iter iter;
++#endif
+ 
+ 		if ((*length) == *capacity && *capacity < KASUMI_MI_MAX_SIZE) {
+ 			size_t size =
+@@ -279,6 +282,7 @@
+ 		    (*length) == *capacity ? &overflow : (*buffer) + (*length);
+ 		vec.iov_len =
+ 		    (*length) == *capacity ? 1 : *capacity - (*length);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
+ 		iov_iter_kvec(&iter, READ, &vec, 1, vec.iov_len);
+ 		init_sync_kiocb(&iocb, file);
+ 		iocb.ki_pos = pos;
+@@ -294,6 +298,19 @@
+ 			return -EIO;
+ 		(*length) += ret;
+ 		pos = iocb.ki_pos;
++#else
++		/* 4.19: seq files serve ->read (seq_read), not ->read_iter, and
++		 * seq_read_iter() does not exist; read the way kernel-space code
++		 * of that era does, with kernel_read(). */
++		ret = kernel_read(file, vec.iov_base, vec.iov_len, &pos);
++		if (ret < 0)
++			return ret;
++		if (!ret)
++			return (*length) ? 0 : -EIO;
++		if ((*length) == *capacity)
++			return -EFBIG;
++		(*length) += ret;
++#endif
+ 	}
+ }
+ 
