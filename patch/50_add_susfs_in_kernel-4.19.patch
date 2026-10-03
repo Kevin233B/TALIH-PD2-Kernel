@@ -936,7 +936,7 @@ index 92bd05678..bad0a5780 100755
 +}
 +#endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 diff --git a/fs/notify/fdinfo.c b/fs/notify/fdinfo.c
-index 86fcf5814..de5544a89 100755
+index 86fcf5814..7900fa055 100755
 --- a/fs/notify/fdinfo.c
 +++ b/fs/notify/fdinfo.c
 @@ -13,6 +13,11 @@
@@ -1002,7 +1002,7 @@ index 86fcf5814..de5544a89 100755
  
  	if (mark->connector->type != FSNOTIFY_OBJ_TYPE_INODE)
  		return;
-@@ -90,6 +118,57 @@
+@@ -90,6 +118,56 @@
  		 * used only internally to the kernel.
  		 */
  		u32 mask = mark->mask & IN_ALL_EVENTS;
@@ -1017,8 +1017,7 @@ index 86fcf5814..de5544a89 100755
 +						inode_mark->wd, ino, dev,
 +						mask, mark->ignored_mask);
 +				show_mark_fhandle(m, inode);
-+				seq_putc(m, '
-+');
++				seq_putc(m, '\n');
 +				iput(inode);
 +				return;
 +			}
@@ -1060,7 +1059,7 @@ index 86fcf5814..de5544a89 100755
  		seq_printf(m, "inotify wd:%x ino:%lx sdev:%x mask:%x ignored_mask:%x ",
  			   inode_mark->wd, inode->i_ino, inode->i_sb->s_dev,
  			   mask, mark->ignored_mask);
-@@ -108,7 +187,11 @@
+@@ -108,7 +186,11 @@
  
  #ifdef CONFIG_FANOTIFY
  
@@ -2428,7 +2427,7 @@ index 47ebda023..8fd5e283c 100755
  	LSM_HOOK_INIT(ismaclabel, selinux_ismaclabel),
  	LSM_HOOK_INIT(secid_to_secctx, selinux_secid_to_secctx),
 diff --git a/security/selinux/selinuxfs.c b/security/selinux/selinuxfs.c
-index f6bc78aba..7920661fb 100755
+index f6bc78aba..1bce5e45f 100755
 --- a/security/selinux/selinuxfs.c
 +++ b/security/selinux/selinuxfs.c
 @@ -42,6 +42,16 @@
@@ -2459,9 +2458,9 @@ index f6bc78aba..7920661fb 100755
 +	int ret;
 +
 +	if (likely(current_uid().val >= 10000 && ksu_selinux_hide_enabled)) {
-+		mutex_lock(&selinux_state.status_lock);
++		mutex_lock(&selinux_state.ss->status_lock);
 +		data = fake_status;
-+		mutex_unlock(&selinux_state.status_lock);
++		mutex_unlock(&selinux_state.ss->status_lock);
 +		if (data) {
 +			filp->private_data = data;
 +			return 0;
