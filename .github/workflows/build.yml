@@ -24,14 +24,6 @@ jobs:
           git checkout -- drivers/Makefile drivers/Kconfig
           curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
 
-      - name: Append 4.19 inline-ABI compat to ReSukiSU sucompat (faccessat/stat char **)
-        run: |
-          # ReSukiSU main 在 CONFIG_KSU_SUSFS 下把 faccessat/stat inline 变体改成 struct filename **
-          #（二次解引用），4.19 调用点传 char **，开机 ksys_access("/init") 即 data abort。
-          # 纯增量追加 _4_19 兼容函数，上游一行不动；上游再漂移只会编译失败（CI 变红）。
-          cat patch/56_resukisu_sucompat_4_19_inline_abi.fragment.c >> KernelSU/kernel/feature/sucompat.c
-          grep -q "ksu_handle_faccessat_4_19" KernelSU/kernel/feature/sucompat.c || { echo "::error::patch/56 片段追加失败"; exit 1; }
-
       - name: Apply SUSFS kernel patch (4.19, non-GKI)
         run: |
           patch -p1 < patch/50_add_susfs_in_kernel-4.19.patch
