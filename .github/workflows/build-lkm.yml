@@ -100,7 +100,7 @@ jobs:
       - name: Build hma-uidfake (hma_uidfake.ko)
         continue-on-error: true
         run: |
-          git clone --depth 1 https://github.com/Kevin233B/TALIH-PD2-Kernel-4.19-hma-uidfake lkms/hma-uidfake
+          git clone --depth 1 --branch main https://github.com/Kevin233B/TALIH-PD2-Kernel-4.19-hma-uidfake lkms/hma-uidfake
           patch -p1 -d lkms/hma-uidfake < patch/lkm/hma_uidfake_4.19_compat.patch
           CLANG_PATH="$PWD/prebuilts/clang/host/linux-x86/clang-r383902"
           CLANG_BIN="$CLANG_PATH/bin"
