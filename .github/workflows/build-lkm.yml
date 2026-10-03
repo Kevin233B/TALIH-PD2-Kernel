@@ -83,10 +83,10 @@ jobs:
           ./download_clang.sh
           ./build-mt8797.sh
 
-      - name: Build LKM-PathMask (pathmask.ko + procguard.ko)
+      - name: Build LKM-PathMask (pathmask.ko + procguard.ko, upstream v2.8.2)
         continue-on-error: true
         run: |
-          git clone --depth 1 https://github.com/CrackerCat/LKM-PathMask lkms/LKM-PathMask
+          git clone --depth 1 --branch v2.8.2 https://github.com/Andrea-lyz/LKM-PathMask lkms/LKM-PathMask
           patch -p1 -d lkms/LKM-PathMask < patch/lkm/pathmask_4.19_compat.patch
           CLANG_PATH="$PWD/prebuilts/clang/host/linux-x86/clang-r383902"
           CLANG_BIN="$CLANG_PATH/bin"

@@ -1,9 +1,40 @@
---- a/kernel/pathmask.c
-+++ b/kernel/pathmask.c
-@@ -26,6 +26,15 @@
+diff -ru a/kernel/Makefile b/kernel/Makefile
+--- a/kernel/Makefile
++++ b/kernel/Makefile
+@@ -7,10 +7,21 @@
+ 
+ DEPS := KallRecon
+ ifneq ($(MAKECMDGOALS),format)
++ifeq ($(shell test \( $(VERSION) -gt 5 -o \( $(VERSION) -eq 5 -a $(PATCHLEVEL) -ge 10 \) \) && echo y),y)
++# 5.10+ only: KallRecon (deps) reconstructs kallsyms where GKI prunes helper
++# exports. Below 5.10, src/pathmask.c resolves symbols via register_kprobe()
++# instead, so the dependency tree is neither linked nor required.
+ include $(MDIR)/mk/deps.mk
+ endif
++endif
+ 
++ifeq ($(shell test \( $(VERSION) -lt 5 -o \( $(VERSION) -eq 5 -a $(PATCHLEVEL) -lt 10 \) \) && echo y),y)
++# Below 5.10 the KallRecon objects are not linked (see above): src/pathmask.c
++# resolves its helper symbols through register_kprobe() on those kernels.
++pathmask-y := src/pathmask.o
++else
+ pathmask-y := src/pathmask.o $(DEPS_OBJS_ALL)
++endif
+ procguard-y := src/procguard.o
+ 
+ ccflags-y += -std=gnu11
+diff -ru a/kernel/src/pathmask.c b/kernel/src/pathmask.c
+--- a/kernel/src/pathmask.c
++++ b/kernel/src/pathmask.c
+@@ -26,7 +26,19 @@
  #include <asm/syscall.h>
  #include <asm/unistd.h>
  
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
++/* KallRecon (deps) resolves pruned helper exports on 5.10+ GKI only. */
+ #include "core.h"
++#endif
++
 +#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 9, 0)
 +/*
 + * regs_set_return_value() only exists from 5.9; before that the arm64
@@ -12,12 +43,79 @@
 + */
 +#define regs_set_return_value(regs, val) ((regs)->regs[0] = (val))
 +#endif
-+
+ 
  #define PM_LOG_PREFIX "pathmask: "
  #define MAX_HIDE_TARGETS 64
- #define MAX_DENY_UIDS 1024
---- a/kernel/procguard.c
-+++ b/kernel/procguard.c
+@@ -271,6 +283,26 @@
+ 
+ static unsigned long __nocfi pm_resolve(const char *name)
+ {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
++	/*
++	 * Below 5.10 (upstream's KallRecon support floor) resolve through
++	 * register_kprobe(): probe registration resolves the name in-kernel
++	 * and we read the address back from the probe. This is how PathMask
++	 * resolved helpers before KallRecon existed, and it works on 4.x
++	 * where neither the scanner's layout support nor a
++	 * kallsyms_lookup_name export is available.
++	 */
++	struct kprobe kp = {
++		.symbol_name = name,
++	};
++	unsigned long addr;
++
++	if (register_kprobe(&kp))
++		return 0;
++	addr = (unsigned long)kp.addr;
++	unregister_kprobe(&kp);
++	return addr;
++#else
+ 	unsigned long addr;
+ 
+ 	addr = kallrecon_klp(name);
+@@ -278,10 +310,15 @@
+ 		addr = kallsyms_name_to_addr(name);
+ 
+ 	return addr;
++#endif
+ }
+ 
+ static int pm_symrecon_init(void)
+ {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
++	/* Symbols come from kprobe resolution; nothing to recover. */
++	return 0;
++#else
+ 	find_kallsyms_base();
+ 	if (!klnum_val || !kallrecon_klp) {
+ 		pr_err(PM_LOG_PREFIX "kallsyms recovery failed\n");
+@@ -290,6 +327,7 @@
+ 
+ 	pr_info(PM_LOG_PREFIX "kallsyms ready, %u symbols\n", klnum_val);
+ 	return 0;
++#endif
+ }
+ 
+ static int resolve_path_helpers(void)
+@@ -310,6 +348,15 @@
+ 	 */
+ 	if (!pm_close_fd)
+ 		pm_close_fd = (pm_close_fd_t) pm_resolve("close_fd");
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0)
++	/*
++	 * close_fd() was born in the 5.x files_table refactor; 4.19 spells
++	 * the same int(unsigned int fd) helper ksys_close(). Resolve it so
++	 * the openat exit hook keeps releasing fds on old kernels.
++	 */
++	if (!pm_close_fd)
++		pm_close_fd = (pm_close_fd_t) pm_resolve("ksys_close");
++#endif
+ 
+ 	pr_info(PM_LOG_PREFIX "resolved VFS path helpers via kallsyms\n");
+ 	return 0;
+diff -ru a/kernel/src/procguard.c b/kernel/src/procguard.c
+--- a/kernel/src/procguard.c
++++ b/kernel/src/procguard.c
 @@ -53,6 +53,16 @@
  #include <linux/uidgid.h>
  #include <linux/atomic.h>
