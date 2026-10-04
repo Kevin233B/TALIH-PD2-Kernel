@@ -1,6 +1,6 @@
 id=android_data_hide
 name=Android Data Hide（应用存在性封堵）
-version=v1.0.0
+version=v1.0.1
 versionCode=1
 author=Kevin233
 description=按目录属主 uid 键控，封堵检测应用经 /sdcard/Android/data、/data/data 等探测应用存在性。需配套内核（CONFIG_ANDROID_DATA_HIDE）。配置面：KernelSU WebUI。普通应用（uid≥10000）对名单内目标得到与“未安装”逐字节一致的回答；属主自身、root/system/shell/media（uid<10000）、预装系统应用、用户授权的应用完全可见。

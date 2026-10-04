@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# refresh.sh —— 全量发布配置到内核 sysfs（幂等；flock 串行所有发布会话）。
+# refresh.sh —— 全量发布配置到内核 sysfs（幂等；mkdir 原子锁串行所有发布会话）。
 # 目标集为空时同样发布（等价“不封堵”），保持内核态与配置文件一致。
 # 单次写入远小于 PAGE_SIZE：allow 行每行最多 20 个 uid。
 # 失败语义：硬错误（sys 放行集为空 / sysfs 写失败）写 .fail 时间戳退出——
@@ -9,8 +9,31 @@ MODDIR=${0%/*}
 . "$MODDIR/common.sh"
 
 mkdir -p "$ADH_DIR"
-exec 9>"$LOCK"
-flock 9 || exit 1
+
+# ---- mkdir 原子锁 ----
+# 不用 flock：mksh 的 exec N> 打开的 fd 带 close-on-exec，外部 toybox flock
+# 看不到该 fd（实测 Bad file descriptor → exit 1，且为唯一无日志退出路径）；
+# 不同执行上下文的 PATH 里 flock 实现也不一致。mkdir(2) 原子 + 可移植。
+lock() {
+    i=0
+    while ! mkdir "$LOCKDIR" 2>/dev/null; do
+        lp=$(cat "$LOCKDIR/pid" 2>/dev/null)
+        if [ -n "$lp" ] && [ -d "/proc/$lp" ]; then
+            i=$((i + 1))
+            if [ "$i" -ge 50 ]; then
+                log "锁竞争超时（持有者 pid=$lp）——放弃本轮发布"
+                return 1
+            fi
+            sleep 0.1
+        else
+            rm -rf "$LOCKDIR" 2>/dev/null   # 僵尸锁回收
+        fi
+    done
+    echo $$ > "$LOCKDIR/pid"
+    return 0
+}
+lock || exit 1
+trap 'rm -rf "$LOCKDIR" 2>/dev/null' EXIT
 
 fail_stamp() { date +%s > "$FAIL" 2>/dev/null; }
 

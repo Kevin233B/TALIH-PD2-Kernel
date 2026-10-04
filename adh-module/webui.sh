@@ -72,12 +72,14 @@ save)
     mkdir -p "$ADH_DIR"
     mv -f "$tmp_h" "$HIDE_LIST"
     mv -f "$tmp_v" "$VISIBLE_LIST"
+    # 配置落盘即成功：发布失败不报 FAIL（daemon ≤60s 自动重试收敛），
+    # WebUI 保存后重载的内核状态横幅会显示真实生效情况
     if sh "$MODDIR/refresh.sh" >/dev/null 2>&1; then
         log "WebUI 保存并发布"
-        echo OK
     else
-        echo FAIL
+        log "WebUI 保存（发布未完成——daemon 自动重试）"
     fi
+    echo OK
     ;;
 
 *)
