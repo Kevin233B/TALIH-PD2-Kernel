@@ -2,19 +2,18 @@ name: Build LKM Modules
 
 on:
   push:
-    branches: [ main, resukisu-susfs, susfs-v2.2.0 ]
+    branches: [ main, susfs+resukisu ]
   workflow_dispatch:
     inputs:
       branch:
-        description: '内核分支（all = main + resukisu-susfs + susfs-v2.2.0）'
+        description: '内核分支（all = main + susfs+resukisu）'
         required: false
         default: 'all'
         type: choice
         options:
           - all
           - main
-          - resukisu-susfs
-          - susfs-v2.2.0
+          - susfs+resukisu
 
 jobs:
   select:
@@ -28,7 +27,7 @@ jobs:
           if [ "${{ github.event_name }}" = "push" ]; then
             echo 'branches=["${{ github.ref_name }}"]' >> "$GITHUB_OUTPUT"
           elif [ "${{ github.event.inputs.branch }}" = "all" ] || [ -z "${{ github.event.inputs.branch }}" ]; then
-            echo 'branches=["main","resukisu-susfs","susfs-v2.2.0"]' >> "$GITHUB_OUTPUT"
+            echo 'branches=["main","susfs+resukisu"]' >> "$GITHUB_OUTPUT"
           else
             echo 'branches=["${{ github.event.inputs.branch }}"]' >> "$GITHUB_OUTPUT"
           fi
@@ -53,17 +52,7 @@ jobs:
       - name: Integrate SU + SUSFS (mirror per-branch build.yml)
         run: |
           case "${{ matrix.branch }}" in
-            resukisu-susfs)
-              rm -rf KernelSU drivers/kernelsu
-              git checkout -- drivers/Makefile drivers/Kconfig
-              curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
-              # 4.19 inline ABI 兼容（同 build.yml：防 main 驱动 SUSFS 变体二次解引用变砖）
-              cat patch/56_resukisu_sucompat_4_19_inline_abi.fragment.c >> KernelSU/kernel/feature/sucompat.c
-              grep -q "ksu_handle_faccessat_4_19" KernelSU/kernel/feature/sucompat.c || { echo "::error::patch/56 片段追加失败"; exit 1; }
-              patch -p1 < patch/50_add_susfs_in_kernel-4.19.patch
-              patch -p1 < patch/55_resukisu_susfs_abi_compat.patch
-              ;;
-            susfs-v2.2.0)
+            susfs+resukisu)
               rm -rf KernelSU drivers/kernelsu
               git checkout -- drivers/Makefile drivers/Kconfig
               curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash

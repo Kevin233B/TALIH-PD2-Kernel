@@ -2,7 +2,7 @@ name: Build and Release Kernel
 
 on:
   push:
-    branches: [ main, master, resukisu-susfs, susfs-v2.2.0 ]
+    branches: [ main, master, susfs+resukisu ]
     tags: [ '*' ]
   workflow_dispatch:
 
