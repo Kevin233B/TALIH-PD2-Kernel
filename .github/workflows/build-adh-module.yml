@@ -1,0 +1,49 @@
+name: Build ADH Module
+
+on:
+  push:
+    # 注意：branch filter 是 glob，+ 是特殊字符——字面匹配须转义（单引号内 \ 保持字面）
+    branches: [ 'susfs\+resukisu' ]
+    paths:
+      - 'adh-module/**'
+      - '.github/workflows/build-adh-module.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 安装 WebUI 依赖
+        working-directory: adh-module/webui
+        run: npm install --no-fund --no-audit
+
+      - name: 构建 WebUI
+        working-directory: adh-module/webui
+        run: npm run build
+
+      - name: 组装模块 zip
+        run: |
+          cd adh-module
+          mkdir -p webroot
+          cp -r webui/dist/* webroot/
+          if [ ! -f webroot/index.html ]; then
+            echo "::error::webroot/index.html 缺失——前端构建产物异常"
+            exit 1
+          fi
+          rm -f ../android_data_hide.zip
+          zip -r -X ../android_data_hide.zip \
+            module.prop README.md common.sh refresh.sh daemon.sh service.sh uninstall.sh webui.sh webroot
+          unzip -l ../android_data_hide.zip
+
+      - name: 上传模块
+        uses: actions/upload-artifact@v4
+        with:
+          name: android_data_hide-module
+          path: android_data_hide.zip
+          if-no-files-found: error
