@@ -47,6 +47,8 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/namei.h>
 
+#include "adh.h"
+
 /* [Feb-1997 T. Schoebel-Theuer]
  * Fundamental changes in the pathname lookup mechanisms (namei)
  * were necessary because of omirr.  The reason is that omirr needs
@@ -1921,6 +1923,19 @@ static int walk_component(struct nameidata *nd, int flags)
 		inode = d_backing_inode(path.dentry);
 	}
 
+	/*
+	 * adh: 受管父目录（Android/{data,obb}、/data/data 等）之下、属主在
+	 * 隐藏名单内的子项，对非属主普通应用返回 ENOENT —— 与“该组件不存在”
+	 * 语义逐字节一致，覆盖 stat/faccessat/exec/rename 源端及一切深路径。
+	 * 拒绝只作用于本次 walk，零 dcache 写入（共享 dentry 树无跨 uid 污染）。
+	 */
+	if (adh_should_hide(nd->path.dentry->d_inode, inode,
+			    current_fsuid())) {
+		if (!(nd->flags & LOOKUP_RCU))
+			path_to_nameidata(&path, nd);
+		return -ENOENT;
+	}
+
 	return step_into(nd, &path, flags, inode, seq);
 }
 
@@ -3488,6 +3503,18 @@ static int do_last(struct nameidata *nd,
 	}
 
 	/*
+	 * adh: lookup_open 路径的末位组件命中隐藏目标 —— 同 finish_lookup
+	 * 规则，但必须在 O_EXCL 的 EEXIST 检查之前拒绝（EEXIST 会泄露存在性）。
+	 * 此分支必已出 RCU 模式（complete_walk 已执行）。
+	 */
+	if (adh_should_hide(nd->path.dentry->d_inode,
+			    d_backing_inode(path.dentry), current_fsuid())) {
+		error = (open_flag & O_CREAT) ? -EACCES : -ENOENT;
+		path_to_nameidata(&path, nd);
+		return error;
+	}
+
+	/*
 	 * create/update audit record if it already exists.
 	 */
 	audit_inode(nd->name, path.dentry, 0);
@@ -3500,6 +3527,18 @@ static int do_last(struct nameidata *nd,
 	seq = 0;	/* out of RCU mode, so the value doesn't matter */
 	inode = d_backing_inode(path.dentry);
 finish_lookup:
+	/*
+	 * adh: open 的末位组件命中隐藏目标 —— 无 O_CREAT 按“不存在”答
+	 * ENOENT；带 O_CREAT 模拟“父目录无写权限”答 EACCES（与真不存在且
+	 * 父目录 x-only 的 stock 语义一致，封掉 mkdir/rename 类存在性 oracle）。
+	 */
+	if (adh_should_hide(nd->path.dentry->d_inode, inode,
+			    current_fsuid())) {
+		error = (open_flag & O_CREAT) ? -EACCES : -ENOENT;
+		if (!(nd->flags & LOOKUP_RCU))
+			path_to_nameidata(&path, nd);
+		return error;
+	}
 	error = step_into(nd, &path, 0, inode, seq);
 	if (unlikely(error))
 		return error;
@@ -3755,6 +3794,16 @@ static struct dentry *filename_create(int dfd, struct filename *name,
 	lookup_flags |= LOOKUP_CREATE | LOOKUP_EXCL;
 	inode_lock_nested(path->dentry->d_inode, I_MUTEX_PARENT);
 	dentry = __lookup_hash(&last, path->dentry, lookup_flags);
+	/*
+	 * adh: create 类（mkdir/rename 目标/mknod/symlink/link）末位组件命中
+	 * 隐藏目标 —— 答 EACCES，与“真不存在 + 父目录无写权限”同构。
+	 */
+	if (!IS_ERR(dentry) &&
+	    adh_should_hide(path->dentry->d_inode, dentry->d_inode,
+			    current_fsuid())) {
+		dput(dentry);
+		dentry = ERR_PTR(-EACCES);
+	}
 	if (IS_ERR(dentry))
 		goto unlock;
 
@@ -4066,6 +4115,16 @@ retry:
 
 	inode_lock_nested(path.dentry->d_inode, I_MUTEX_PARENT);
 	dentry = __lookup_hash(&last, path.dentry, lookup_flags);
+	/*
+	 * adh: rmdir 末位组件命中隐藏目标 —— 答 ENOENT，与真不存在一致
+	 * （可见目标 stock 为 EACCES，不在 leaked 答案集合内）。
+	 */
+	if (!IS_ERR(dentry) &&
+	    adh_should_hide(path.dentry->d_inode, dentry->d_inode,
+			    current_fsuid())) {
+		dput(dentry);
+		dentry = ERR_PTR(-ENOENT);
+	}
 	error = PTR_ERR(dentry);
 	if (IS_ERR(dentry))
 		goto exit2;
@@ -4192,6 +4251,15 @@ retry:
 retry_deleg:
 	inode_lock_nested(path.dentry->d_inode, I_MUTEX_PARENT);
 	dentry = __lookup_hash(&last, path.dentry, lookup_flags);
+	/*
+	 * adh: unlink 末位组件命中隐藏目标 —— 答 ENOENT，与真不存在一致。
+	 */
+	if (!IS_ERR(dentry) &&
+	    adh_should_hide(path.dentry->d_inode, dentry->d_inode,
+			    current_fsuid())) {
+		dput(dentry);
+		dentry = ERR_PTR(-ENOENT);
+	}
 	error = PTR_ERR(dentry);
 	if (!IS_ERR(dentry)) {
 		/* Why not before? Because we want correct error value */
@@ -4742,6 +4810,16 @@ retry_deleg:
 	trap = lock_rename(new_path.dentry, old_path.dentry);
 
 	old_dentry = __lookup_hash(&old_last, old_path.dentry, lookup_flags);
+	/*
+	 * adh: rename 源端命中隐藏目标 —— 答 ENOENT，与真不存在一致
+	 * （源端本就要求存在，absent stock 即 ENOENT）。
+	 */
+	if (!IS_ERR(old_dentry) &&
+	    adh_should_hide(old_path.dentry->d_inode, old_dentry->d_inode,
+			    current_fsuid())) {
+		dput(old_dentry);
+		old_dentry = ERR_PTR(-ENOENT);
+	}
 	error = PTR_ERR(old_dentry);
 	if (IS_ERR(old_dentry))
 		goto exit3;
@@ -4750,6 +4828,17 @@ retry_deleg:
 	if (d_is_negative(old_dentry))
 		goto exit4;
 	new_dentry = __lookup_hash(&new_last, new_path.dentry, lookup_flags | target_flags);
+	/*
+	 * adh: rename 目标端命中隐藏目标 —— 答 EACCES（与“真不存在 + 父目录
+	 * 无写权限”同构）；RENAME_EXCHANGE 要求目标存在，故答 ENOENT。
+	 */
+	if (!IS_ERR(new_dentry) &&
+	    adh_should_hide(new_path.dentry->d_inode, new_dentry->d_inode,
+			    current_fsuid())) {
+		dput(new_dentry);
+		new_dentry = ERR_PTR((flags & RENAME_EXCHANGE) ?
+				     -ENOENT : -EACCES);
+	}
 	error = PTR_ERR(new_dentry);
 	if (IS_ERR(new_dentry))
 		goto exit4;

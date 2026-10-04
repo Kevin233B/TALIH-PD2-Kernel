@@ -319,4 +319,24 @@ source "fs/nls/Kconfig"
 source "fs/dlm/Kconfig"
 source "fs/unicode/Kconfig"
 
+config ANDROID_DATA_HIDE
+	bool "Android data existence hide (uid-keyed)"
+	default n
+	help
+	  Android 应用存在性封堵（属主 uid 键控）。隐藏名单内应用的
+	  Android/{data,obb}/<pkg>、/data/data/<pkg>、/data/user/<n>/<pkg>、
+	  /data/user_de/<n>/<pkg> 目录，对非属主普通应用（uid >= 10000）
+	  表现为“该应用未安装”，同时对 root/system/shell/media、预装系统
+	  应用、属主自身及单独授权应用保持完全可见。
+
+	  按目录属主 inode uid 键控而非路径名匹配：大小写/casefold 变体、
+	  零宽可忽略码点变体、应用重装全部自然覆盖；零 dcache 写入、零
+	  挂载拓扑变化（statfs/mountinfo 无指纹）。
+
+	  配置面：/sys/kernel/android_data_hide/rules（root 0600），
+	  行协议 parent/hide/allow/reset/commit，由用户空间 service
+	  在 /data 挂载后写入并原子发布。
+
+	  不开启时所有调用点编译期折叠为空操作，零开销零行为。
+
 endmenu
