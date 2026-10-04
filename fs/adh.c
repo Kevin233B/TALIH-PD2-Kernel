@@ -28,7 +28,8 @@
  *   allow <uid> [uid..] 全局放行（预装系统应用中 uid >= 10000 者）
  *   reset               丢弃未 commit 的缓冲
  *   commit              原子发布：RCU 换快照 + static_key 翻转
- *                       （parent 集与 hide 集均非空才启用，防半态生效）
+ *                       （parent 集与 hide 集均非空才启用，防半态生效；
+ *                       无 pending 时 commit = 发布空态，即显式禁用）
  */
 
 #include <linux/kernel.h>
@@ -259,22 +260,29 @@ static void adh_state_free_rcu(struct rcu_head *rhc)
 
 static int adh_commit(void)
 {
-	struct adh_state *old;
+	struct adh_state *ns, *old;
 	u16 n_parents, n_rules, n_sys;
 	bool enable;
 
-	if (!adh_pending)
-		return 0;
+	/* 无 pending 时 commit = 显式发布空态（全可见/禁用）：
+	 * uninstall.sh 以 reset+commit 清空退场。 */
+	if (adh_pending) {
+		ns = adh_pending;
+	} else {
+		ns = kzalloc(sizeof(*ns), GFP_KERNEL);
+		if (!ns)
+			return -ENOMEM;
+	}
+	adh_pending = NULL;
 
-	enable = adh_pending->n_parents && adh_pending->n_rules;
-	n_parents = adh_pending->n_parents;
-	n_rules = adh_pending->n_rules;
-	n_sys = adh_pending->n_sys;
+	enable = ns->n_parents && ns->n_rules;
+	n_parents = ns->n_parents;
+	n_rules = ns->n_rules;
+	n_sys = ns->n_sys;
 
 	old = rcu_dereference_protected(adh_active,
 					lockdep_is_held(&adh_mutex));
-	rcu_assign_pointer(adh_active, adh_pending);
-	adh_pending = NULL;
+	rcu_assign_pointer(adh_active, ns);
 	if (old)
 		call_rcu(&old->rcu, adh_state_free_rcu);
 
