@@ -2,7 +2,8 @@ name: Build and Release Kernel
 
 on:
   push:
-    branches: [ main, master, susfs+resukisu ]
+    # 注意：branches filter 是 glob，+ 是特殊字符——字面匹配须转义（单引号内 \ 保持字面）
+    branches: [ main, master, 'susfs\+resukisu' ]
     tags: [ '*' ]
   workflow_dispatch:
 
