@@ -31,8 +31,12 @@ status)
         while ((getline l < V) > 0) {
             sub(/[\r\n]/, "", l); sub(/#.*/, "", l)
             n = split(l, a, /[ \t]+/)
-            if (n > 1) for (i = 2; i <= n; i++)
-                vis[a[1]] = ((a[1] in vis) ? vis[a[1]] "," : "") "\"" a[i] "\""
+            if (n > 1) for (i = 2; i <= n; i++) {
+                # 注意：awk 的 a[k]=<引用 a[k] 的表达式> 会让 LHS 元素先于 RHS
+                # 创建（in 判断恒真 → 前导逗号）——必须经临时变量中转
+                v = (a[1] in vis) ? vis[a[1]] "," : ""
+                vis[a[1]] = v "\"" a[i] "\""
+            }
         }
     }
     NF && $1 !~ /^#/ {
@@ -55,7 +59,8 @@ save)
         : > "$tmp_h"
     fi
     if [ -n "$3" ]; then
-        echo "$3" | tr ',' '\n' | awk -F: '
+        # CSV：目标:授权方+授权方，…… —— + 转 . 无关（包名字符集无 +）
+        echo "$3" | tr ',' '\n' | sed 's/+/ /g' | awk -F: '
             NF >= 1 && $1 != "" {
                 s = $1
                 for (i = 2; i <= NF; i++) s = s " " $i

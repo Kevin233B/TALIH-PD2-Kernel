@@ -2,25 +2,40 @@
 # refresh.sh —— 全量发布配置到内核 sysfs（幂等；flock 串行所有发布会话）。
 # 目标集为空时同样发布（等价“不封堵”），保持内核态与配置文件一致。
 # 单次写入远小于 PAGE_SIZE：allow 行每行最多 20 个 uid。
+# 失败语义：硬错误（sys 放行集为空 / sysfs 写失败）写 .fail 时间戳退出——
+# daemon 5 分钟退避（配置再改则立即重试），绝不无限刷日志。
 
 MODDIR=${0%/*}
 . "$MODDIR/common.sh"
 
+mkdir -p "$ADH_DIR"
 exec 9>"$LOCK"
 flock 9 || exit 1
 
+fail_stamp() { date +%s > "$FAIL" 2>/dev/null; }
+
 if [ ! -e "$SYSFS" ]; then
-    log "sysfs 不存在（内核补丁未刷）——跳过发布"
+    log "sysfs 不存在（内核补丁未刷）——配置已就绪，跳过发布"
+    rm -f "$FAIL" 2>/dev/null
     exit 0
 fi
 
-wr() { echo "$1" > "$SYSFS" 2>/dev/null || { log "sysfs 写失败：$1"; exit 1; }; }
+# 先清内核侧 pending（上一会话若中途失败可能留有半成品缓冲），再解析校验
+echo reset > "$SYSFS" 2>/dev/null
+
+wr() {
+    echo "$1" > "$SYSFS" 2>/dev/null && return 0
+    log "sysfs 写失败：$1"
+    echo reset > "$SYSFS" 2>/dev/null
+    fail_stamp
+    exit 1
+}
 
 # ---- 系统放行集（uid>=10000 的系统应用）----
 # 基础：packages.list 的 @system 行（明文、开机即可读）；
 # 补充：pm（覆盖被商店更新过的系统应用——其 installer 标记不再是 @system）。
 sys_uids=$(awk '$NF=="@system" && $2+0>=10000 {print $2+0}' "$PKG_LIST" 2>/dev/null)
-pm_s=$(pm list packages -s -U 2>/dev/null)
+pm_s=$(/system/bin/pm list packages -s -U 2>/dev/null)
 if [ -n "$pm_s" ]; then
     : > "$PMREADY"
     pm_uids=$(printf '%s\n' "$pm_s" | sed -n 's/.*uid:\([0-9][0-9]*\)$/\1/p' | \
@@ -31,10 +46,10 @@ else
 fi
 if [ -z "$sys_uids" ]; then
     log "系统放行集为空——解析异常，中止发布（保留上一态）"
+    fail_stamp
     exit 1
 fi
 
-wr reset
 for p in $PARENTS; do
     wr "parent $p"
 done
@@ -75,4 +90,5 @@ done
 
 wr commit
 touch "$STAMP"
+rm -f "$FAIL" 2>/dev/null
 log "已发布：hide=$n_hide sys=$n_sys"

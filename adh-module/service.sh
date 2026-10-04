@@ -10,9 +10,10 @@ mkdir -p "$ADH_DIR"
 
 sh "$MODDIR/refresh.sh" >/dev/null 2>&1
 
-# 防重复拉起（软重启场景）
+# 防重复拉起（软重启场景；校验 cmdline 防 pid 复用误判）
 old=$(cat "$ADH_DIR/daemon.pid" 2>/dev/null)
-if [ -n "$old" ] && [ -d "/proc/$old" ]; then
+if [ -n "$old" ] && [ -d "/proc/$old" ] && \
+   grep -aq "daemon.sh" "/proc/$old/cmdline" 2>/dev/null; then
     exit 0
 fi
 nohup sh "$MODDIR/daemon.sh" >/dev/null 2>&1 &

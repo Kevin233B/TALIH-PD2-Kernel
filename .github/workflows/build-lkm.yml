@@ -4,8 +4,9 @@ on:
   push:
     # 注意：branches filter 是 glob，+ 是特殊字符——字面匹配须转义（单引号内 \ 保持字面）
     branches: [ main, 'susfs\+resukisu' ]
-    # 模块目录的迭代不触发 ko 重建（四 ko 与 adh-module 完全无关）
-    paths-ignore: [ 'adh-module/**' ]
+    # 模块目录的迭代不触发 ko 重建（四 ko 与 adh-module 完全无关）；
+    # workflows 自身的改动同样无需重建（内容不变的冗余构建）
+    paths-ignore: [ 'adh-module/**', '.github/workflows/**' ]
   workflow_dispatch:
     inputs:
       branch:

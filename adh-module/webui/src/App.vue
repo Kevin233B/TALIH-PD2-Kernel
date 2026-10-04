@@ -65,7 +65,8 @@ function snapshot() {
 const dirty = computed(() => JSON.stringify(snapshot()) !== initial.value)
 
 const hiddenApps = computed(() => filterByQuery(apps.value.filter(a => a.hidden)))
-const restApps = computed(() => filterByQuery(apps.value.filter(a => !a.hidden)))
+const restUserApps = computed(() => filterByQuery(apps.value.filter(a => !a.hidden && !a.sys)))
+const restSysApps = computed(() => filterByQuery(apps.value.filter(a => !a.hidden && a.sys)))
 
 function filterByQuery(list) {
   const q = query.value.trim().toLowerCase()
@@ -195,14 +196,28 @@ function kernelSummary() {
           <MiuixText v-else type="body2" class="empty-text">无——所有应用互相可见（stock 行为）</MiuixText>
         </MiuixCard>
 
-        <MiuixSmallTitle :text="`全部应用（${restApps.length}）`" />
+        <MiuixSmallTitle :text="`用户应用（${restUserApps.length}）`" />
+        <MiuixCard class="sect-mb12">
+          <template v-if="restUserApps.length">
+            <MiuixSwitchPreference
+              v-for="a in restUserApps"
+              :key="a.pkg"
+              v-model="a.hidden"
+              :title="a.pkg"
+              :summary="`uid ${a.uid}`"
+            />
+          </template>
+          <MiuixText v-else type="body2" class="empty-text">无</MiuixText>
+        </MiuixCard>
+
+        <MiuixSmallTitle :text="`系统应用（${restSysApps.length}）`" />
         <MiuixCard class="sect-mb12">
           <MiuixSwitchPreference
-            v-for="a in restApps"
+            v-for="a in restSysApps"
             :key="a.pkg"
             v-model="a.hidden"
             :title="a.pkg"
-            :summary="`uid ${a.uid}${a.sys ? ' · 系统' : ''}`"
+            :summary="`uid ${a.uid} · 系统`"
           />
         </MiuixCard>
 

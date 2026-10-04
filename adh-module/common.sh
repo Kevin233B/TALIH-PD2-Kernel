@@ -6,6 +6,7 @@ HIDE_LIST=$ADH_DIR/hide.list
 VISIBLE_LIST=$ADH_DIR/visible.list
 STAMP=$ADH_DIR/.stamp
 LOCK=$ADH_DIR/.lock
+FAIL=$ADH_DIR/.fail
 PMREADY=$ADH_DIR/.pmready
 PKG_LIST=/data/system/packages.list
 SYSFS=/sys/kernel/android_data_hide/rules

@@ -5,6 +5,10 @@ on:
     # 注意：branches filter 是 glob，+ 是特殊字符——字面匹配须转义（单引号内 \ 保持字面）
     branches: [ main, master, 'susfs\+resukisu' ]
     tags: [ '*' ]
+    # adh-module/webui-only 迭代不再空转 15 分钟内核构建。
+    # release tag 不受影响：tag push 的 changed-files 与 main 的差异必含内核文件，
+    # 不可能全部命中 ignore 模式，故发布流恒触发。
+    paths-ignore: [ 'adh-module/**', '.github/workflows/**' ]
   workflow_dispatch:
 
 jobs:
