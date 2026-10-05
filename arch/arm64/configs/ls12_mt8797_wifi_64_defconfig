@@ -577,6 +577,13 @@ CONFIG_PWM_MTK_DISP=y
 CONFIG_PHY_MTK_TPHY=y
 CONFIG_MTK_DEVINFO=y
 CONFIG_FS_ENCRYPTION_INLINE_CRYPT=y
+# TALIH-PD2: overlayfs 完善——模块 RW overlay（upperdir/workdir 落
+# /data/adb 或 tmpfs）所需。OVERLAY_FS 显式化（原本仅经 MTK platform
+# select 生效，显式行防漂移）；TMPFS_XATTR 让 tmpfs 可作 overlay
+# upperdir/workdir（默认 n，此前实测 EOPNOTSUPP）。
+# redirect_dir/index/metacopy 保持关闭（上游默认，模块生态不需要）。
+CONFIG_OVERLAY_FS=y
+CONFIG_TMPFS_XATTR=y
 CONFIG_QUOTA_NETLINK_INTERFACE=y
 CONFIG_INCREMENTAL_FS=y
 CONFIG_ISO9660_FS=y

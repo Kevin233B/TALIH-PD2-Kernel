@@ -1,0 +1,35 @@
+--- a/fs/overlayfs/util.c
++++ b/fs/overlayfs/util.c
+@@ -129,10 +129,28 @@
+ 
+ bool ovl_dentry_weird(struct dentry *dentry)
+ {
+-	return dentry->d_flags & (DCACHE_NEED_AUTOMOUNT |
+-				  DCACHE_MANAGE_TRANSIT |
+-				  DCACHE_OP_HASH |
+-				  DCACHE_OP_COMPARE);
++	if (dentry->d_flags & (DCACHE_NEED_AUTOMOUNT |
++			       DCACHE_MANAGE_TRANSIT))
++		return true;
++	if (dentry->d_flags & (DCACHE_OP_HASH | DCACHE_OP_COMPARE)) {
++#ifdef CONFIG_UNICODE
++		/*
++		 * TALIH-PD2 模块生态放松：casefold 文件系统（sb->s_encoding
++		 * 置位；本机 /data = f2fs+casefold）会为层内 dentry 安装
++		 * generic_ci_dentry_ops（仅 d_hash/d_compare，无 d_revalidate，
++		 * 见 fs/libfs.c 的 generic_set_encrypted_ci_d_ops），原版掩码
++		 * 因此把 /data 整体挡在 overlay 层之外——而模块 RW overlay 的
++		 * upperdir/workdir 首选 /data/adb。ci 的 hash/compare 只影响
++		 * 层内查找语义，overlay 对层的查找仍走层自身 d_op，行为自洽。
++		 * 仅对 s_encoding 置位的层放行；autofs 类（NEED_AUTOMOUNT/
++		 * MANAGE_TRANSIT）以及未启用 UNICODE 时的 hash/compare 依旧拒绝。
++		 */
++		return dentry->d_sb->s_encoding == NULL;
++#else
++		return true;
++#endif
++	}
++	return false;
+ }
+ 
+ enum ovl_path_type ovl_path_type(struct dentry *dentry)

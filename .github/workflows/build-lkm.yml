@@ -62,6 +62,7 @@ jobs:
               curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
               patch -p1 < patch/50_add_susfs_in_kernel-4.19.patch
               patch -p1 < patch/55_resukisu_susfs_abi_compat.patch
+              patch -p1 < patch/60_overlayfs_casefold_relax_4.19.patch
               ;;
             main)
               echo "main 分支：无 SU/SUSFS 集成，直接编内核"
