@@ -1,0 +1,39 @@
+--- a/hybridmount.c
++++ b/hybridmount.c
+@@ -842,6 +842,9 @@
+     struct name_snapshot name;
+     struct dentry *parent;
+     unsigned int seq;
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 9, 0)
++    unsigned int snapshot_len = 0;
++#endif
+     int ret;
+ 
+     /* Ref-walk pins the dentry, not a former parent after a concurrent rename.
+@@ -853,6 +856,11 @@
+         seq = read_seqcount_begin(&dentry->d_seq);
+         parent = dget_parent(dentry);
+         take_dentry_name_snapshot(&name, dentry);
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 9, 0)
++        /* 4.19：name_snapshot.name 是裸指针（qstr 形态 5.9 才引入），
++         * 快照不含 len——在同一 d_seq 稳定窗口内补读 d_name.len。 */
++        snapshot_len = dentry->d_name.len;
++#endif
+         if (!read_seqcount_retry(&dentry->d_seq, seq))
+             break;
+         release_dentry_name_snapshot(&name);
+@@ -860,7 +868,14 @@
+         cond_resched();
+     }
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 9, 0)
++    {
++        struct qstr snapshot = { .hash = 0, .len = snapshot_len, .name = name.name };
++        ret = hm_d_revalidate_common(d_inode(parent), &snapshot, dentry, flags, weak);
++    }
++#else
+     ret = hm_d_revalidate_common(d_inode(parent), &name.name, dentry, flags, weak);
++#endif
+     release_dentry_name_snapshot(&name);
+     dput(parent);
+     return ret;
