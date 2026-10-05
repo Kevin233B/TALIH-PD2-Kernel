@@ -118,6 +118,25 @@ jobs:
             CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1 \
             M=$PWD/lkms/Kasumi/src modules
 
+      - name: Build hybridmount (hybridmount.ko, vendored from Hybrid-Mount 6.2.2-2053 vfs/src)
+        continue-on-error: true
+        run: |
+          # vfs 后端（NoMount fork，路径重定向、零挂载条目）——仓库内置 pristine 源码；
+          # 4.19 兼容补丁存在时才应用，保持 vendor 副本不可变（对齐其他 LKM 的 pristine+patch 模式）
+          if [ -f patch/lkm/hybridmount_4.19_compat.patch ]; then
+            patch -p1 -d patch/lkm/hybridmount < patch/lkm/hybridmount_4.19_compat.patch
+          else
+            echo "无 4.19 兼容补丁，直接编译 vendored 源码（源码自带 4.11+ 版本守卫）"
+          fi
+          CLANG_PATH="$PWD/prebuilts/clang/host/linux-x86/clang-r383902"
+          CLANG_BIN="$CLANG_PATH/bin"
+          make -k O=out ARCH=arm64 \
+            CC=$CLANG_BIN/clang LD=$CLANG_BIN/ld.lld AR=$CLANG_BIN/llvm-ar NM=$CLANG_BIN/llvm-nm \
+            OBJCOPY=$CLANG_BIN/llvm-objcopy OBJDUMP=$CLANG_BIN/llvm-objdump READELF=$CLANG_BIN/llvm-readelf \
+            OBJSIZE=$CLANG_BIN/llvm-size STRIP=$CLANG_BIN/llvm-strip \
+            CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1 \
+            M=$PWD/patch/lkm/hybridmount modules
+
       - name: Collect and report LKMs
         run: |
           mkdir -p modules-out
@@ -125,7 +144,7 @@ jobs:
           while IFS= read -r ko; do
             cp "$ko" modules-out/
             found=$((found+1))
-          done < <(find lkms -name '*.ko' -type f)
+          done < <(find lkms patch/lkm/hybridmount -name '*.ko' -type f)
           if [ "$found" -eq 0 ]; then
             echo "::error::没有任何 LKM 编译成功（.ko 数量为 0）"
             exit 1
@@ -179,6 +198,9 @@ jobs:
           check_ko procguard.ko register_kretprobe unregister_kretprobe
           check_ko hma_uidfake.ko get_task_cred find_user free_uid
           check_ko kasumi_lkm.ko register_kprobe register_kretprobe
+          # hybridmount 核心机制 = keyring 控制通道（register_key_type 注册、preparse 收指令）；
+          # 缺失 = 整个驱动链路被消除，vfs 后端无从配置
+          check_ko hybridmount.ko register_key_type unregister_key_type
           if [ "$fail" -ne 0 ]; then
             echo "::error::可加载性门禁失败（详见上方 ::error 行）"
             exit 1
