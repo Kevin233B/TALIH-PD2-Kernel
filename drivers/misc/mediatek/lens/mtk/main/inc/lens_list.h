@@ -410,4 +410,18 @@ extern int DW9718PAF_Release(struct inode *a_pstInode, struct file *a_pstFile);
 extern int DW9718PAF_GetFileName(unsigned char *pFileName);
 //zhongzhu add for dw9718paf end,2023/07/31
 
+#define AW8601XAF_SetI2Cclient AW8601XAF_SetI2Cclient_Main
+#define AW8601XAF_Ioctl AW8601XAF_Ioctl_Main
+#define AW8601XAF_Release AW8601XAF_Release_Main
+#define AW8601XAF_PowerDown AW8601XAF_PowerDown_Main
+#define AW8601XAF_GetFileName AW8601XAF_GetFileName_Main
+extern int AW8601XAF_SetI2Cclient(struct i2c_client *pstAF_I2Cclient,
+				  spinlock_t *pAF_SpinLock, int *pAF_Opened);
+extern long AW8601XAF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command,
+			    unsigned long a_u4Param);
+extern int AW8601XAF_Release(struct inode *a_pstInode, struct file *a_pstFile);
+extern int AW8601XAF_PowerDown(struct i2c_client *pstAF_I2Cclient,
+			       int *pAF_Opened);
+extern int AW8601XAF_GetFileName(unsigned char *pFileName);
+
 #endif

@@ -145,6 +145,15 @@ config MTK_LENS_DW9714AF_SUPPORT
 	  lens driver for the camera sensor module
 	  Set as y if the driver is used in this project
 
+config MTK_LENS_AW8601XAF_SUPPORT
+	tristate "AW8601XAF Lens Driver"
+        depends on MTK_LENS
+	help
+	  AW8601XAF Lens Driver
+	  This config is used to enable the corresponding
+	  lens driver for the camera sensor module
+	  Set as y if the driver is used in this project
+
 config MTK_LENS_DW9714A_SUPPORT
 	tristate "DW9714A Lens Driver"
         depends on MTK_LENS
