@@ -84,7 +84,7 @@ static struct stAF_OisPosInfo OisPosInfo;
 
 static struct stAF_DrvList g_stAF_DrvList[MAX_NUM_OF_LENS] = {
 	{1, AFDRV_DW9718PAF, DW9718PAF_SetI2Cclient, DW9718PAF_Ioctl, DW9718PAF_Release, DW9718PAF_GetFileName, NULL},  //zhongzhu add for dw9718paf,2023/07/31
-	{1, AFDRV_AW8601XAF, AW8601XAF_SetI2Cclient, AW8601XAF_Ioctl, AW8601XAF_Release, AW8601XAF_GetFileName, NULL},
+	{1, AFDRV_AW8601XAF, AW8601xAF_SetI2Cclient, AW8601xAF_Ioctl, AW8601xAF_Release, AW8601xAF_GetFileName, NULL},
 
 	{1, AFDRV_DW9718TAF, DW9718TAF_SetI2Cclient, DW9718TAF_Ioctl,
 	 DW9718TAF_Release, DW9718TAF_GetFileName, NULL},
