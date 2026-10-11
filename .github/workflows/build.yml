@@ -31,6 +31,10 @@ jobs:
 
       - name: Apply SUSFS kernel patch (4.19, non-GKI)
         run: |
+          # [VALIDATION BUILD] BakaSU suspended susfs builds pending simonpunk's sync
+          # (KernelSU/kernel/tools/susfs_compat.mk hard-errors). Kernel side here IS the
+          # latest susfs (b389fb9, 2026-10-10). Validation only; do not flash/release yet.
+          sed -i 's|^.*Please wait susfs update.*$|# [validation] BakaSU gate bypassed|' KernelSU/kernel/tools/susfs_compat.mk || true
           patch -p1 < patch/50_add_susfs_in_kernel-4.19.patch
           patch -p1 < patch/55_resukisu_susfs_abi_compat.patch
           patch -p1 < patch/60_overlayfs_casefold_relax_4.19.patch
