@@ -249,8 +249,33 @@ static int mtk_drm_fbdev_vm_split(struct vm_area_struct *area, unsigned long add
 	return -EFAULT;
 }
 
+static void mtk_drm_fbdev_vm_open(struct vm_area_struct *vma)
+{
+	struct fb_info *info = vma->vm_file->private_data;
+	struct drm_fb_helper *fb_helper = info->par;
+	struct drm_device *drm_dev = fb_helper->dev;
+
+	/*
+	 * TALIH-PD2 fix: every VMA copy (e.g. dup_mmap() on fork) reuses this
+	 * vm_ops and the kernel calls .open() if present; the matching
+	 * .close() will kref_put().  Without .open() the kref was only taken
+	 * in mtk_drm_fbdev_mmap(), so each forked child's VMA teardown
+	 * (execve/exit -> exit_mmap -> vm_close) dropped a reference it never
+	 * took.  The kref then hit zero while the recovery process still
+	 * mapped (and the display still scanned) the framebuffer:
+	 * free_fb_buf() filled the whole fbmem area with 0xff (a fully white
+	 * screen right after the splash) and released it to the buddy
+	 * allocator, which later reused it for kernel objects - producing
+	 * random hard-to-trace panics (f2fs "invalid blkaddr" storms,
+	 * bio_crypt_ctx UAF crashes) whenever the freed area got handed back
+	 * out (e.g. during a large 'super' backup).
+	 */
+	try_use_fb_buf(drm_dev);
+}
+
 static const struct vm_operations_struct mtk_drm_fbdev_vm_ops = {
 	.split = mtk_drm_fbdev_vm_split,
+	.open = mtk_drm_fbdev_vm_open,
 	.close = mtk_drm_fbdev_vm_close,
 };
 
