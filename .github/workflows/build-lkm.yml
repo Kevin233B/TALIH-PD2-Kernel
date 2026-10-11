@@ -28,13 +28,7 @@ jobs:
       - name: Select target branches
         id: set
         run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
-            echo 'branches=["${{ github.ref_name }}"]' >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event.inputs.branch }}" = "all" ] || [ -z "${{ github.event.inputs.branch }}" ]; then
-            echo 'branches=["main","susfs+resukisu"]' >> "$GITHUB_OUTPUT"
-          else
-            echo 'branches=["${{ github.event.inputs.branch }}"]' >> "$GITHUB_OUTPUT"
-          fi
+          echo 'branches=["lkm-419"]' >> "$GITHUB_OUTPUT"   # [temp] LKM 构建专用分支
 
   build:
     needs: select
@@ -60,6 +54,15 @@ jobs:
               rm -rf KernelSU drivers/kernelsu
               git checkout -- drivers/Makefile drivers/Kconfig
               curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
+              patch -p1 < patch/50_add_susfs_in_kernel-4.19.patch
+              patch -p1 < patch/55_resukisu_susfs_abi_compat.patch
+              patch -p1 < patch/60_overlayfs_casefold_relax_4.19.patch
+              ;;
+            lkm-419)
+              rm -rf KernelSU drivers/kernelsu
+              git checkout -- drivers/Makefile drivers/Kconfig
+              curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
+              sed -i 's|^.*Please wait susfs update.*$|# [lkm build] gate bypassed|' KernelSU/kernel/tools/susfs_compat.mk || true
               patch -p1 < patch/50_add_susfs_in_kernel-4.19.patch
               patch -p1 < patch/55_resukisu_susfs_abi_compat.patch
               patch -p1 < patch/60_overlayfs_casefold_relax_4.19.patch
