@@ -10,6 +10,12 @@ on:
     # 不可能全部命中 ignore 模式，故发布流恒触发。
     paths-ignore: [ 'adh-module/**', '.github/workflows/**' ]
   workflow_dispatch:
+    inputs:
+      variant:
+        description: '构建变体: susfs=主力（默认）/ manual=KSU 手动钩子试验'
+        type: choice
+        options: [ susfs, manual ]
+        default: susfs
 
 jobs:
   build:
@@ -29,15 +35,19 @@ jobs:
           git checkout -- drivers/Makefile drivers/Kconfig
           curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
 
-      - name: Apply SUSFS kernel patch (4.19, non-GKI)
+      - name: Apply kernel patches (${{ github.event.inputs.variant || 'susfs' }})
         run: |
-          # [VALIDATION BUILD] BakaSU suspended susfs builds pending simonpunk's sync
-          # (KernelSU/kernel/tools/susfs_compat.mk hard-errors). Kernel side here IS the
-          # latest susfs (b389fb9, 2026-10-10). Validation only; do not flash/release yet.
+          VARIANT="${{ github.event.inputs.variant || 'susfs' }}"
+          # 门禁 sed：susfs 构建需要；manual 构建不会 include 该文件，执行无害
           sed -i 's|^.*Please wait susfs update.*$|# [validation] BakaSU gate bypassed|' KernelSU/kernel/tools/susfs_compat.mk || true
-          patch -p1 < patch/50_add_susfs_in_kernel-4.19.patch
-          patch -p1 < patch/55_resukisu_susfs_abi_compat.patch
-          patch -p1 < patch/60_overlayfs_casefold_relax_4.19.patch
+          if [ "$VARIANT" = "manual" ]; then
+            # manual 变体：KSU 手动钩子集成（tiann/BakaSU guide）+ 不应用 susfs 内核侧
+            patch -p1 < patch/65_ksu_manual_hook-4.19.patch
+          else
+            patch -p1 < patch/50_add_susfs_in_kernel-4.19.patch
+            patch -p1 < patch/55_resukisu_susfs_abi_compat.patch
+            patch -p1 < patch/60_overlayfs_casefold_relax_4.19.patch
+          fi
 
       - name: Build kernel
         run: |
@@ -48,12 +58,22 @@ jobs:
           ./download_clang.sh
           ./build-mt8797.sh
 
-      - name: Verify SUSFS integration
+      - name: Verify build (${{ github.event.inputs.variant || 'susfs' }})
         run: |
-          grep -q '^CONFIG_KSU_SUSFS=y' out/.config || { echo "::error::CONFIG_KSU_SUSFS 未在最终 .config 中启用（kconfig 丢弃了该选项）"; exit 1; }
-          [ -f out/fs/susfs.o ] || { echo "::error::out/fs/susfs.o 未编译，SUSFS 内核侧缺失"; exit 1; }
-          grep -q 'susfs_show_version' out/System.map || { echo "::error::System.map 中无 susfs_show_version，链接产物缺 SUSFS"; exit 1; }
-          echo "SUSFS 验证通过：CONFIG_KSU_SUSFS=y、fs/susfs.o、System.map 符号齐全"
+          VARIANT="${{ github.event.inputs.variant || 'susfs' }}"
+          grep -q '^CONFIG_KSU=y' out/.config || { echo "::error::CONFIG_KSU 未启用"; exit 1; }
+          grep -q 'ksu_selinux_hide_init' out/System.map || { echo "::error::selinux_hide 驱动缺失"; exit 1; }
+          if [ "$VARIANT" = "manual" ]; then
+            grep -q '^CONFIG_KSU_MANUAL_HOOK=y' out/.config || { echo "::error::CONFIG_KSU_MANUAL_HOOK 未启用"; exit 1; }
+            grep -q 'ksu_handle_execveat' out/System.map || { echo "::error::manual hook 缺失"; exit 1; }
+            if grep -q 'susfs_show_version' out/System.map; then echo "::error::manual 变体不应含 susfs"; exit 1; fi
+            echo "验证通过：manual 变体（KSU 手动钩子 + selinux_hide 在位）"
+          else
+            grep -q '^CONFIG_KSU_SUSFS=y' out/.config || { echo "::error::CONFIG_KSU_SUSFS 未启用"; exit 1; }
+            [ -f out/fs/susfs.o ] || { echo "::error::out/fs/susfs.o 缺失"; exit 1; }
+            grep -q 'susfs_show_version' out/System.map || { echo "::error::System.map 缺 susfs"; exit 1; }
+            echo "验证通过：susfs 变体（CONFIG_KSU_SUSFS=y、fs/susfs.o、符号齐全）"
+          fi
 
       - name: Upload Image.gz
         uses: actions/upload-artifact@v4

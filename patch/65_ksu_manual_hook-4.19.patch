@@ -1,0 +1,172 @@
+diff --git a/arch/arm64/configs/ls12_mt8797_wifi_64_defconfig b/arch/arm64/configs/ls12_mt8797_wifi_64_defconfig
+index 41517a4fb..c01fbf8c2 100755
+--- a/arch/arm64/configs/ls12_mt8797_wifi_64_defconfig
++++ b/arch/arm64/configs/ls12_mt8797_wifi_64_defconfig
+@@ -3,7 +3,11 @@ CONFIG_LOCALVERSION="-Kevin233"
+ CONFIG_PREEMPT=y
+ CONFIG_KSU=y
+ CONFIG_KSU_DEBUG=y
+-CONFIG_KSU_SUSFS=y
++# CONFIG_KSU_SUSFS is not set
++CONFIG_KSU_MANUAL_HOOK=y
++# CONFIG_KSU_MANUAL_HOOK_AUTO_SETUID_HOOK is not set
++# CONFIG_KSU_MANUAL_HOOK_AUTO_INITRC_HOOK is not set
++# CONFIG_KSU_MANUAL_HOOK_AUTO_INPUT_HOOK is not set
+ CONFIG_IKHEADERS=m
+ CONFIG_ANDROID_DATA_HIDE=y
+ CONFIG_LOG_BUF_SHIFT=23
+diff --git a/drivers/input/input.c b/drivers/input/input.c
+index ec64709c4..04f3bf803 100755
+--- a/drivers/input/input.c
++++ b/drivers/input/input.c
+@@ -383,6 +383,11 @@ static void input_handle_event(struct input_dev *dev,
+ 	if (static_branch_unlikely(&ksu_is_input_hook_enabled))
+ 		ksu_handle_input_handle_event(&type, &code, &value);
+ #endif
++#ifdef CONFIG_KSU_MANUAL_HOOK
++	extern __attribute__((cold)) int ksu_handle_input_handle_event(
++			unsigned int *type, unsigned int *code, int *value);
++	ksu_handle_input_handle_event(&type, &code, &value);
++#endif
+ 
+ 	if (disposition != INPUT_IGNORE_EVENT && type != EV_SYN)
+ 		add_input_randomness(type, code, value);
+diff --git a/fs/exec.c b/fs/exec.c
+index 4501d914c..6dcf20da4 100755
+--- a/fs/exec.c
++++ b/fs/exec.c
+@@ -1747,6 +1747,11 @@ static int __do_execve_file(int fd, struct filename *filename,
+ 	struct files_struct *displaced;
+ 	int retval;
+ 
++#ifdef CONFIG_KSU_MANUAL_HOOK
++	extern int ksu_handle_execveat(int *, struct filename **, void *, void *, int *);
++	ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
++#endif
++
+ #ifdef CONFIG_KSU_SUSFS
+ 	bool is_su_session = false;
+ #endif // #ifdef CONFIG_KSU_SUSFS
+diff --git a/fs/namespace.c b/fs/namespace.c
+index 92bd05678..ac1185a27 100755
+--- a/fs/namespace.c
++++ b/fs/namespace.c
+@@ -1636,6 +1636,42 @@ static inline bool may_mandlock(void)
+ 	return capable(CAP_SYS_ADMIN);
+ }
+ 
++#ifdef CONFIG_KSU_MANUAL_HOOK
++static int can_umount(const struct path *path, int flags)
++{
++	struct mount *mnt = real_mount(path->mnt);
++
++	if (flags & ~(MNT_FORCE | MNT_DETACH | MNT_EXPIRE | UMOUNT_NOFOLLOW))
++		return -EINVAL;
++	if (!may_mount())
++		return -EPERM;
++	if (path->dentry != path->mnt->mnt_root)
++		return -EINVAL;
++	if (!check_mnt(mnt))
++		return -EINVAL;
++	if (mnt->mnt.mnt_flags & MNT_LOCKED) /* Check optimistically */
++		return -EINVAL;
++	if (flags & MNT_FORCE && !capable(CAP_SYS_ADMIN))
++		return -EPERM;
++	return 0;
++}
++
++int path_umount(struct path *path, int flags)
++{
++	struct mount *mnt = real_mount(path->mnt);
++	int ret;
++
++	ret = can_umount(path, flags);
++	if (!ret)
++		ret = do_umount(mnt, flags);
++
++	/* we mustn't call path_put() as that would clear mnt_expiry_mark */
++	dput(path->dentry);
++	mntput_no_expire(mnt);
++	return ret;
++}
++#endif
++
+ /*
+  * Now umount can handle mount points as well as block devices.
+  * This is important for filesystems which use unnamed block devices.
+diff --git a/fs/open.c b/fs/open.c
+index 206b27d3c..2a898cd10 100755
+--- a/fs/open.c
++++ b/fs/open.c
+@@ -373,6 +373,10 @@ long do_faccessat(int dfd, const char __user *filename, int mode)
+ 	struct vfsmount *mnt;
+ 	int res;
+ 	unsigned int lookup_flags = LOOKUP_FOLLOW;
++#ifdef CONFIG_KSU_MANUAL_HOOK
++	extern int ksu_handle_faccessat(int *, const char __user **, int *, int *);
++	ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
++#endif
+ #ifdef CONFIG_KSU_SUSFS
+ 	struct filename *fname = NULL;
+ #endif
+diff --git a/fs/read_write.c b/fs/read_write.c
+index d014c595e..99dbc3865 100755
+--- a/fs/read_write.c
++++ b/fs/read_write.c
+@@ -594,6 +594,11 @@ ssize_t ksys_read(unsigned int fd, char __user *buf, size_t count)
+ 
+ SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
+ {
++#ifdef CONFIG_KSU_MANUAL_HOOK
++	extern __attribute__((cold)) int ksu_handle_sys_read(unsigned int fd, char __user **buf_ptr,
++			size_t *count_ptr);
++	ksu_handle_sys_read(fd, &buf, &count);
++#endif
+ #ifdef CONFIG_KSU_SUSFS
+ 	if (static_branch_unlikely(&ksu_is_init_rc_hook_enabled))
+ 		ksu_handle_sys_read(fd, &buf, &count);
+diff --git a/fs/stat.c b/fs/stat.c
+index fe2ff725c..028d57abc 100755
+--- a/fs/stat.c
++++ b/fs/stat.c
+@@ -191,6 +191,10 @@ int vfs_statx(int dfd, const char __user *filename, int flags,
+ #ifdef CONFIG_KSU_SUSFS
+ 	struct filename *fname = NULL;
+ #endif
++#ifdef CONFIG_KSU_MANUAL_HOOK
++	extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
++	ksu_handle_stat(&dfd, &filename, &flags);
++#endif
+ 
+ 	if ((flags & ~(AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT |
+ 		       AT_EMPTY_PATH | KSTAT_QUERY_FLAGS)) != 0)
+@@ -414,6 +418,14 @@ SYSCALL_DEFINE2(newfstat, unsigned int, fd, struct stat __user *, statbuf)
+ 	if (!error)
+ 		error = cp_new_stat(&stat, statbuf);
+ 
++#ifdef CONFIG_KSU_MANUAL_HOOK
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wdeclaration-after-statement"
++	extern void ksu_handle_newfstat_ret(unsigned int *, struct stat __user **);
++	ksu_handle_newfstat_ret(&fd, &statbuf);
++#pragma GCC diagnostic pop
++#endif
++
+ 	return error;
+ }
+ 
+@@ -540,6 +552,14 @@ SYSCALL_DEFINE2(fstat64, unsigned long, fd, struct stat64 __user *, statbuf)
+ 	if (!error)
+ 		error = cp_new_stat64(&stat, statbuf);
+ 
++#ifdef CONFIG_KSU_MANUAL_HOOK
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wdeclaration-after-statement"
++	extern void ksu_handle_fstat64_ret(unsigned long *, struct stat64 __user **);
++	ksu_handle_fstat64_ret(&fd, &statbuf);
++#pragma GCC diagnostic pop
++#endif
++
+ 	return error;
+ }
+ 
