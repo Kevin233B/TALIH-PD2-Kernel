@@ -44,6 +44,10 @@ jobs:
             # manual 变体：KSU 手动钩子集成（tiann/BakaSU guide）+ 不应用 susfs 内核侧
             patch -p1 < patch/65_ksu_manual_hook-4.19.patch
           else
+            # [临时] 驱动钉到 pre-#3877（9097b1a1c）：当前 4.19 内核侧契约（fake_state）与该版本驱动匹配；
+            # 等 4.19 新接口适配完成后解除 pin（simon ≤6.1 系列转换 + 我们的旧内核适配）
+            git -C KernelSU checkout 9097b1a1c6c889756201bbc5713a84a9b23f7908 2>/dev/null \
+              || (git -C KernelSU fetch origin 9097b1a1c6c889756201bbc5713a84a9b23f7908 && git -C KernelSU checkout 9097b1a1c6c889756201bbc5713a84a9b23f7908)
             patch -p1 < patch/50_add_susfs_in_kernel-4.19.patch
             patch -p1 < patch/55_resukisu_susfs_abi_compat.patch
             patch -p1 < patch/60_overlayfs_casefold_relax_4.19.patch
