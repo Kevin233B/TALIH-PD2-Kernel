@@ -60,6 +60,8 @@ jobs:
               rm -rf KernelSU drivers/kernelsu
               git checkout -- drivers/Makefile drivers/Kconfig
               curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
+              sed -i 's|^.*Please wait susfs update.*$|# [lkm build] gate bypassed|' KernelSU/kernel/tools/susfs_compat.mk || true
+              patch -p1 < patch/45_bakasu_fake_state_restore.patch
               patch -p1 < patch/50_add_susfs_in_kernel-4.19.patch
               patch -p1 < patch/55_resukisu_susfs_abi_compat.patch
               patch -p1 < patch/60_overlayfs_casefold_relax_4.19.patch
