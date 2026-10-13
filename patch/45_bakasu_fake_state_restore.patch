@@ -1,0 +1,79 @@
+--- a/KernelSU/kernel/feature/selinux_hide.c
++++ b/KernelSU/kernel/feature/selinux_hide.c
+@@ -100,6 +100,14 @@
+ 
+ #endif // #ifndef KSU_COMPAT_HAS_SUSFS_FEATURE_SELINUX_HIDE
+ 
++#ifdef KSU_COMPAT_HAS_SUSFS_FEATURE_SELINUX_HIDE
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0) && defined(KSU_COMPAT_USE_SELINUX_STATE)
++// [fake_state restore] <6.6 manual mode: SUSFS kernel side needs fake_state
++// (removed when syncing upstream; must be re-provided for <6.6 per maintainer)
++__maybe_static struct selinux_state fake_state;
++#endif
++#endif // #ifdef KSU_COMPAT_HAS_SUSFS_FEATURE_SELINUX_HIDE
++
+ static int ksu_security_context_to_sid(struct policydb *orig_policydb, struct sidtab *orig_sidtab,
+                                        struct policydb *policydb, struct sidtab *sidtab, const char *scontext,
+                                        u32 scontext_len, u32 *sid, u32 def_sid, gfp_t gfp_flags, u32 *orig_sid_p,
+@@ -672,6 +680,40 @@
+     hook_selinux_status_open();
+ #endif
+ 
++#ifdef KSU_COMPAT_HAS_SUSFS_FEATURE_SELINUX_HIDE
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0) && defined(KSU_COMPAT_USE_SELINUX_STATE)
++    // [fake_state restore] build fake_state in manual mode (<6.6 contract, same as legacy driver)
++    fake_state.initialized = true;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0) || defined(KSU_COMPAT_HAS_SELINUX_POLICY_STRUCT)
++    fake_state.policy = backup_sepolicy;
++#else
++    fake_state.ss = kzalloc(sizeof(*fake_state.ss), GFP_KERNEL);
++    if (!fake_state.ss) {
++        pr_err("selinux_hide: failed alloc selinux_ss!\n");
++        return -ENOMEM;
++    }
++
++    rwlock_init(&fake_state.ss->policy_rwlock);
++
++    // In normal android, only set selinux policy once
++    // So let's just hardcode to 1 to avoid avdSeqNo detect
++    fake_state.ss->latest_granting = 1;
++
++    // Replace policydb/sidtab with ourselves
++    memcpy(&fake_state.ss->policydb, backup_policydb, sizeof(struct policydb));
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0) || defined(KSU_COMPAT_SIDTAB_AS_REFERENCE)
++    fake_state.ss->sidtab = backup_sidtab;
++#else
++    memcpy(&fake_state.ss->sidtab, backup_sidtab, sizeof(struct sidtab));
++    kfree(backup_sidtab);
++    backup_sidtab = NULL;
++#endif
++    kfree(backup_policydb);
++    backup_policydb = NULL;
++#endif // >= 5.10 || HAS_SELINUX_POLICY_STRUCT
++#endif // < 6.6 && USE_SELINUX_STATE
++#endif // #ifdef KSU_COMPAT_HAS_SUSFS_FEATURE_SELINUX_HIDE
++
+     // clang-format off
+ #ifdef CONFIG_KALLSYMS_ALL
+     #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0) || defined(KSU_COMPAT_USE_SELINUX_STATE)
+@@ -841,6 +883,20 @@
+ {
+     pr_info("selinux_hide: exit selinux hide\n");
+ 
++#ifdef KSU_COMPAT_HAS_SUSFS_FEATURE_SELINUX_HIDE
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0) && defined(KSU_COMPAT_USE_SELINUX_STATE) && !defined(KSU_COMPAT_HAS_SELINUX_POLICY_STRUCT)
++    // [fake_state restore] give backups back from fake_state
++    backup_policydb = kzalloc(sizeof(*backup_policydb), GFP_KERNEL);
++    memcpy(backup_policydb, &fake_state.ss->policydb, sizeof(struct policydb));
++
++    // 5.0+ backup_sidtab share memory with fake_state, so we doesn't replace to NULL in lifetime
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0) && !defined(KSU_COMPAT_SIDTAB_AS_REFERENCE)
++    backup_sidtab = kzalloc(sizeof(*backup_sidtab), GFP_KERNEL);
++    memcpy(backup_sidtab, &fake_state.ss->sidtab, sizeof(struct sidtab));
++#endif
++#endif // < 5.10 && USE_SELINUX_STATE && !HAS_SELINUX_POLICY_STRUCT
++#endif // #ifdef KSU_COMPAT_HAS_SUSFS_FEATURE_SELINUX_HIDE
++
+     ksu_selinux_hide_unhook();
+ }
+ 
