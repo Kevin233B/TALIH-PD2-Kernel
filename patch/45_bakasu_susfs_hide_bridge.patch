@@ -1,0 +1,20 @@
+--- a/KernelSU/kernel/feature/selinux_hide.c
++++ b/KernelSU/kernel/feature/selinux_hide.c
+@@ -237,7 +237,7 @@
+ }
+ #endif
+ 
+-static ssize_t my_write_context(struct file *file, char *buf, size_t size)
++ssize_t my_write_context(struct file *file, char *buf, size_t size)
+ {
+     // apply to all app uids
+     if (likely(ksu_get_uid_t(current_uid()) < 10000)) {
+@@ -301,7 +301,7 @@
+     return length;
+ }
+ 
+-static ssize_t my_write_access(struct file *file, char *buf, size_t size)
++ssize_t my_write_access(struct file *file, char *buf, size_t size)
+ {
+     // apply to all app uids
+     if (likely(ksu_get_uid_t(current_uid()) < 10000)) {
