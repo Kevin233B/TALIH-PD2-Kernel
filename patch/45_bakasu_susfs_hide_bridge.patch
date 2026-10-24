@@ -1,5 +1,23 @@
 --- a/KernelSU/kernel/feature/selinux_hide.c
 +++ b/KernelSU/kernel/feature/selinux_hide.c
+@@ -69,7 +69,7 @@
+ static struct mutex *ksu_selinux_status_lock = NULL;
+ __maybe_static void initialize_fake_status();
+ 
+-#ifndef KSU_COMPAT_HAS_SUSFS_FEATURE_SELINUX_HIDE
++#if 1 // [bridge] compile in both modes: write_op_fn typedef needed by the manual-mode functions
+ enum sel_inos {
+     SEL_ROOT_INO = 2,
+     SEL_LOAD, /* load policy */
+@@ -206,7 +206,7 @@
+ }
+ #endif
+ 
+-#ifndef KSU_COMPAT_HAS_SUSFS_FEATURE_SELINUX_HIDE
++#if 1 // [bridge] compile in both modes: manual mode needs my_write_context/access + ksu_handle_selinux_setprocattr
+ 
+ static write_op_fn *context_write, *access_write;
+ static write_op_fn orig_context_write, orig_access_write;
 @@ -237,7 +237,7 @@
  }
  #endif
