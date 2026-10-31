@@ -25,13 +25,22 @@ index 805f08f..a3b3b76 100644
  
  ccflags-y += -std=gnu11
 diff --git a/kernel/src/pathmask.c b/kernel/src/pathmask.c
-index d236c3d..140cf07 100644
+index d236c3d..a8c696b 100644
 --- a/kernel/src/pathmask.c
 +++ b/kernel/src/pathmask.c
-@@ -26,8 +26,11 @@
+@@ -26,8 +26,20 @@
  #include <asm/syscall.h>
  #include <asm/unistd.h>
  
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 9, 0)
++/*
++ * regs_set_return_value() only exists from 5.9; before that the arm64
++ * syscall return value lives in pt_regs->regs[0], which is exactly what
++ * the helper writes.
++ */
++#define regs_set_return_value(regs, val) ((regs)->regs[0] = (val))
++#endif
++
 +#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
 +/* KallRecon (deps) resolves pruned helper exports on 5.10+ GKI only. */
  #include "core.h"
@@ -40,7 +49,7 @@ index d236c3d..140cf07 100644
  
  #define PM_LOG_PREFIX "pathmask: "
  #define MAX_HIDE_TARGETS 64
-@@ -272,6 +275,26 @@ static int __nocfi pm_invoke_close_fd(unsigned int fd)
+@@ -272,6 +284,26 @@ static int __nocfi pm_invoke_close_fd(unsigned int fd)
  
  static unsigned long __nocfi pm_resolve(const char *name)
  {
@@ -67,7 +76,7 @@ index d236c3d..140cf07 100644
  	unsigned long addr;
  
  	addr = kallrecon_klp(name);
-@@ -279,10 +302,15 @@ static unsigned long __nocfi pm_resolve(const char *name)
+@@ -279,10 +311,15 @@ static unsigned long __nocfi pm_resolve(const char *name)
  		addr = kallsyms_name_to_addr(name);
  
  	return addr;
@@ -83,7 +92,7 @@ index d236c3d..140cf07 100644
  	struct kallrecon_hint hint = {
  		.scan_back = 0x2000000,
  	};
-@@ -300,6 +328,7 @@ static int pm_symrecon_init(void)
+@@ -300,6 +337,7 @@ static int pm_symrecon_init(void)
  
  	pr_info(PM_LOG_PREFIX "kallsyms ready, %u symbols\n", klnum_val);
  	return 0;
@@ -91,7 +100,7 @@ index d236c3d..140cf07 100644
  }
  
  static int resolve_path_helpers(void)
-@@ -320,6 +349,15 @@ static int resolve_path_helpers(void)
+@@ -320,6 +358,15 @@ static int resolve_path_helpers(void)
  	 */
  	if (!pm_close_fd)
  		pm_close_fd = (pm_close_fd_t) pm_resolve("close_fd");

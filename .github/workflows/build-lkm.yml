@@ -108,7 +108,12 @@ jobs:
       - name: Build Kasumi (kasumi_lkm.ko)
         continue-on-error: true
         run: |
-          git clone --depth 1 https://github.com/Rouyashiki/Kasumi lkms/Kasumi
+          # Kasumi 无 release tag，HEAD 会随时引入 5.10+ API（本仓兼容补丁只针对
+          # 已审阅的 d26fa30）。固定提交，避免下一次上游 HEAD 漂移把 4.19 构建打挂。
+          git init -q lkms/Kasumi
+          git -C lkms/Kasumi remote add origin https://github.com/Rouyashiki/Kasumi
+          git -C lkms/Kasumi fetch -q --depth 1 origin d26fa3044c8fd61c11446499f63f92cbcd53bfc5
+          git -C lkms/Kasumi checkout -q --detach FETCH_HEAD
           patch -p1 -d lkms/Kasumi < patch/lkm/kasumi_4.19_compat.patch
           CLANG_PATH="$PWD/prebuilts/clang/host/linux-x86/clang-r383902"
           CLANG_BIN="$CLANG_PATH/bin"
