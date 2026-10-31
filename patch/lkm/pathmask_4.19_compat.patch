@@ -1,7 +1,8 @@
-diff -ru a/kernel/Makefile b/kernel/Makefile
+diff --git a/kernel/Makefile b/kernel/Makefile
+index 805f08f..a3b3b76 100644
 --- a/kernel/Makefile
 +++ b/kernel/Makefile
-@@ -7,10 +7,21 @@
+@@ -7,10 +7,21 @@ ODIR := $(MDIR)/out/$(VER)
  
  DEPS := KallRecon
  ifneq ($(MAKECMDGOALS),format)
@@ -23,30 +24,23 @@ diff -ru a/kernel/Makefile b/kernel/Makefile
  procguard-y := src/procguard.o
  
  ccflags-y += -std=gnu11
-diff -ru a/kernel/src/pathmask.c b/kernel/src/pathmask.c
+diff --git a/kernel/src/pathmask.c b/kernel/src/pathmask.c
+index d236c3d..140cf07 100644
 --- a/kernel/src/pathmask.c
 +++ b/kernel/src/pathmask.c
-@@ -26,7 +26,19 @@
+@@ -26,8 +26,11 @@
  #include <asm/syscall.h>
  #include <asm/unistd.h>
  
 +#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
 +/* KallRecon (deps) resolves pruned helper exports on 5.10+ GKI only. */
  #include "core.h"
-+#endif
-+
-+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 9, 0)
-+/*
-+ * regs_set_return_value() only exists from 5.9; before that the arm64
-+ * syscall return value lives in pt_regs->regs[0], which is exactly what
-+ * the helper writes.
-+ */
-+#define regs_set_return_value(regs, val) ((regs)->regs[0] = (val))
+ #include "hint.h"
 +#endif
  
  #define PM_LOG_PREFIX "pathmask: "
  #define MAX_HIDE_TARGETS 64
-@@ -271,6 +283,26 @@
+@@ -272,6 +275,26 @@ static int __nocfi pm_invoke_close_fd(unsigned int fd)
  
  static unsigned long __nocfi pm_resolve(const char *name)
  {
@@ -73,7 +67,7 @@ diff -ru a/kernel/src/pathmask.c b/kernel/src/pathmask.c
  	unsigned long addr;
  
  	addr = kallrecon_klp(name);
-@@ -278,10 +310,15 @@
+@@ -279,10 +302,15 @@ static unsigned long __nocfi pm_resolve(const char *name)
  		addr = kallsyms_name_to_addr(name);
  
  	return addr;
@@ -86,10 +80,10 @@ diff -ru a/kernel/src/pathmask.c b/kernel/src/pathmask.c
 +	/* Symbols come from kprobe resolution; nothing to recover. */
 +	return 0;
 +#else
- 	find_kallsyms_base();
- 	if (!klnum_val || !kallrecon_klp) {
- 		pr_err(PM_LOG_PREFIX "kallsyms recovery failed\n");
-@@ -290,6 +327,7 @@
+ 	struct kallrecon_hint hint = {
+ 		.scan_back = 0x2000000,
+ 	};
+@@ -300,6 +328,7 @@ static int pm_symrecon_init(void)
  
  	pr_info(PM_LOG_PREFIX "kallsyms ready, %u symbols\n", klnum_val);
  	return 0;
@@ -97,7 +91,7 @@ diff -ru a/kernel/src/pathmask.c b/kernel/src/pathmask.c
  }
  
  static int resolve_path_helpers(void)
-@@ -310,6 +348,15 @@
+@@ -320,6 +349,15 @@ static int resolve_path_helpers(void)
  	 */
  	if (!pm_close_fd)
  		pm_close_fd = (pm_close_fd_t) pm_resolve("close_fd");
@@ -113,7 +107,8 @@ diff -ru a/kernel/src/pathmask.c b/kernel/src/pathmask.c
  
  	pr_info(PM_LOG_PREFIX "resolved VFS path helpers via kallsyms\n");
  	return 0;
-diff -ru a/kernel/src/procguard.c b/kernel/src/procguard.c
+diff --git a/kernel/src/procguard.c b/kernel/src/procguard.c
+index 1852399..c1f40c8 100644
 --- a/kernel/src/procguard.c
 +++ b/kernel/src/procguard.c
 @@ -53,6 +53,16 @@

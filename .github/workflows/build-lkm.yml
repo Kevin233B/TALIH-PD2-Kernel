@@ -60,8 +60,6 @@ jobs:
               rm -rf KernelSU drivers/kernelsu
               git checkout -- drivers/Makefile drivers/Kconfig
               curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
-              sed -i 's|^.*Please wait susfs update.*$|# [lkm build] gate bypassed|' KernelSU/kernel/tools/susfs_compat.mk || true
-              patch -p1 < patch/45_bakasu_susfs_hide_bridge.patch
               patch -p1 < patch/50_add_susfs_in_kernel-4.19.patch
               patch -p1 < patch/55_resukisu_susfs_abi_compat.patch
               patch -p1 < patch/60_overlayfs_casefold_relax_4.19.patch
@@ -79,10 +77,10 @@ jobs:
           ./download_clang.sh
           ./build-mt8797.sh
 
-      - name: Build LKM-PathMask (pathmask.ko + procguard.ko, upstream v2.8.2)
+      - name: Build LKM-PathMask (pathmask.ko + procguard.ko, upstream v2.8.3)
         continue-on-error: true
         run: |
-          git clone --depth 1 --branch v2.8.2 https://github.com/Andrea-lyz/LKM-PathMask lkms/LKM-PathMask
+          git clone --depth 1 --branch v2.8.3 https://github.com/Andrea-lyz/LKM-PathMask lkms/LKM-PathMask
           patch -p1 -d lkms/LKM-PathMask < patch/lkm/pathmask_4.19_compat.patch
           CLANG_PATH="$PWD/prebuilts/clang/host/linux-x86/clang-r383902"
           CLANG_BIN="$CLANG_PATH/bin"
@@ -121,7 +119,7 @@ jobs:
             CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1 \
             M=$PWD/lkms/Kasumi/src modules
 
-      - name: Build hybridmount (hybridmount.ko, vendored from Hybrid-Mount 6.2.2-2053 vfs/src)
+      - name: Build hybridmount (hybridmount.ko, vendored from Hybrid-Mount 6.2.5-2118 vfs/src)
         continue-on-error: true
         run: |
           # vfs 后端（NoMount fork，路径重定向、零挂载条目）——仓库内置 pristine 源码；
