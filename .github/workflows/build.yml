@@ -42,8 +42,10 @@ jobs:
             # manual 变体：KSU 手动钩子集成（tiann/BakaSU guide）+ 不应用 susfs 内核侧
             patch -p1 < patch/65_ksu_manual_hook-4.19.patch
           else
-            # 新架构（susfs a8e00d3b7+）：内核侧完全自实现 selinux hide，
-            # 只依赖驱动已有的 fake_status/ksu_selinux_hide_running 等符号，无需桥接补丁
+            # 4.19 走 BakaSU 驱动自身的 selinux_hide 实现（上游 kernel-4.19 分支即如此，
+            # 内核侧 security/selinux/hooks.c、selinuxfs.c 均不改动）。
+            # 驱动通过 CONFIG_KALLSYMS_ALL 定位 write_op[]，并接管
+            # security_hook_heads 里的 selinux_setprocattr，无需内核配合。
             patch -p1 < patch/50_add_susfs_in_kernel-4.19.patch
             patch -p1 < patch/55_resukisu_susfs_abi_compat.patch
             patch -p1 < patch/60_overlayfs_casefold_relax_4.19.patch
