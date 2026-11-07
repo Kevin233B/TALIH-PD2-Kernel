@@ -33,7 +33,7 @@ jobs:
           # 仓库中不再内置 KernelSU 源码，按官方流程拉取最新 ReSukiSU（保留 .git，Kbuild 需要）
           rm -rf KernelSU drivers/kernelsu
           git checkout -- drivers/Makefile drivers/Kconfig
-          curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
+          curl -LSs "https://raw.githubusercontent.com/Baka-SU/BakaSU/main/kernel/setup.sh" | sed 's|Baka-SU/BakaSU|Kevin233B/BakaSU|' | bash -s -- 841ac1016e394b7c2892a7ca0f9ba649218fa84d
 
       - name: Apply kernel patches (${{ github.event.inputs.variant || 'susfs' }})
         run: |
